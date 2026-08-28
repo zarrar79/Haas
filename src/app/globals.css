@@ -16,8 +16,8 @@ body {
   color: var(--text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  background-image: linear-gradient(color-mix(in srgb, var(--cyan) 3%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--cyan) 3%, transparent) 1px, transparent 1px);
-  background-size: 36px 36px;
+  background-image: radial-gradient(circle at 8% 8%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 17rem), radial-gradient(circle at 96% 92%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 18rem);
+  background-attachment: fixed;
 }
 a { color: inherit; text-decoration: none; }
 ::selection { background: var(--accent); color: var(--accent-fg); }
