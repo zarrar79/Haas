@@ -32,7 +32,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    const initial: ThemeMode = stored === "light" || stored === "dark" ? stored : "dark";
+    const initial: ThemeMode = stored === "light" || stored === "dark" ? stored : "light";
     setThemeState(initial);
     applyThemeToDocument(initial);
   }, []);
