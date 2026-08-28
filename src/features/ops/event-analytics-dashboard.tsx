@@ -19,14 +19,11 @@ import type { HackathonAnalytics } from "@/features/hackathons/hackathon-api";
 import type { ScoreRow } from "@/features/ops/ops-api";
 
 const CHART_COLORS = [
-  "#2dd4bf",
-  "#38bdf8",
-  "#a78bfa",
-  "#fbbf24",
-  "#f87171",
-  "#34d399",
-  "#fb923c",
-  "#e879f9",
+  "var(--accent)",
+  "var(--cyan)",
+  "var(--warning)",
+  "var(--danger)",
+  "var(--success)",
 ];
 
 type ChartCardProps = {
