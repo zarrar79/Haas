@@ -17,6 +17,11 @@ import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
+import {
+  applySectionSearch,
+  machineRowSearchParts,
+  useSectionSearch,
+} from "@/features/search/section-search";
 import { BulkSpawnModal } from "@/features/machines/bulk-spawn-modal";
 import { MachineFormModal } from "@/features/machines/machine-form-modal";
 import {
@@ -55,8 +60,8 @@ export function EventMachinesView({ hackathonId }: Props) {
   const [rows, setRows] = useState<MachineRow[]>([]);
   const [teams, setTeams] = useState<EventTeam[]>([]);
   const [challenges, setChallenges] = useState<ChallengeSummary[]>([]);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const { search, setSearch, debouncedSearch, focusId, clearDeepSearch } =
+    useSectionSearch();
   const [teamFilter, setTeamFilter] = useState("");
   const [challengeFilter, setChallengeFilter] = useState("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
@@ -74,11 +79,6 @@ export function EventMachinesView({ hackathonId }: Props) {
   useEffect(() => {
     setActiveId(hackathonId);
   }, [hackathonId]);
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => window.clearTimeout(t);
-  }, [search]);
 
   const load = useCallback(async () => {
     if (!activeId) return;
@@ -135,14 +135,25 @@ export function EventMachinesView({ hackathonId }: Props) {
     void load();
   }, [load]);
 
+  const filteredRows = useMemo(
+    () =>
+      applySectionSearch(
+        rows,
+        debouncedSearch,
+        focusId,
+        machineRowSearchParts,
+      ),
+    [rows, debouncedSearch, focusId],
+  );
+
   const stats = useMemo(() => {
-    const active = rows.filter((r) => r.is_active && !r.is_deleted);
+    const active = filteredRows.filter((r) => r.is_active && !r.is_deleted);
     return {
-      total: rows.length,
+      total: filteredRows.length,
       active: active.length,
-      blocked: rows.filter((r) => r.blocked).length,
+      blocked: filteredRows.filter((r) => r.blocked).length,
     };
-  }, [rows]);
+  }, [filteredRows]);
 
   async function onStop(row: MachineRow) {
     setBusyId(row.id);
@@ -220,7 +231,7 @@ export function EventMachinesView({ hackathonId }: Props) {
   }
 
   function toggleSelectAll() {
-    const activeRows = rows.filter((r) => r.is_active && !r.is_deleted);
+    const activeRows = filteredRows.filter((r) => r.is_active && !r.is_deleted);
     if (selectedKeys.size === activeRows.length && activeRows.length > 0) {
       setSelectedKeys(new Set());
     } else {
@@ -264,12 +275,23 @@ export function EventMachinesView({ hackathonId }: Props) {
           <label className="flex min-w-[180px] flex-col gap-1 text-xs text-[var(--text-muted)]">
             <span className="font-medium text-[var(--text)]">Search</span>
             <input
-              className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
+              className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]/40"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Team, challenge, IP, pod…"
             />
           </label>
+          {(search.trim() || focusId) && (
+            <div className="flex items-end pb-0.5">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={clearDeepSearch}
+              >
+                Clear search
+              </Button>
+            </div>
+          )}
           <FilterSelect
             label="Team"
             value={teamFilter}
@@ -357,10 +379,14 @@ export function EventMachinesView({ hackathonId }: Props) {
       />
 
       <DataTable
-        rows={rows}
+        rows={filteredRows}
         rowKey={(r) => r.id}
         isLoading={isLoading}
-        emptyMessage="No spawned machines for this event."
+        emptyMessage={
+          debouncedSearch || focusId
+            ? "No machines match your search."
+            : "No spawned machines for this event."
+        }
         columns={[
           {
             key: "select",
@@ -369,9 +395,9 @@ export function EventMachinesView({ hackathonId }: Props) {
                 type="checkbox"
                 aria-label="Select all active machines"
                 checked={
-                  rows.filter((r) => r.is_active && !r.is_deleted).length > 0 &&
+                  filteredRows.filter((r) => r.is_active && !r.is_deleted).length > 0 &&
                   selectedKeys.size ===
-                    rows.filter((r) => r.is_active && !r.is_deleted).length
+                    filteredRows.filter((r) => r.is_active && !r.is_deleted).length
                 }
                 onChange={toggleSelectAll}
               />
@@ -405,7 +431,7 @@ export function EventMachinesView({ hackathonId }: Props) {
                   value={r.ip_address}
                   maxWidthClass="max-w-[140px]"
                 />
-                <span className="block font-mono text-[10px] text-[var(--text-muted)]">
+                <span className="block font-mono text-[10px] text-[var(--text-subtle)]">
                   {r.pod_name || r.namespace || "—"}
                 </span>
               </div>

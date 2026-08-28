@@ -264,3 +264,36 @@ export async function addTeamMember(
   );
   return unwrapHaasResult(result).data;
 }
+
+export async function removeTeamMember(
+  hackathonId: string,
+  teamId: string,
+  membershipId: string,
+) {
+  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
+    haasApiPath(
+      `hackathons/${hackathonId}/teams/${teamId}/members/${membershipId}`,
+    ),
+    { method: "DELETE" },
+  );
+  return unwrapHaasResult(result);
+}
+
+export async function updateTeamMember(
+  hackathonId: string,
+  teamId: string,
+  membershipId: string,
+  body: {
+    is_captain?: boolean;
+    is_approved?: boolean;
+    is_active?: boolean;
+  },
+) {
+  const result = await callAppApi<ApiResult<HaasForwardPayload<TeamMember>>>(
+    haasApiPath(
+      `hackathons/${hackathonId}/teams/${teamId}/members/${membershipId}`,
+    ),
+    { method: "PATCH", body },
+  );
+  return unwrapHaasResult(result).data;
+}

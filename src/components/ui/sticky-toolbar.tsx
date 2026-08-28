@@ -5,7 +5,7 @@ export const STICKY_TOOLBAR_OUTER_CLASS =
   "sticky top-0 z-20 -mx-4 border-b border-[var(--border)] bg-[var(--bg)] px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8";
 
 export const STICKY_TOOLBAR_INNER_CLASS =
-  "rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-3 shadow-sm";
+  "rounded-[var(--radius)] border border-[var(--border-strong)] bg-[var(--surface)] p-3 shadow-[var(--shadow-sm)]";
 
 /** @deprecated Use STICKY_TOOLBAR_OUTER_CLASS */
 export const STICKY_TOOLBAR_CLASS = STICKY_TOOLBAR_OUTER_CLASS;
@@ -69,7 +69,7 @@ export function FilterSelect({
     >
       <span className="font-medium text-[var(--text)]">{label}</span>
       <select
-        className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--text)]"
+        className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--input-bg)] px-2 py-2 text-sm text-[var(--text)] outline-none transition-all duration-200 focus:border-[var(--accent)]/40 focus:shadow-[var(--shadow-sm)]"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >

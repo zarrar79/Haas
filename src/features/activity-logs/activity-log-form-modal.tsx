@@ -12,14 +12,15 @@ import {
   type ActivityLog,
   type ActivityLogWriteInput,
 } from "@/features/ops/ops-api";
-import type { EventMember } from "@/features/members/member-api";
+import type { EventUser } from "@/features/users/users-api";
+import { eventUserLabel } from "@/features/users/users-api";
 
 type Props = {
   open: boolean;
   mode: "create" | "edit";
   hackathonId: string;
   row?: ActivityLog | null;
-  members: EventMember[];
+  users: EventUser[];
   onClose: () => void;
   onSaved: () => void;
 };
@@ -27,10 +28,8 @@ type Props = {
 const INPUT_CLASS =
   "rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]";
 
-function memberLabel(m: EventMember) {
-  const d = m.user_detail;
-  const name = [d?.name, d?.last_name].filter(Boolean).join(" ").trim();
-  return name || d?.username || d?.email || m.user;
+function memberLabel(m: EventUser) {
+  return eventUserLabel(m);
 }
 
 export function ActivityLogFormModal({
@@ -38,7 +37,7 @@ export function ActivityLogFormModal({
   mode,
   hackathonId,
   row,
-  members,
+  users,
   onClose,
   onSaved,
 }: Props) {
@@ -147,9 +146,9 @@ export function ActivityLogFormModal({
               onChange={(e) => setSubmittedBy(e.target.value)}
             >
               <option value="">None</option>
-              {members.map((m) => (
-                <option key={m.id} value={m.user}>
-                  {memberLabel(m)}
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {memberLabel(u)}
                 </option>
               ))}
             </select>

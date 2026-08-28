@@ -1,23 +1,17 @@
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import type { Metadata } from "next";
 
 import { AppProviders } from "@/components/providers/app-providers";
 import "./globals.css";
 
-const ibmPlexSans = IBM_Plex_Sans({
-  variable: "--font-ibm-plex-sans",
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  variable: "--font-ibm-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
-  title: "HAS",
+  title: "HAS — Hackathon Admin",
   description: "Hackathon as a Service — admin console",
 };
 
@@ -25,8 +19,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      data-theme="dark"
-      className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} h-full`}
+      data-theme="light"
+      className={`${plusJakarta.variable} h-full`}
       suppressHydrationWarning
     >
       <body className="min-h-full font-sans antialiased">

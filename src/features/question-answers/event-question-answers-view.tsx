@@ -19,6 +19,11 @@ import { listAllChallenges } from "@/features/challenges/challenge-api";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
+import {
+  applySectionSearch,
+  questionAnswerRowSearchParts,
+  useSectionSearch,
+} from "@/features/search/section-search";
 import { QuestionAnswerFormModal } from "@/features/question-answers/question-answer-form-modal";
 import {
   deleteAnswerKey,
@@ -56,8 +61,8 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
   const [rows, setRows] = useState<QuestionAnswerRow[]>([]);
   const [challenges, setChallenges] = useState<ChallengeSummary[]>([]);
   const [teams, setTeams] = useState<EventTeam[]>([]);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const { search, setSearch, debouncedSearch, focusId, clearDeepSearch } =
+    useSectionSearch();
   const [ipFilter, setIpFilter] = useState("");
   const [debouncedIp, setDebouncedIp] = useState("");
   const [challengeFilter, setChallengeFilter] = useState("");
@@ -89,11 +94,6 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
       }
     })();
   }, []);
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => window.clearTimeout(t);
-  }, [search]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedIp(ipFilter.trim()), 300);
@@ -165,19 +165,28 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
   }, [load]);
 
   const filteredRows = useMemo(() => {
-    if (validityFilter !== "pending") return rows;
-    return rows.filter(
-      (r) => r.answer_submitted == null || r.answer_submitted === "",
+    const validityFiltered =
+      validityFilter === "pending"
+        ? rows.filter(
+            (r) => r.answer_submitted == null || r.answer_submitted === "",
+          )
+        : rows;
+
+    return applySectionSearch(
+      validityFiltered,
+      debouncedSearch,
+      focusId,
+      questionAnswerRowSearchParts,
     );
-  }, [rows, validityFilter]);
+  }, [rows, validityFilter, debouncedSearch, focusId]);
 
   const selectedRows = useMemo(
     () => filteredRows.filter((r) => selectedKeys.has(r.id)),
     [filteredRows, selectedKeys],
   );
 
-  const dynamicCount = rows.filter((r) => r.is_dynamic).length;
-  const staticCount = rows.length - dynamicCount;
+  const dynamicCount = filteredRows.filter((r) => r.is_dynamic).length;
+  const staticCount = filteredRows.length - dynamicCount;
 
   function rowScope(row: QuestionAnswerRow) {
     return resolveAnswerHackathonScope(row, activeId, isAllScope);
@@ -356,6 +365,14 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
           />
         </label>
 
+        {(search.trim() || focusId) && (
+          <div className="flex items-end pb-0.5">
+            <Button size="sm" variant="secondary" onClick={clearDeepSearch}>
+              Clear search
+            </Button>
+          </div>
+        )}
+
         <FilterSelect
           label="Challenge"
           value={challengeFilter}
@@ -440,7 +457,11 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
         selectable
         selectedKeys={selectedKeys}
         onSelectionChange={setSelectedKeys}
-        emptyMessage="No question answers match your filters."
+        emptyMessage={
+          debouncedSearch || focusId
+            ? "No question answers match your search."
+            : "No question answers match your filters."
+        }
         columns={[
           ...(isAllScope
             ? [

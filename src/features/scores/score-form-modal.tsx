@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/text-field";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
 import { listChallengeQuestions } from "@/features/challenges/challenge-api";
-import type { EventMember } from "@/features/members/member-api";
+import type { EventUser } from "@/features/users/users-api";
+import { eventUserLabel } from "@/features/users/users-api";
 import {
   createScore,
   updateScore,
@@ -23,7 +24,7 @@ type Props = {
   row?: ScoreRow | null;
   teams: EventTeam[];
   challenges: ChallengeSummary[];
-  members: EventMember[];
+  users: EventUser[];
   onClose: () => void;
   onSaved: () => void;
 };
@@ -38,7 +39,7 @@ export function ScoreFormModal({
   row,
   teams,
   challenges,
-  members,
+  users,
   onClose,
   onSaved,
 }: Props) {
@@ -113,10 +114,8 @@ export function ScoreFormModal({
     };
   }, [open, challengeId, hackathonId]);
 
-  function memberLabel(m: EventMember) {
-    const d = m.user_detail;
-    const name = [d?.name, d?.last_name].filter(Boolean).join(" ").trim();
-    return name || d?.username || d?.email || m.user;
+  function userOptionLabel(u: EventUser) {
+    return eventUserLabel(u);
   }
 
   async function submit() {
@@ -198,9 +197,9 @@ export function ScoreFormModal({
                 onChange={(e) => setUserId(e.target.value)}
               >
                 <option value="">None</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.user}>
-                    {memberLabel(m)}
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {userOptionLabel(u)}
                   </option>
                 ))}
               </select>

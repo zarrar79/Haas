@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -10,39 +11,35 @@ import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { TextField } from "@/components/ui/text-field";
+import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
 import {
-  addMember,
-  blockMember,
-  createEventUser,
-  listMembers,
-  removeMember,
-  unblockMember,
-  type EventMember,
-} from "@/features/members/member-api";
+  blockEventUser,
+  deleteEventUser,
+  eventUserDetailPath,
+  eventUserLabel,
+  listEventUsers,
+  unblockEventUser,
+  type EventUser,
+} from "@/features/users/users-api";
+import { UserFormModal } from "@/features/users/user-form-modal";
 import { ApiRequestError } from "@/lib/client-api";
 
 type Props = { hackathonId: string };
 
 export function EventMembersView({ hackathonId }: Props) {
   const router = useRouter();
+  const { canMutateEvent } = useHaasAccess();
   const [activeId, setActiveId] = useState(hackathonId);
-  const [rows, setRows] = useState<EventMember[]>([]);
+  const [rows, setRows] = useState<EventUser[]>([]);
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [userId, setUserId] = useState("");
-  const [playerLabel, setPlayerLabel] = useState("");
-  const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    email: "",
-    username: "",
-    password: "",
-    name: "",
-    last_name: "",
-    player_label: "",
-  });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<EventUser | null>(null);
+
+  const canWrite = canMutateEvent(activeId);
 
   useEffect(() => {
     setActiveId(hackathonId);
@@ -54,7 +51,7 @@ export function EventMembersView({ hackathonId }: Props) {
     setError(null);
     try {
       setRows(
-        await listMembers(activeId, {
+        await listEventUsers(activeId, {
           search: search.trim() || undefined,
         }),
       );
@@ -63,7 +60,7 @@ export function EventMembersView({ hackathonId }: Props) {
         router.replace("/login");
         return;
       }
-      setError(err instanceof Error ? err.message : "Failed to load members");
+      setError(err instanceof Error ? err.message : "Failed to load users");
     } finally {
       setIsLoading(false);
     }
@@ -73,53 +70,12 @@ export function EventMembersView({ hackathonId }: Props) {
     void load();
   }, [load]);
 
-  async function onAdd() {
-    if (!userId.trim()) return;
-    setBusyId("add");
-    setError(null);
-    try {
-      await addMember(activeId, {
-        user: userId.trim(),
-        player_label: playerLabel.trim() || undefined,
-      });
-      setUserId("");
-      setPlayerLabel("");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add member");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function onCreateUser() {
-    setBusyId("create");
-    setError(null);
-    try {
-      await createEventUser(activeId, createForm);
-      setShowCreate(false);
-      setCreateForm({
-        email: "",
-        username: "",
-        password: "",
-        name: "",
-        last_name: "",
-        player_label: "",
-      });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create user");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function onBlock(row: EventMember) {
+  async function onBlock(row: EventUser) {
     const reason = window.prompt("Block reason", "Blocked in HAS admin");
     if (reason == null) return;
     setBusyId(row.id);
     try {
-      await blockMember(activeId, row.id, reason);
+      await blockEventUser(activeId, row.id, reason);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to block");
@@ -128,10 +84,10 @@ export function EventMembersView({ hackathonId }: Props) {
     }
   }
 
-  async function onUnblock(row: EventMember) {
+  async function onUnblock(row: EventUser) {
     setBusyId(row.id);
     try {
-      await unblockMember(activeId, row.id);
+      await unblockEventUser(activeId, row.id);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to unblock");
@@ -140,11 +96,11 @@ export function EventMembersView({ hackathonId }: Props) {
     }
   }
 
-  async function onRemove(row: EventMember) {
-    if (!window.confirm("Remove this member from the event?")) return;
+  async function onRemove(row: EventUser) {
+    if (!window.confirm("Deactivate this user (soft delete)?")) return;
     setBusyId(row.id);
     try {
-      await removeMember(activeId, row.id);
+      await deleteEventUser(activeId, row.id);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove");
@@ -157,103 +113,47 @@ export function EventMembersView({ hackathonId }: Props) {
     <div className="w-full">
       <PageHeader
         eyebrow="Event workspace"
-        title="Members"
-        description="Users attached to this hackathon. Event-level block only."
+        title="Users"
+        description="Hackathon-scoped user CRUD — list, create, update, block, and deactivate."
         actions={
           <>
             <Button variant="secondary" onClick={() => void load()}>
               Refresh
             </Button>
-            <Button variant="secondary" onClick={() => setShowCreate((v) => !v)}>
-              {showCreate ? "Hide create" : "Create user"}
-            </Button>
+            {canWrite ? (
+              <Button
+                onClick={() => {
+                  setEditingRow(null);
+                  setModalOpen(true);
+                }}
+              >
+                Create user
+              </Button>
+            ) : null}
           </>
         }
       />
 
       <StickyToolbar layout="stack">
         <div className="grid gap-3 sm:grid-cols-3">
-        <HackathonPicker
-          value={activeId}
-          onChange={setActiveId}
-          section="members"
-        />
-        <TextField
-          label="Search"
-          name="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Name, email…"
-        />
-        <div className="flex items-end">
-          <Button className="w-full" variant="secondary" onClick={() => void load()}>
-            Apply
-          </Button>
-        </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-        <TextField
-          label="Add existing user (UUID)"
-          name="user"
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-        />
-        <TextField
-          label="Player label"
-          name="player_label"
-          value={playerLabel}
-          onChange={(e) => setPlayerLabel(e.target.value)}
-        />
-        <div className="flex items-end">
-          <Button
-            className="w-full"
-            disabled={busyId === "add" || !userId.trim()}
-            onClick={() => void onAdd()}
-          >
-            Add member
-          </Button>
-        </div>
-        </div>
-
-      {showCreate ? (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {(
-            [
-              ["email", "Email"],
-              ["username", "Username"],
-              ["password", "Password"],
-              ["name", "First name"],
-              ["last_name", "Last name"],
-              ["player_label", "Player label"],
-            ] as const
-          ).map(([key, label]) => (
-            <TextField
-              key={key}
-              label={label}
-              name={key}
-              type={key === "password" ? "password" : "text"}
-              value={createForm[key]}
-              onChange={(e) =>
-                setCreateForm((prev) => ({ ...prev, [key]: e.target.value }))
-              }
-            />
-          ))}
-          <div className="flex items-end sm:col-span-3">
-            <Button
-              disabled={
-                busyId === "create" ||
-                !createForm.email ||
-                !createForm.username ||
-                !createForm.password
-              }
-              onClick={() => void onCreateUser()}
-            >
-              Create & attach
+          <HackathonPicker
+            value={activeId}
+            onChange={setActiveId}
+            section="members"
+          />
+          <TextField
+            label="Search"
+            name="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Name, email, username…"
+          />
+          <div className="flex items-end">
+            <Button className="w-full" variant="secondary" onClick={() => void load()}>
+              Apply
             </Button>
           </div>
         </div>
-      ) : null}
       </StickyToolbar>
 
       {error ? (
@@ -266,34 +166,38 @@ export function EventMembersView({ hackathonId }: Props) {
         isLoading={isLoading}
         rows={rows}
         rowKey={(r) => r.id}
-        emptyMessage="No members for this event."
+        emptyMessage="No users for this event."
         columns={[
           {
             key: "user",
             header: "User",
             render: (row) => (
               <div>
-                <div className="font-medium">
-                  {row.user_detail?.name ||
-                    row.user_detail?.username ||
-                    row.user}
-                </div>
+                <Link
+                  href={eventUserDetailPath(activeId, row.id)}
+                  className="font-medium text-[var(--accent)] hover:underline"
+                >
+                  {eventUserLabel(row)}
+                </Link>
                 <div className="text-xs text-[var(--text-muted)]">
-                  {row.user_detail?.email || row.user}
+                  {row.email || row.username}
                 </div>
               </div>
             ),
           },
           {
-            key: "label",
-            header: "Label",
-            render: (row) => row.player_label || "—",
+            key: "teams",
+            header: "Teams",
+            render: (row) =>
+              row.teams?.length
+                ? row.teams.map((t) => t.name || t.id).join(", ")
+                : "—",
           },
           {
             key: "status",
             header: "Status",
             render: (row) =>
-              row.is_blocked ? (
+              row.is_block ? (
                 <Badge tone="danger">Blocked</Badge>
               ) : row.is_active === false ? (
                 <Badge>Inactive</Badge>
@@ -305,39 +209,77 @@ export function EventMembersView({ hackathonId }: Props) {
             key: "actions",
             header: "",
             className: "text-right",
-            render: (row) => (
-              <div className="flex flex-wrap justify-end gap-2">
-                {row.is_blocked ? (
+            render: (row) =>
+              canWrite ? (
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Link
+                    href={eventUserDetailPath(activeId, row.id)}
+                    className="inline-flex items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--surface-raised)] px-3 py-2 text-xs font-semibold text-[var(--text)] shadow-[var(--shadow-sm)] hover:bg-[var(--surface-hover)]"
+                  >
+                    View
+                  </Link>
                   <Button
                     size="sm"
                     variant="secondary"
                     disabled={busyId === row.id}
-                    onClick={() => void onUnblock(row)}
+                    onClick={() => {
+                      setEditingRow(row);
+                      setModalOpen(true);
+                    }}
                   >
-                    Unblock
+                    Edit
                   </Button>
-                ) : (
+                  {row.is_block ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busyId === row.id}
+                      onClick={() => void onUnblock(row)}
+                    >
+                      Unblock
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busyId === row.id}
+                      onClick={() => void onBlock(row)}
+                    >
+                      Block
+                    </Button>
+                  )}
                   <Button
                     size="sm"
-                    variant="secondary"
+                    variant="ghost"
                     disabled={busyId === row.id}
-                    onClick={() => void onBlock(row)}
+                    onClick={() => void onRemove(row)}
                   >
-                    Block
+                    Deactivate
                   </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busyId === row.id}
-                  onClick={() => void onRemove(row)}
+                </div>
+              ) : (
+                <Link
+                  href={eventUserDetailPath(activeId, row.id)}
+                  className="inline-flex items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--surface-raised)] px-3 py-2 text-xs font-semibold text-[var(--text)] shadow-[var(--shadow-sm)] hover:bg-[var(--surface-hover)]"
                 >
-                  Remove
-                </Button>
-              </div>
-            ),
+                  View
+                </Link>
+              ),
           },
         ]}
+      />
+
+      <UserFormModal
+        open={modalOpen}
+        mode={editingRow ? "edit" : "create"}
+        hackathonId={activeId}
+        userId={editingRow?.id}
+        row={editingRow}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingRow(null);
+        }}
+        onSaved={() => void load()}
       />
     </div>
   );

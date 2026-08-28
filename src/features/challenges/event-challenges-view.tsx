@@ -35,6 +35,11 @@ import {
   type CatalogItem,
 } from "@/features/catalog/catalog-api";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
+import {
+  applySectionSearch,
+  challengeRowSearchParts,
+  useSectionSearch,
+} from "@/features/search/section-search";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
 import { ApiRequestError } from "@/lib/client-api";
 import type { Hackathon } from "@/types/hackathon";
@@ -140,7 +145,8 @@ export function EventChallengesView({
   const isAllScope = activeId === ALL_HACKATHONS || !activeId;
 
   const [rows, setRows] = useState<Row[]>([]);
-  const [search, setSearch] = useState("");
+  const { search, setSearch, debouncedSearch, focusId, clearDeepSearch } =
+    useSectionSearch();
   const [membership, setMembership] = useState<MembershipFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [difficultyFilter, setDifficultyFilter] = useState("");
@@ -162,16 +168,8 @@ export function EventChallengesView({
   const [detailChallengeId, setDetailChallengeId] = useState<string | null>(
     null,
   );
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setDebouncedSearch(search.trim());
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [search]);
 
   useEffect(() => {
     if (hackathonIdProp) {
@@ -348,7 +346,7 @@ export function EventChallengesView({
   }, [load]);
 
   const filtered = useMemo(() => {
-    return rows.filter((row) => {
+    const base = rows.filter((row) => {
       if (!isAllScope) {
         if (membership === "added" && !row.isAdded) return false;
         if (membership === "not_added" && row.isAdded) return false;
@@ -376,6 +374,14 @@ export function EventChallengesView({
 
       return true;
     });
+
+    return applySectionSearch(
+      base,
+      debouncedSearch,
+      focusId,
+      challengeRowSearchParts,
+      (row) => row.challengeId,
+    );
   }, [
     rows,
     membership,
@@ -385,10 +391,12 @@ export function EventChallengesView({
     vmFilter,
     dynamicFilter,
     isAllScope,
+    debouncedSearch,
+    focusId,
   ]);
 
   function clearFilters() {
-    setSearch("");
+    clearDeepSearch();
     setMembership("all");
     setCategoryFilter("");
     setDifficultyFilter("");
@@ -653,6 +661,7 @@ export function EventChallengesView({
 
   const hasActiveFilters =
     Boolean(search.trim()) ||
+    Boolean(focusId) ||
     membership !== "all" ||
     Boolean(categoryFilter) ||
     Boolean(difficultyFilter) ||
@@ -799,6 +808,13 @@ export function EventChallengesView({
             <strong className="text-[var(--warning)]">{notAddedCount}</strong>
           </span>
         ) : null}
+        {(debouncedSearch || focusId) && (
+          <span className="text-[var(--accent)]">
+            {focusId
+              ? "Showing selected result from deep search"
+              : `Matching “${debouncedSearch}”`}
+          </span>
+        )}
       </div>
 
       <ChallengeCreateModal

@@ -12,8 +12,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { ActivityLogFormModal } from "@/features/activity-logs/activity-log-form-modal";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
-import { listMembers } from "@/features/members/member-api";
-import type { EventMember } from "@/features/members/member-api";
+import { listEventUsers, eventUserLabel, type EventUser } from "@/features/users/users-api";
+import { useHaasAccess } from "@/features/auth/haas-access-context";
 import {
   ACTIVITY_LOG_TYPES,
   deleteActivityLog,
@@ -66,9 +66,10 @@ function typeBadge(type?: string) {
 
 export function EventActivityLogsView({ hackathonId }: Props) {
   const router = useRouter();
+  const { canMutateEvent } = useHaasAccess();
   const [activeId, setActiveId] = useState(hackathonId);
   const [rows, setRows] = useState<ActivityLog[]>([]);
-  const [members, setMembers] = useState<EventMember[]>([]);
+  const [users, setUsers] = useState<EventUser[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -82,6 +83,8 @@ export function EventActivityLogsView({ hackathonId }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<ActivityLog | null>(null);
+
+  const canWrite = canMutateEvent(activeId);
 
   useEffect(() => {
     setActiveId(hackathonId);
@@ -102,7 +105,7 @@ export function EventActivityLogsView({ hackathonId }: Props) {
     setIsLoading(true);
     setError(null);
     try {
-      const [logList, memberList] = await Promise.all([
+      const [logList, userList] = await Promise.all([
         listActivityLogs(activeId, {
           search: debouncedSearch || undefined,
           type: typeFilter || undefined,
@@ -116,10 +119,10 @@ export function EventActivityLogsView({ hackathonId }: Props) {
             : undefined,
           ordering: "-date_time",
         }),
-        listMembers(activeId),
+        listEventUsers(activeId),
       ]);
       setRows(logList);
-      setMembers(memberList);
+      setUsers(userList);
     } catch (err) {
       if (err instanceof ApiRequestError && err.httpStatus === 401) {
         router.replace("/login");
@@ -168,14 +171,16 @@ export function EventActivityLogsView({ hackathonId }: Props) {
             <Button variant="secondary" onClick={() => void load()}>
               Refresh
             </Button>
-            <Button
-              onClick={() => {
-                setEditingRow(null);
-                setModalOpen(true);
-              }}
-            >
-              Record log
-            </Button>
+            {canWrite ? (
+              <Button
+                onClick={() => {
+                  setEditingRow(null);
+                  setModalOpen(true);
+                }}
+              >
+                Record log
+              </Button>
+            ) : null}
           </>
         }
       />
@@ -214,18 +219,11 @@ export function EventActivityLogsView({ hackathonId }: Props) {
             onChange={setUserFilter}
           >
             <option value="">All users</option>
-            {members.map((m) => {
-              const d = m.user_detail;
-              const name = [d?.name, d?.last_name]
-                .filter(Boolean)
-                .join(" ")
-                .trim();
-              return (
-                <option key={m.id} value={m.user}>
-                  {name || d?.username || d?.email || m.user}
-                </option>
-              );
-            })}
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {eventUserLabel(u)}
+              </option>
+            ))}
           </FilterSelect>
           <label className="flex min-w-[140px] flex-col gap-1 text-xs text-[var(--text-muted)]">
             <span className="font-medium text-[var(--text)]">IP</span>
@@ -311,29 +309,32 @@ export function EventActivityLogsView({ hackathonId }: Props) {
             key: "actions",
             header: "",
             className: "text-right",
-            render: (r) => (
-              <div className="flex flex-wrap justify-end gap-1">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busyId === String(r.id)}
-                  onClick={() => {
-                    setEditingRow(r);
-                    setModalOpen(true);
-                  }}
-                >
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busyId === String(r.id)}
-                  onClick={() => void onDelete(r)}
-                >
-                  Delete
-                </Button>
-              </div>
-            ),
+            render: (r) =>
+              canWrite ? (
+                <div className="flex flex-wrap justify-end gap-1">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busyId === String(r.id)}
+                    onClick={() => {
+                      setEditingRow(r);
+                      setModalOpen(true);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busyId === String(r.id)}
+                    onClick={() => void onDelete(r)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              ) : (
+                <span className="text-xs text-[var(--text-muted)]">—</span>
+              ),
           },
         ]}
       />
@@ -343,7 +344,7 @@ export function EventActivityLogsView({ hackathonId }: Props) {
         mode={editingRow ? "edit" : "create"}
         hackathonId={activeId}
         row={editingRow}
-        members={members}
+        users={users}
         onClose={() => {
           setModalOpen(false);
           setEditingRow(null);

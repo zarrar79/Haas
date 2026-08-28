@@ -10,19 +10,18 @@ import { CopyableText } from "@/components/ui/copyable-text";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
-import { listMembers } from "@/features/members/member-api";
-import type { EventMember } from "@/features/members/member-api";
 import {
+  deleteScore,
   listScores,
-  restoreScore,
-  softDeleteScore,
   type ScoreRow,
 } from "@/features/ops/ops-api";
 import { ScoreFormModal } from "@/features/scores/score-form-modal";
 import { listTeams, type EventTeam } from "@/features/teams/team-api";
+import { listEventUsers, type EventUser } from "@/features/users/users-api";
 import { ApiRequestError } from "@/lib/client-api";
 
 type Props = { hackathonId: string };
@@ -45,22 +44,24 @@ function userLabel(row: ScoreRow) {
 
 export function EventTeamScoresView({ hackathonId }: Props) {
   const router = useRouter();
+  const { canMutateEvent } = useHaasAccess();
   const [activeId, setActiveId] = useState(hackathonId);
   const [rows, setRows] = useState<ScoreRow[]>([]);
   const [teams, setTeams] = useState<EventTeam[]>([]);
   const [challenges, setChallenges] = useState<ChallengeSummary[]>([]);
-  const [members, setMembers] = useState<EventMember[]>([]);
+  const [users, setUsers] = useState<EventUser[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState("");
   const [challengeFilter, setChallengeFilter] = useState("");
   const [validityFilter, setValidityFilter] = useState<ValidityFilter>("all");
-  const [showDeleted, setShowDeleted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<ScoreRow | null>(null);
+
+  const canWrite = canMutateEvent(activeId);
 
   useEffect(() => {
     setActiveId(hackathonId);
@@ -76,7 +77,7 @@ export function EventTeamScoresView({ hackathonId }: Props) {
     setIsLoading(true);
     setError(null);
     try {
-      const [scoreList, teamList, challengeList, memberList] = await Promise.all([
+      const [scoreList, teamList, challengeList, userList] = await Promise.all([
         listScores(activeId, {
           search: debouncedSearch || undefined,
           team: teamFilter || undefined,
@@ -87,16 +88,15 @@ export function EventTeamScoresView({ hackathonId }: Props) {
               : validityFilter === "incorrect"
                 ? "false"
                 : undefined,
-          show_deleted: showDeleted ? "true" : "false",
         }),
         listTeams(activeId, { limit: "200" }),
         listChallengeAdmin(activeId),
-        listMembers(activeId),
+        listEventUsers(activeId),
       ]);
       setRows(scoreList);
       setTeams(teamList);
       setChallenges(challengeList);
-      setMembers(memberList);
+      setUsers(userList);
     } catch (err) {
       if (err instanceof ApiRequestError && err.httpStatus === 401) {
         router.replace("/login");
@@ -111,7 +111,6 @@ export function EventTeamScoresView({ hackathonId }: Props) {
     challengeFilter,
     debouncedSearch,
     router,
-    showDeleted,
     teamFilter,
     validityFilter,
   ]);
@@ -121,33 +120,20 @@ export function EventTeamScoresView({ hackathonId }: Props) {
   }, [load]);
 
   const totals = useMemo(() => {
-    const active = rows.filter((r) => !r.is_soft_deleted);
     return {
-      count: active.length,
-      points: active.reduce((sum, r) => sum + (r.score ?? 0), 0),
+      count: rows.length,
+      points: rows.reduce((sum, r) => sum + (r.score ?? 0), 0),
     };
   }, [rows]);
 
-  async function onSoftDelete(row: ScoreRow) {
-    if (!window.confirm("Soft-delete this score entry?")) return;
+  async function onDelete(row: ScoreRow) {
+    if (!window.confirm("Delete this score entry permanently?")) return;
     setBusyId(row.id);
     try {
-      await softDeleteScore(activeId, row.id);
+      await deleteScore(activeId, row.id);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function onRestore(row: ScoreRow) {
-    setBusyId(row.id);
-    try {
-      await restoreScore(activeId, row.id);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Restore failed");
     } finally {
       setBusyId(null);
     }
@@ -164,14 +150,16 @@ export function EventTeamScoresView({ hackathonId }: Props) {
             <Button variant="secondary" onClick={() => void load()}>
               Refresh
             </Button>
-            <Button
-              onClick={() => {
-                setEditingRow(null);
-                setModalOpen(true);
-              }}
-            >
-              Record score
-            </Button>
+            {canWrite ? (
+              <Button
+                onClick={() => {
+                  setEditingRow(null);
+                  setModalOpen(true);
+                }}
+              >
+                Record score
+              </Button>
+            ) : null}
           </>
         }
       />
@@ -225,14 +213,6 @@ export function EventTeamScoresView({ hackathonId }: Props) {
             <option value="correct">Correct</option>
             <option value="incorrect">Incorrect</option>
           </FilterSelect>
-          <label className="flex items-center gap-2 pb-2 text-sm text-[var(--text)]">
-            <input
-              type="checkbox"
-              checked={showDeleted}
-              onChange={(e) => setShowDeleted(e.target.checked)}
-            />
-            Show deleted
-          </label>
         </div>
         <p className="text-xs text-[var(--text-muted)]">
           {totals.count} entries · {totals.points} total points
@@ -307,16 +287,6 @@ export function EventTeamScoresView({ hackathonId }: Props) {
             ),
           },
           {
-            key: "status",
-            header: "Status",
-            render: (r) =>
-              r.is_soft_deleted ? (
-                <Badge tone="warning">Deleted</Badge>
-              ) : (
-                <Badge tone="success">Active</Badge>
-              ),
-          },
-          {
             key: "when",
             header: "Created",
             render: (r) => (
@@ -329,40 +299,32 @@ export function EventTeamScoresView({ hackathonId }: Props) {
             key: "actions",
             header: "",
             className: "text-right",
-            render: (r) => (
-              <div className="flex flex-wrap justify-end gap-1">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busyId === r.id || r.is_soft_deleted}
-                  onClick={() => {
-                    setEditingRow(r);
-                    setModalOpen(true);
-                  }}
-                >
-                  Edit
-                </Button>
-                {r.is_soft_deleted ? (
+            render: (r) =>
+              canWrite ? (
+                <div className="flex flex-wrap justify-end gap-1">
                   <Button
                     size="sm"
                     variant="secondary"
                     disabled={busyId === r.id}
-                    onClick={() => void onRestore(r)}
+                    onClick={() => {
+                      setEditingRow(r);
+                      setModalOpen(true);
+                    }}
                   >
-                    Restore
+                    Edit
                   </Button>
-                ) : (
                   <Button
                     size="sm"
                     variant="ghost"
                     disabled={busyId === r.id}
-                    onClick={() => void onSoftDelete(r)}
+                    onClick={() => void onDelete(r)}
                   >
                     Delete
                   </Button>
-                )}
-              </div>
-            ),
+                </div>
+              ) : (
+                <span className="text-xs text-[var(--text-muted)]">—</span>
+              ),
           },
         ]}
       />
@@ -374,7 +336,7 @@ export function EventTeamScoresView({ hackathonId }: Props) {
         row={editingRow}
         teams={teams}
         challenges={challenges}
-        members={members}
+        users={users}
         onClose={() => {
           setModalOpen(false);
           setEditingRow(null);

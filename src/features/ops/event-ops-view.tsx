@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { TextField } from "@/components/ui/text-field";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
+import { useHaasAccess } from "@/features/auth/haas-access-context";
 import type { HackathonAnalytics } from "@/features/hackathons/hackathon-api";
 import {
   downloadAnalyticsExport,
@@ -32,6 +33,7 @@ type Props = { hackathonId: string };
 
 export function EventOpsView({ hackathonId }: Props) {
   const router = useRouter();
+  const { canMutateEvent } = useHaasAccess();
   const [activeId, setActiveId] = useState(hackathonId);
   const [tab, setTab] = useState<Tab>("overview");
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +45,8 @@ export function EventOpsView({ hackathonId }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notifTitle, setNotifTitle] = useState("");
   const [notifMessage, setNotifMessage] = useState("");
+
+  const canWrite = canMutateEvent(activeId);
 
   useEffect(() => {
     setActiveId(hackathonId);
@@ -165,28 +169,34 @@ export function EventOpsView({ hackathonId }: Props) {
 
       {!isLoading && tab === "notifications" ? (
         <div className="space-y-4">
-          <div className="grid gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-2">
-            <TextField
-              label="Title"
-              name="title"
-              value={notifTitle}
-              onChange={(e) => setNotifTitle(e.target.value)}
-            />
-            <TextField
-              label="Message"
-              name="message"
-              value={notifMessage}
-              onChange={(e) => setNotifMessage(e.target.value)}
-            />
-            <div className="sm:col-span-2">
-              <Button
-                disabled={busyId === "notif"}
-                onClick={() => void onSendNotification()}
-              >
-                Send notification
-              </Button>
+          {canWrite ? (
+            <div className="grid gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-2">
+              <TextField
+                label="Title"
+                name="title"
+                value={notifTitle}
+                onChange={(e) => setNotifTitle(e.target.value)}
+              />
+              <TextField
+                label="Message"
+                name="message"
+                value={notifMessage}
+                onChange={(e) => setNotifMessage(e.target.value)}
+              />
+              <div className="sm:col-span-2">
+                <Button
+                  disabled={busyId === "notif"}
+                  onClick={() => void onSendNotification()}
+                >
+                  Send notification
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <p className="text-sm text-[var(--text-muted)]">
+              You have read-only access to notifications for this event.
+            </p>
+          )}
           <DataTable
             rows={notifications}
             rowKey={(r) => r.id}

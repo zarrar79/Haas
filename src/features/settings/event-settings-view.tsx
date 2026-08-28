@@ -7,15 +7,17 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageLoader } from "@/components/ui/loader";
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { TextField } from "@/components/ui/text-field";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
+import { useHaasAccess } from "@/features/auth/haas-access-context";
 import {
-  grantRole,
-  listRoles,
-  revokeRole,
-  type RoleBinding,
-} from "@/features/roles/role-api";
+  assignHackathonAdmin,
+  listHackathonAdmins,
+  revokeHackathonAdmin,
+  type HackathonAdminBinding,
+} from "@/features/hackathon-admins/hackathon-admin-api";
 import {
   getModules,
   getPlaying,
@@ -38,7 +40,7 @@ import {
 } from "@/features/challenges/challenge-admin-api";
 import { ApiRequestError } from "@/lib/client-api";
 
-type Tab = "settings" | "modules" | "rules" | "playing" | "roles";
+type Tab = "settings" | "modules" | "rules" | "playing" | "admins";
 
 type Props = { hackathonId: string };
 
@@ -57,6 +59,7 @@ const MANAGER_SETTING_KEYS = [
 
 export function EventSettingsView({ hackathonId }: Props) {
   const router = useRouter();
+  const { canMutateEvent, isRoot } = useHaasAccess();
   const [activeId, setActiveId] = useState(hackathonId);
   const [tab, setTab] = useState<Tab>("settings");
   const [error, setError] = useState<string | null>(null);
@@ -66,12 +69,14 @@ export function EventSettingsView({ hackathonId }: Props) {
   const [modules, setModules] = useState<EventModules>({});
   const [rules, setRules] = useState<UserRules>({});
   const [playing, setPlaying] = useState<PlayingState>({});
-  const [roles, setRoles] = useState<RoleBinding[]>([]);
-  const [roleUser, setRoleUser] = useState("");
-  const [roleName, setRoleName] = useState("hackathon.manager");
+  const [admins, setAdmins] = useState<HackathonAdminBinding[]>([]);
+  const [adminUser, setAdminUser] = useState("");
+  const [adminNotes, setAdminNotes] = useState("");
   const [settingsJson, setSettingsJson] = useState("{}");
   const [rosterChallengeId, setRosterChallengeId] = useState("");
   const [rosterTeamId, setRosterTeamId] = useState("");
+
+  const canWrite = canMutateEvent(activeId);
 
   useEffect(() => {
     setActiveId(hackathonId);
@@ -82,19 +87,22 @@ export function EventSettingsView({ hackathonId }: Props) {
     setIsLoading(true);
     setError(null);
     try {
-      const [s, m, r, p, roleRows] = await Promise.all([
+      const adminPromise = isRoot
+        ? listHackathonAdmins({ hackathon: activeId })
+        : Promise.resolve([] as HackathonAdminBinding[]);
+      const [s, m, r, p, adminRows] = await Promise.all([
         getSettings(activeId),
         getModules(activeId),
         getUserRules(activeId),
         getPlaying(activeId),
-        listRoles(activeId),
+        adminPromise,
       ]);
       setSettings(s || {});
       setSettingsJson(JSON.stringify(s || {}, null, 2));
       setModules(m || {});
       setRules(r || {});
       setPlaying(p || {});
-      setRoles(roleRows);
+      setAdmins(adminRows);
     } catch (err) {
       if (err instanceof ApiRequestError && err.httpStatus === 401) {
         router.replace("/login");
@@ -104,7 +112,7 @@ export function EventSettingsView({ hackathonId }: Props) {
     } finally {
       setIsLoading(false);
     }
-  }, [activeId, router]);
+  }, [activeId, isRoot, router]);
 
   useEffect(() => {
     void load();
@@ -159,26 +167,35 @@ export function EventSettingsView({ hackathonId }: Props) {
     }
   }
 
-  async function onGrantRole() {
-    if (!roleUser.trim()) return;
+  async function onAssignAdmin() {
+    if (!adminUser.trim()) return;
     setError(null);
     try {
-      await grantRole(activeId, { user: roleUser.trim(), role: roleName });
-      setRoleUser("");
+      await assignHackathonAdmin({
+        user: adminUser.trim(),
+        hackathon: activeId,
+        notes: adminNotes.trim() || undefined,
+      });
+      setAdminUser("");
+      setAdminNotes("");
       await load();
-      setInfo("Role granted.");
+      setInfo("Hackathon admin assigned.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to grant role");
+      setError(
+        err instanceof Error ? err.message : "Failed to assign hackathon admin",
+      );
     }
   }
 
-  async function onRevoke(bindingId: string) {
-    if (!window.confirm("Revoke this role binding?")) return;
+  async function onRevokeAdmin(bindingId: string) {
+    if (!window.confirm("Revoke this hackathon admin binding?")) return;
     try {
-      await revokeRole(activeId, bindingId);
+      await revokeHackathonAdmin(bindingId);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to revoke");
+      setError(
+        err instanceof Error ? err.message : "Failed to revoke hackathon admin",
+      );
     }
   }
 
@@ -187,7 +204,7 @@ export function EventSettingsView({ hackathonId }: Props) {
     { id: "modules", label: "Modules" },
     { id: "rules", label: "User rules" },
     { id: "playing", label: "Playing" },
-    { id: "roles", label: "Roles" },
+    ...(isRoot ? [{ id: "admins" as const, label: "Hackathon admins" }] : []),
   ];
 
   return (
@@ -195,7 +212,7 @@ export function EventSettingsView({ hackathonId }: Props) {
       <PageHeader
         eyebrow="Event workspace"
         title="Settings"
-        description="Event settings, modules, user rules, live playing flags, and staff roles."
+        description="Event settings, modules, user rules, and live playing flags."
         actions={
           <Button variant="secondary" onClick={() => void load()}>
             Refresh
@@ -235,9 +252,7 @@ export function EventSettingsView({ hackathonId }: Props) {
         </div>
       ) : null}
 
-      {isLoading ? (
-        <p className="text-sm text-[var(--text-muted)]">Loading…</p>
-      ) : null}
+      {isLoading ? <PageLoader label="Loading settings…" /> : null}
 
       {!isLoading && tab === "settings" ? (
         <div className="space-y-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4">
@@ -251,7 +266,9 @@ export function EventSettingsView({ hackathonId }: Props) {
             value={settingsJson}
             onChange={(e) => setSettingsJson(e.target.value)}
           />
-          <Button onClick={() => void saveSettings()}>Save settings</Button>
+          <Button onClick={() => void saveSettings()} disabled={!canWrite}>
+            Save settings
+          </Button>
           <pre className="overflow-auto rounded-[var(--radius-sm)] bg-[var(--bg)] p-3 text-[10px] text-[var(--text-muted)]">
             {JSON.stringify(settings, null, 2)}
           </pre>
@@ -282,7 +299,9 @@ export function EventSettingsView({ hackathonId }: Props) {
               {label}
             </label>
           ))}
-          <Button onClick={() => void saveModules()}>Save modules</Button>
+          <Button onClick={() => void saveModules()} disabled={!canWrite}>
+            Save modules
+          </Button>
         </div>
       ) : null}
 
@@ -336,7 +355,9 @@ export function EventSettingsView({ hackathonId }: Props) {
             Force password policy
           </label>
           <div className="sm:col-span-2">
-            <Button onClick={() => void saveRules()}>Save user rules</Button>
+            <Button onClick={() => void saveRules()} disabled={!canWrite}>
+              Save user rules
+            </Button>
           </div>
         </div>
       ) : null}
@@ -363,7 +384,9 @@ export function EventSettingsView({ hackathonId }: Props) {
             />
             Playing active (`is_active`)
           </label>
-          <Button onClick={() => void savePlaying()}>Save playing</Button>
+          <Button onClick={() => void savePlaying()} disabled={!canWrite}>
+            Save playing
+          </Button>
 
           <div className="grid gap-3 border-t border-[var(--border)] pt-3 sm:grid-cols-2">
             <TextField
@@ -375,7 +398,7 @@ export function EventSettingsView({ hackathonId }: Props) {
             <div className="flex items-end">
               <Button
                 variant="secondary"
-                disabled={!rosterChallengeId.trim()}
+                disabled={!canWrite || !rosterChallengeId.trim()}
                 onClick={() =>
                   void (async () => {
                     try {
@@ -404,7 +427,7 @@ export function EventSettingsView({ hackathonId }: Props) {
             <div className="flex items-end">
               <Button
                 variant="secondary"
-                disabled={!rosterTeamId.trim()}
+                disabled={!canWrite || !rosterTeamId.trim()}
                 onClick={() =>
                   void (async () => {
                     try {
@@ -493,40 +516,34 @@ export function EventSettingsView({ hackathonId }: Props) {
         </div>
       ) : null}
 
-      {!isLoading && tab === "roles" ? (
+      {!isLoading && tab === "admins" && isRoot ? (
         <div className="space-y-4">
+          <p className="text-xs text-[var(--text-muted)]">
+            Root only — assign platform users as full organizers for this event.
+          </p>
           <div className="grid gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-3">
             <TextField
               label="User UUID"
-              name="role_user"
-              value={roleUser}
-              onChange={(e) => setRoleUser(e.target.value)}
+              name="admin_user"
+              value={adminUser}
+              onChange={(e) => setAdminUser(e.target.value)}
             />
-            <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-              <span className="font-medium text-[var(--text)]">Role</span>
-              <select
-                className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]"
-                value={roleName}
-                onChange={(e) => setRoleName(e.target.value)}
-              >
-                <option value="hackathon.manager">hackathon.manager</option>
-                <option value="hackathon.challenge_admin">
-                  hackathon.challenge_admin
-                </option>
-                <option value="hackathon.viewer">hackathon.viewer</option>
-                <option value="hackathon.organizer">hackathon.organizer</option>
-              </select>
-            </label>
+            <TextField
+              label="Notes (optional)"
+              name="admin_notes"
+              value={adminNotes}
+              onChange={(e) => setAdminNotes(e.target.value)}
+            />
             <div className="flex items-end">
-              <Button className="w-full" onClick={() => void onGrantRole()}>
-                Grant role
+              <Button className="w-full" onClick={() => void onAssignAdmin()}>
+                Assign admin
               </Button>
             </div>
           </div>
           <DataTable
-            rows={roles}
+            rows={admins}
             rowKey={(r) => r.id}
-            emptyMessage="No role bindings."
+            emptyMessage="No hackathon admin bindings for this event."
             columns={[
               {
                 key: "user",
@@ -536,7 +553,11 @@ export function EventSettingsView({ hackathonId }: Props) {
                   row.user_detail?.email ||
                   row.user,
               },
-              { key: "role", header: "Role", render: (row) => row.role },
+              {
+                key: "granted",
+                header: "Granted",
+                render: (row) => row.granted_at || "—",
+              },
               {
                 key: "active",
                 header: "Active",
@@ -550,7 +571,7 @@ export function EventSettingsView({ hackathonId }: Props) {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => void onRevoke(row.id)}
+                    onClick={() => void onRevokeAdmin(row.id)}
                   >
                     Revoke
                   </Button>

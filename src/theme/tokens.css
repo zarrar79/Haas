@@ -1,66 +1,134 @@
-/* Dasher-inspired admin system: airy canvas, emerald navigation, colorful metrics. */
+/**
+ * Spark Admin-inspired design tokens (https://themewagon.github.io/spark-admin/)
+ * Light mode: airy canvas + light sidebar + forest-green accents.
+ * Dark mode: neutral charcoal surfaces — green only as small accents, not backgrounds.
+ */
+
 :root,
 [data-theme="light"] {
-  --bg: #f5f7f6;
+  --bg: #f4f6f5;
   --surface: #ffffff;
   --surface-raised: #f8faf9;
   --surface-hover: #eef4f1;
-  --border: #e4ebe7;
+  --input-bg: #ffffff;
+  --border: #e9efef;
   --border-strong: #c5d4cc;
-  --text: #172321;
-  --text-muted: #6c7b77;
-  --accent: #a8ef00;
-  --accent-fg: #10251d;
-  --accent-muted: color-mix(in srgb, var(--accent) 22%, transparent);
-  --cyan: #16b6ca;
-  --cyan-muted: color-mix(in srgb, var(--cyan) 14%, transparent);
-  --danger: #f04d51;
-  --danger-muted: color-mix(in srgb, var(--danger) 10%, transparent);
-  --warning: #f5a623;
-  --success: #16ad79;
-  --focus-ring: color-mix(in srgb, var(--cyan) 70%, #ffffff);
-  --overlay: color-mix(in srgb, #0c2420 42%, transparent);
+  --text: #0b130f;
+  --text-muted: #6c7e75;
+  --text-subtle: #8a9a92;
+
+  --accent: #0d6b4f;
+  --accent-hover: #0a5640;
+  --accent-fg: #ffffff;
+  --accent-muted: rgba(13, 107, 79, 0.1);
+
+  --brand-forest-dark: #051c12;
+  --brand-forest-medium: #0d6b4f;
+  --brand-forest-light: #e8f3ee;
+
+  --cyan: #16a34a;
+  --cyan-muted: #dcfce7;
+  --danger: #ef4444;
+  --danger-muted: #fee2e2;
+  --warning: #d97706;
+  --warning-muted: #fef3c7;
+  --success: #16a34a;
+  --success-muted: #dcfce7;
+  --focus-ring: rgba(13, 107, 79, 0.35);
+  --overlay: rgba(5, 28, 18, 0.45);
+
   --sidebar-bg: #ffffff;
-  --sidebar-surface: #e8f8f0;
-  --sidebar-text: #172321;
-  --sidebar-muted: #6c7b77;
-  --sidebar-border: #e1e9e5;
-  --sidebar-width: 250px;
-  --sidebar-collapsed-width: 76px;
-  --header-height: 64px;
+  --sidebar-surface: #f4f7f5;
+  --sidebar-text: #0b130f;
+  --sidebar-muted: #6c7e75;
+  --sidebar-section: #8a9a92;
+  --sidebar-border: #e9efef;
+  --sidebar-active-bg: #e8f3ee;
+  --sidebar-hover-bg: #f0f4f2;
+  --sidebar-accent: #0d6b4f;
+  --sidebar-accent-muted: rgba(13, 107, 79, 0.12);
+  --sidebar-profile-bg: #e8f3ee;
+  --sidebar-profile-fg: #0d6b4f;
+  --avatar-inner-bg: #ffffff;
+  --avatar-inner-fg: #0d6b4f;
+
+  --sidebar-width: 280px;
+  --sidebar-collapsed-width: 80px;
+  --header-height: 80px;
+  --header-border: rgba(11, 19, 15, 0.06);
   --radius: 18px;
   --radius-sm: 10px;
-  --shadow: 0 10px 28px color-mix(in srgb, #37534a 10%, transparent);
-  --font-sans: var(--font-ibm-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
-  --font-mono: var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-pill: 9999px;
+  --shadow: 0 10px 30px rgba(11, 19, 15, 0.04);
+  --shadow-sm: 0 2px 8px rgba(11, 19, 15, 0.02);
+  --shadow-lg: 0 20px 50px rgba(11, 19, 15, 0.08);
+  --font-sans: var(--font-plus-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", monospace;
 }
 
 [data-theme="dark"] {
-  --bg: #101816;
-  --surface: #17221f;
-  --surface-raised: #1e2e29;
-  --surface-hover: #263b34;
-  --border: #30483f;
-  --border-strong: #4a685b;
-  --text: #f4faf7;
-  --text-muted: #a2b5ad;
-  --accent: #a8ef00;
-  --accent-fg: #10251d;
-  --accent-muted: color-mix(in srgb, var(--accent) 18%, transparent);
-  --cyan: #59d9e5;
-  --cyan-muted: color-mix(in srgb, var(--cyan) 14%, transparent);
-  --danger: #ff7378;
-  --danger-muted: color-mix(in srgb, var(--danger) 14%, transparent);
-  --warning: #ffc65f;
-  --success: #55dca0;
-  --focus-ring: color-mix(in srgb, var(--accent) 60%, transparent);
-  --overlay: color-mix(in srgb, #000 72%, transparent);
-  --sidebar-bg: #08251c;
-  --sidebar-surface: #12382a;
-  --sidebar-text: #f4faf7;
-  --sidebar-muted: #a2c4b5;
-  --sidebar-border: color-mix(in srgb, #f4faf7 14%, transparent);
+  /* Neutral charcoal — no green tint on surfaces */
+  --bg: #111413;
+  --surface: #1a1d1c;
+  --surface-raised: #242827;
+  --surface-hover: #2e3230;
+  --input-bg: #242827;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --text: #f3f4f3;
+  --text-muted: #a8b0ad;
+  --text-subtle: #8b9490;
+
+  /* Lime accent — buttons & active states only, not large fills */
+  --accent: #b8e636;
+  --accent-hover: #c8f542;
+  --accent-fg: #141614;
+  --accent-muted: rgba(184, 230, 54, 0.12);
+
+  /* Forest tokens → neutral in dark (used by forest buttons / legacy refs) */
+  --brand-forest-dark: #242827;
+  --brand-forest-medium: #2e3230;
+  --brand-forest-light: #3a3f3c;
+
+  --cyan: #86efac;
+  --cyan-muted: rgba(134, 239, 172, 0.12);
+  --danger: #fca5a5;
+  --danger-muted: rgba(252, 165, 165, 0.12);
+  --warning: #fdba74;
+  --warning-muted: rgba(253, 186, 116, 0.12);
+  --success: #86efac;
+  --success-muted: rgba(134, 239, 172, 0.12);
+  --focus-ring: rgba(184, 230, 54, 0.35);
+  --overlay: rgba(0, 0, 0, 0.72);
+
+  /* Neutral dark sidebar — not forest green */
+  --sidebar-bg: #161918;
+  --sidebar-surface: #242827;
+  --sidebar-text: #f3f4f3;
+  --sidebar-muted: #a8b0ad;
+  --sidebar-section: #8b9490;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-active-bg: rgba(255, 255, 255, 0.08);
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.04);
+  --sidebar-accent: #b8e636;
+  --sidebar-accent-muted: rgba(184, 230, 54, 0.1);
+  --sidebar-profile-bg: #242827;
+  --sidebar-profile-fg: #b8e636;
+  --avatar-inner-bg: #ffffff;
+  --avatar-inner-fg: #141614;
+
+  --header-border: rgba(255, 255, 255, 0.08);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.5);
 }
 
-:root { color-scheme: light; }
-[data-theme="dark"] { color-scheme: dark; }
+:root {
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+}

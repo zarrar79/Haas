@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -15,6 +16,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { TextField } from "@/components/ui/text-field";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
+import { useHaasAccess } from "@/features/auth/haas-access-context";
+import { useSectionSearch, applySectionSearch, teamRowSearchParts } from "@/features/search/section-search";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
 import {
   attachTeam,
@@ -32,6 +35,12 @@ import {
   type EventTeam,
   type TeamMember,
 } from "@/features/teams/team-api";
+import {
+  AddTeamMemberModal,
+  MAX_TEAM_MEMBERS,
+} from "@/features/teams/add-team-member-modal";
+import { TeamEditMembersPanel } from "@/features/teams/team-edit-members-panel";
+import { eventUserDetailPath } from "@/features/users/users-api";
 import { ApiRequestError } from "@/lib/client-api";
 import type { Hackathon } from "@/types/hackathon";
 
@@ -57,11 +66,88 @@ function memberLabel(m: TeamMember) {
   return name || d?.username || d?.email || m.user || m.id;
 }
 
+function memberUserId(m: TeamMember) {
+  return m.user_detail?.id || m.user || null;
+}
+
+function TeamMembersCell({
+  members,
+  memberCount,
+  hackathonId,
+  canAdd,
+  onAdd,
+}: {
+  members: TeamMember[];
+  memberCount: number;
+  hackathonId: string | null;
+  canAdd: boolean;
+  onAdd?: () => void;
+}) {
+  const showAdd = canAdd && hackathonId && memberCount < MAX_TEAM_MEMBERS;
+  const visible = members.slice(0, 5);
+  const extra = memberCount > visible.length ? memberCount - visible.length : 0;
+
+  return (
+    <div className="max-w-[260px]">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium">{memberCount}</span>
+        {showAdd && onAdd ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-6 px-2 text-[10px]"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd();
+            }}
+          >
+            Add
+          </Button>
+        ) : null}
+      </div>
+      {memberCount > 0 ? (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {visible.map((member) => {
+            const userId = memberUserId(member);
+            const label = memberLabel(member);
+            if (hackathonId && userId) {
+              return (
+                <Link
+                  key={member.id}
+                  href={eventUserDetailPath(hackathonId, userId)}
+                  className="rounded-full bg-[var(--accent-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)] hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {label}
+                </Link>
+              );
+            }
+            return (
+              <span
+                key={member.id}
+                className="rounded-full bg-[var(--surface-hover)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]"
+              >
+                {label}
+              </span>
+            );
+          })}
+          {extra > 0 ? (
+            <span className="text-[10px] text-[var(--text-muted)]">+{extra}</span>
+          ) : null}
+        </div>
+      ) : showAdd ? null : (
+        <span className="mt-1 text-[10px] text-[var(--text-muted)]">No members</span>
+      )}
+    </div>
+  );
+}
+
 function TeamFormModal({
   open,
   mode,
   hackathonId,
   teamId,
+  canManageMembers,
   onClose,
   onSaved,
 }: {
@@ -69,6 +155,7 @@ function TeamFormModal({
   mode: "create" | "edit";
   hackathonId?: string | null;
   teamId?: string | null;
+  canManageMembers?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -162,6 +249,8 @@ function TeamFormModal({
 
   if (!open) return null;
 
+  const showMembers = mode === "edit" && Boolean(hackathonId && teamId);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
@@ -170,7 +259,11 @@ function TeamFormModal({
         aria-label="Close dialog"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-lg rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
+      <div
+        className={`relative z-10 flex max-h-[min(92vh,720px)] w-full flex-col overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)] ${
+          showMembers ? "max-w-2xl" : "max-w-lg"
+        }`}
+      >
         <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
@@ -189,7 +282,7 @@ function TeamFormModal({
             Close
           </Button>
         </div>
-        <div className="space-y-3 px-5 py-4">
+        <div className="space-y-3 overflow-y-auto px-5 py-4">
           {error ? <Alert variant="error">{error}</Alert> : null}
           {loading ? (
             <p className="text-sm text-[var(--text-muted)]">Loading…</p>
@@ -251,6 +344,15 @@ function TeamFormModal({
                   </span>
                 </label>
               ) : null}
+              {showMembers ? (
+                <TeamEditMembersPanel
+                  hackathonId={hackathonId!}
+                  teamId={teamId!}
+                  teamName={name.trim() || "Team"}
+                  canManage={Boolean(canManageMembers)}
+                  onChanged={onSaved}
+                />
+              ) : null}
             </>
           )}
         </div>
@@ -282,14 +384,15 @@ export function EventTeamsView({
 }: EventTeamsViewProps) {
   const router = useRouter();
   const { setSelectedHackathonId } = useSelectedEvent();
+  const { canMutateEvent } = useHaasAccess();
 
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
   const [activeId, setActiveId] = useState(hackathonIdProp || ALL_HACKATHONS);
   const isAllScope = activeId === ALL_HACKATHONS || !activeId;
 
   const [rows, setRows] = useState<Row[]>([]);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const { search, setSearch, debouncedSearch, focusId, clearDeepSearch } =
+    useSectionSearch();
   const [membership, setMembership] = useState<MembershipFilter>("all");
   const [sideFilter, setSideFilter] = useState<SideFilter>("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
@@ -303,11 +406,12 @@ export function EventTeamsView({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => window.clearTimeout(timer);
-  }, [search]);
+  const [addMemberTarget, setAddMemberTarget] = useState<{
+    teamId: string;
+    teamName: string;
+    hackathonId: string;
+    memberUserIds: string[];
+  } | null>(null);
 
   useEffect(() => {
     if (hackathonIdProp) {
@@ -449,7 +553,7 @@ export function EventTeamsView({
   }, [load]);
 
   const filtered = useMemo(() => {
-    return rows.filter((row) => {
+    const base = rows.filter((row) => {
       if (!isAllScope) {
         if (membership === "added" && !row.isAdded) return false;
         if (membership === "not_added" && row.isAdded) return false;
@@ -459,10 +563,25 @@ export function EventTeamsView({
       if (activeFilter === "inactive" && row.is_active !== false) return false;
       return true;
     });
-  }, [rows, membership, sideFilter, activeFilter, isAllScope]);
+
+    return applySectionSearch(
+      base,
+      debouncedSearch,
+      focusId,
+      teamRowSearchParts,
+    );
+  }, [
+    rows,
+    membership,
+    sideFilter,
+    activeFilter,
+    isAllScope,
+    debouncedSearch,
+    focusId,
+  ]);
 
   function clearFilters() {
-    setSearch("");
+    clearDeepSearch();
     setMembership("all");
     setSideFilter("");
     setActiveFilter("all");
@@ -713,6 +832,7 @@ export function EventTeamsView({
   const notAddedCount = rows.length - addedCount;
   const hasActiveFilters =
     Boolean(search.trim()) ||
+    Boolean(focusId) ||
     membership !== "all" ||
     Boolean(sideFilter) ||
     activeFilter !== "all";
@@ -818,6 +938,13 @@ export function EventTeamsView({
             <strong className="text-[var(--warning)]">{notAddedCount}</strong>
           </span>
         ) : null}
+        {(debouncedSearch || focusId) && (
+          <span className="text-[var(--accent)]">
+            {focusId
+              ? "Showing selected result from deep search"
+              : `Matching “${debouncedSearch}”`}
+          </span>
+        )}
       </div>
 
       <TeamFormModal
@@ -825,12 +952,27 @@ export function EventTeamsView({
         mode={modalMode}
         hackathonId={scopeHackathonId()}
         teamId={editingId}
+        canManageMembers={
+          !isAllScope && Boolean(activeId && canMutateEvent(activeId))
+        }
         onClose={() => {
           setModalOpen(false);
           setEditingId(null);
         }}
         onSaved={() => void load()}
       />
+
+      {addMemberTarget ? (
+        <AddTeamMemberModal
+          open
+          hackathonId={addMemberTarget.hackathonId}
+          teamId={addMemberTarget.teamId}
+          teamName={addMemberTarget.teamName}
+          currentMemberUserIds={addMemberTarget.memberUserIds}
+          onClose={() => setAddMemberTarget(null)}
+          onSaved={() => void load()}
+        />
+      ) : null}
 
       {info ? (
         <div className="mb-3">
@@ -946,19 +1088,29 @@ export function EventTeamsView({
                 typeof row.member_count === "number"
                   ? row.member_count
                   : members.length;
-              if (count === 0) {
-                return <span className="text-[var(--text-muted)]">0</span>;
-              }
-              const labels = members.slice(0, 3).map(memberLabel);
-              const extra = count > labels.length ? count - labels.length : 0;
+              const eventId =
+                isAllScope ? row.created_in_hackathon?.id || null : activeId;
+              const memberUserIds = members
+                .map((m) => memberUserId(m))
+                .filter((id): id is string => Boolean(id));
               return (
-                <div className="max-w-[220px]">
-                  <div className="text-xs font-medium">{count}</div>
-                  <div className="text-[10px] text-[var(--text-muted)]">
-                    {labels.join(", ")}
-                    {extra > 0 ? ` +${extra}` : ""}
-                  </div>
-                </div>
+                <TeamMembersCell
+                  members={members}
+                  memberCount={count}
+                  hackathonId={eventId || null}
+                  canAdd={Boolean(eventId && canMutateEvent(eventId))}
+                  onAdd={
+                    eventId
+                      ? () =>
+                          setAddMemberTarget({
+                            teamId: row.id,
+                            teamName: row.name || row.team_code || "Team",
+                            hackathonId: eventId,
+                            memberUserIds,
+                          })
+                      : undefined
+                  }
+                />
               );
             },
           },

@@ -126,9 +126,13 @@ export type NotificationRow = {
   title?: string;
   message?: string;
   team?: string | null;
+  team_name?: string;
   type?: string;
   category?: string;
   created_at?: string;
+  is_read?: boolean;
+  recipient_count?: number;
+  user_ids?: string[];
 };
 
 export type ActivityLog = {
@@ -253,25 +257,16 @@ export async function updateScore(
   return unwrapHaasResult(result).data;
 }
 
-export async function softDeleteScore(
-  hackathonId: string,
-  scoreId: string,
-  reason = "Removed in HAS admin",
-) {
+export async function deleteScore(hackathonId: string, scoreId: string) {
   const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
     haasApiPath(`hackathons/${hackathonId}/scores/${scoreId}`),
-    { method: "DELETE", body: { reason } },
+    { method: "DELETE" },
   );
   return unwrapHaasResult(result);
 }
 
-export async function restoreScore(hackathonId: string, scoreId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ScoreRow>>>(
-    haasApiPath(`hackathons/${hackathonId}/scores/${scoreId}/restore`),
-    { method: "POST", body: {} },
-  );
-  return unwrapHaasResult(result).data;
-}
+/** @deprecated Backend hard-deletes; use deleteScore */
+export const softDeleteScore = deleteScore;
 
 export async function listMachines(
   hackathonId: string,

@@ -6,11 +6,11 @@ type BadgeProps = {
 export function Badge({ tone = "neutral", children }: BadgeProps) {
   const styles =
     tone === "success"
-      ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+      ? "bg-[var(--success-muted)] text-[var(--success)]"
       : tone === "danger"
         ? "bg-[var(--danger-muted)] text-[var(--danger)]"
         : tone === "warning"
-          ? "bg-[color-mix(in_srgb,var(--warning)_18%,transparent)] text-[var(--warning)]"
+          ? "bg-[var(--warning-muted)] text-[var(--warning)]"
           : "bg-[var(--surface-raised)] text-[var(--text-muted)]";
 
   return (

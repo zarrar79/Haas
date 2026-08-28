@@ -15,15 +15,17 @@ export function TextField({
   const fieldId = id ?? props.name;
 
   return (
-    <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-      <span className="font-medium text-[var(--text)]">{label}</span>
+    <label className="flex flex-col gap-2 text-sm">
+      <span className="font-semibold text-[var(--text)]">{label}</span>
       <input
         id={fieldId}
-        className={`rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--focus-ring)] ${className}`}
+        className={`rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--input-bg)] px-3.5 py-2.5 font-medium text-[var(--text)] shadow-[var(--shadow-sm)] outline-none placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)]/40 focus:shadow-md ${className}`}
         {...props}
       />
       {errorMessage ? (
-        <span className="text-xs text-[var(--danger)]">{errorMessage}</span>
+        <span className="text-xs font-medium text-[var(--danger)]">
+          {errorMessage}
+        </span>
       ) : null}
     </label>
   );

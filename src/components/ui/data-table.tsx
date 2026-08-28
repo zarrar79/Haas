@@ -3,6 +3,7 @@ import {
   TABLE_SCROLL_CLASS,
   TABLE_SHELL_CLASS,
 } from "@/components/ui/table-scroll";
+import { TableLoader } from "@/components/ui/loader";
 
 type Column<T> = {
   key: string;
@@ -65,16 +66,12 @@ export function DataTable<T>({
   }
 
   if (isLoading) {
-    return (
-      <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-4 py-10 text-center text-sm text-[var(--text-muted)]">
-        Loading…
-      </div>
-    );
+    return <TableLoader />;
   }
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-10 text-center text-sm text-[var(--text-muted)]">
+      <div className="spark-card border-dashed px-4 py-10 text-center text-sm font-medium text-[var(--text-muted)]">
         {emptyMessage}
       </div>
     );
@@ -84,7 +81,7 @@ export function DataTable<T>({
     <div className={TABLE_SHELL_CLASS}>
       <div className={TABLE_SCROLL_CLASS}>
         <table className={TABLE_ELEMENT_CLASS}>
-          <thead className="border-b border-[var(--border)] bg-[var(--surface-raised)] text-xs uppercase tracking-wide text-[var(--text-muted)]">
+          <thead className="border-b border-[var(--border-strong)] bg-[var(--surface-raised)] text-xs uppercase tracking-wide text-[var(--text-subtle)]">
             <tr>
               {selectable ? (
                 <th className="sticky left-0 z-10 w-10 whitespace-nowrap bg-[var(--surface-raised)] px-3 py-3">
@@ -117,8 +114,8 @@ export function DataTable<T>({
                 <tr
                   key={key}
                   onDoubleClick={() => onRowDoubleClick?.(row)}
-                  className={`border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface-raised)]/60 ${
-                    isSelected ? "bg-[var(--accent-muted)]/30" : ""
+                  className={`border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface-hover)] ${
+                    isSelected ? "bg-[var(--accent-muted)]" : ""
                   }`}
                 >
                   {selectable ? (
