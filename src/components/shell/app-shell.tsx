@@ -93,7 +93,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="relative flex min-h-0 flex-1">
         {showSidebar ? (
           <aside
-            className="hidden h-full shrink-0 overflow-y-auto border-r border-[var(--border)] bg-[var(--surface)] lg:block"
+            className="hidden h-full shrink-0 overflow-y-auto border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] lg:block"
             style={{ width: sidebarWidth }}
           >
             <AppSidebar isPlatformOperator={isPlatformOperator} />
