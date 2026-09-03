@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 
 /** Full-bleed sticky shell — opaque, no table bleed-through while scrolling. */
 export const STICKY_TOOLBAR_OUTER_CLASS =
-  "sticky top-0 z-20 -mx-4 border-b border-[var(--border)] bg-[var(--bg)] px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8";
+  "sticky top-0 z-20 -mx-3 border-b border-[var(--border)] bg-[var(--bg)] px-3 pb-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8";
 
 export const STICKY_TOOLBAR_INNER_CLASS =
-  "rounded-[var(--radius)] border border-[var(--border-strong)] bg-[var(--surface)] p-3 shadow-[var(--shadow-sm)]";
+  "sticky-toolbar-inner rounded-[var(--radius)] border border-[var(--border-strong)] bg-[var(--surface)] p-3 shadow-[var(--shadow-sm)]";
 
 /** @deprecated Use STICKY_TOOLBAR_OUTER_CLASS */
 export const STICKY_TOOLBAR_CLASS = STICKY_TOOLBAR_OUTER_CLASS;
@@ -19,8 +19,8 @@ type StickyToolbarProps = {
 };
 
 const LAYOUT_CLASS: Record<NonNullable<StickyToolbarProps["layout"]>, string> = {
-  row: "flex flex-nowrap items-end gap-2 overflow-x-auto",
-  grid: "grid gap-3 sm:grid-cols-3",
+  row: "flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end",
+  grid: "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3",
   stack: "flex flex-col gap-3",
   plain: "",
 };
@@ -65,7 +65,7 @@ export function FilterSelect({
 }) {
   return (
     <label
-      className={`flex min-w-[140px] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)] ${className ?? ""}`}
+      className={`flex min-w-0 w-full flex-1 flex-col gap-1 text-xs text-[var(--text-muted)] sm:min-w-[8.75rem] ${className ?? ""}`}
     >
       <span className="font-medium text-[var(--text)]">{label}</span>
       <select

@@ -1,9 +1,18 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import {
   TABLE_ELEMENT_CLASS,
-  TABLE_SCROLL_CLASS,
   TABLE_SHELL_CLASS,
+  SyncedHorizontalScroll,
 } from "@/components/ui/table-scroll";
-import { TableLoader } from "@/components/ui/loader";
+import {
+  DEFAULT_TABLE_PAGE_SIZE,
+  TablePagination,
+  TABLE_PAGE_SIZE_OPTIONS,
+} from "@/components/ui/table-pagination";
+import { TableSkeleton } from "@/components/ui/skeleton";
 
 type Column<T> = {
   key: string;
@@ -12,6 +21,15 @@ type Column<T> = {
   /** When true, cell content may wrap (default: nowrap for horizontal scroll). */
   wrap?: boolean;
   render: (row: T) => React.ReactNode;
+};
+
+type DataTablePaginationInfo = {
+  page: number;
+  pageSize: number;
+  /** Rows visible on the current page. */
+  shown: number;
+  /** Total rows after filters (before pagination). */
+  total: number;
 };
 
 type DataTableProps<T> = {
@@ -25,6 +43,12 @@ type DataTableProps<T> = {
   selectedKeys?: Set<string>;
   onSelectionChange?: (next: Set<string>) => void;
   onRowDoubleClick?: (row: T) => void;
+  /** Client-side pagination (default true). */
+  paginate?: boolean;
+  pageSizeOptions?: readonly number[];
+  defaultPageSize?: number;
+  /** Fired when page / page size / visible row count changes. */
+  onPaginationInfo?: (info: DataTablePaginationInfo) => void;
 };
 
 export function DataTable<T>({
@@ -37,9 +61,42 @@ export function DataTable<T>({
   selectedKeys,
   onSelectionChange,
   onRowDoubleClick,
+  paginate = true,
+  pageSizeOptions = TABLE_PAGE_SIZE_OPTIONS,
+  defaultPageSize = DEFAULT_TABLE_PAGE_SIZE,
+  onPaginationInfo,
 }: DataTableProps<T>) {
+  const tableRef = useRef<HTMLTableElement>(null);
   const selected = selectedKeys ?? new Set<string>();
-  const allKeys = rows.map((row) => rowKey(row));
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [rows, pageSize]);
+
+  const total = rows.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
+  const safePage = Math.min(page, totalPages);
+
+  const pageRows = useMemo(() => {
+    if (!paginate) return rows;
+    const start = (safePage - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [paginate, rows, safePage, pageSize]);
+
+  const shown = paginate ? pageRows.length : total;
+
+  useEffect(() => {
+    onPaginationInfo?.({
+      page: safePage,
+      pageSize,
+      shown,
+      total,
+    });
+  }, [onPaginationInfo, safePage, pageSize, shown, total]);
+
+  const allKeys = pageRows.map((row) => rowKey(row));
   const allSelected =
     allKeys.length > 0 && allKeys.every((key) => selected.has(key));
   const someSelected = allKeys.some((key) => selected.has(key));
@@ -66,7 +123,12 @@ export function DataTable<T>({
   }
 
   if (isLoading) {
-    return <TableLoader />;
+    return (
+      <TableSkeleton
+        columns={columns.length}
+        selectable={selectable}
+      />
+    );
   }
 
   if (rows.length === 0) {
@@ -78,73 +140,89 @@ export function DataTable<T>({
   }
 
   return (
-    <div className={TABLE_SHELL_CLASS}>
-      <div className={TABLE_SCROLL_CLASS}>
-        <table className={TABLE_ELEMENT_CLASS}>
-          <thead className="border-b border-[var(--border-strong)] bg-[var(--surface-raised)] text-xs uppercase tracking-wide text-[var(--text-subtle)]">
-            <tr>
-              {selectable ? (
-                <th className="sticky left-0 z-10 w-10 whitespace-nowrap bg-[var(--surface-raised)] px-3 py-3">
-                  <input
-                    type="checkbox"
-                    aria-label="Select all rows"
-                    checked={allSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = !allSelected && someSelected;
-                    }}
-                    onChange={toggleAll}
-                  />
-                </th>
-              ) : null}
-              {columns.map((column) => (
-                <th
-                  key={column.key}
-                  className={`whitespace-nowrap px-4 py-3 font-semibold ${column.className ?? ""}`}
-                >
-                  {column.header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const key = rowKey(row);
-              const isSelected = selected.has(key);
-              return (
-                <tr
-                  key={key}
-                  onDoubleClick={() => onRowDoubleClick?.(row)}
-                  className={`border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface-hover)] ${
-                    isSelected ? "bg-[var(--accent-muted)]" : ""
-                  }`}
-                >
-                  {selectable ? (
-                    <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface)] px-3 py-3 group-hover:bg-[var(--surface-raised)]">
-                      <input
-                        type="checkbox"
-                        aria-label={`Select row ${key}`}
-                        checked={isSelected}
-                        onChange={() => toggleOne(key)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                  ) : null}
-                  {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      className={`px-4 py-3 align-middle text-[var(--text)] ${
-                        column.wrap ? "whitespace-normal" : "whitespace-nowrap"
-                      } ${column.className ?? ""}`}
-                    >
-                      {column.render(row)}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+    <div>
+      <div className={TABLE_SHELL_CLASS}>
+        <SyncedHorizontalScroll tableRef={tableRef}>
+          <table ref={tableRef} className={TABLE_ELEMENT_CLASS}>
+            <thead className="border-b border-[var(--border-strong)] bg-[var(--surface-raised)] text-xs uppercase tracking-wide text-[var(--text-subtle)]">
+              <tr>
+                {selectable ? (
+                  <th className="sticky left-0 z-10 w-10 whitespace-nowrap bg-[var(--surface-raised)] px-3 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all rows"
+                      checked={allSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = !allSelected && someSelected;
+                      }}
+                      onChange={toggleAll}
+                    />
+                  </th>
+                ) : null}
+                {columns.map((column) => (
+                  <th
+                    key={column.key}
+                    className={`whitespace-nowrap px-4 py-3 font-semibold ${column.className ?? ""}`}
+                  >
+                    {column.header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.map((row) => {
+                const key = rowKey(row);
+                const isSelected = selected.has(key);
+                return (
+                  <tr
+                    key={key}
+                    onDoubleClick={() => onRowDoubleClick?.(row)}
+                    className={`border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface-hover)] ${
+                      isSelected ? "bg-[var(--accent-muted)]" : ""
+                    }`}
+                  >
+                    {selectable ? (
+                      <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface)] px-3 py-3 group-hover:bg-[var(--surface-raised)]">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select row ${key}`}
+                          checked={isSelected}
+                          onChange={() => toggleOne(key)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
+                    ) : null}
+                    {columns.map((column) => (
+                      <td
+                        key={column.key}
+                        className={`px-4 py-3 align-middle text-[var(--text)] ${
+                          column.wrap ? "whitespace-normal" : "whitespace-nowrap"
+                        } ${column.className ?? ""}`}
+                      >
+                        {column.render(row)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </SyncedHorizontalScroll>
       </div>
+
+      {paginate ? (
+        <TablePagination
+          page={safePage}
+          pageSize={pageSize}
+          total={total}
+          pageSizeOptions={pageSizeOptions}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

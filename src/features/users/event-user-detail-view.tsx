@@ -9,16 +9,12 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/loader";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
+import { AssignUserToTeamModal } from "@/features/teams/assign-user-to-team-modal";
+import { EventUserRowActions } from "@/features/users/event-user-row-actions";
 import { UserFormModal } from "@/features/users/user-form-modal";
 import { UserProfileSummary } from "@/features/users/user-profile-summary";
-import {
-  blockEventUser,
-  deleteEventUser,
-  eventUserDetailPath,
-  getEventUser,
-  unblockEventUser,
-  type EventUser,
-} from "@/features/users/users-api";
+import { useEventUserActions } from "@/features/users/use-event-user-actions";
+import { getEventUser, type EventUser } from "@/features/users/users-api";
 import { ApiRequestError } from "@/lib/client-api";
 
 type Props = {
@@ -32,8 +28,8 @@ export function EventUserDetailView({ hackathonId, userId }: Props) {
   const [user, setUser] = useState<EventUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [assignTeamOpen, setAssignTeamOpen] = useState(false);
 
   const canWrite = canMutateEvent(hackathonId);
 
@@ -58,41 +54,46 @@ export function EventUserDetailView({ hackathonId, userId }: Props) {
     void load();
   }, [load]);
 
-  async function onBlock() {
-    const reason = window.prompt("Block reason", "Blocked in HAS admin");
-    if (reason == null) return;
-    setBusy(true);
+  const { busyId, blockUser, unblockUser, activateUser, deactivateUser } =
+    useEventUserActions({
+    hackathonId,
+    onChanged: load,
+    onDeactivated: () => router.push(`/events/${hackathonId}/members`),
+  });
+
+  async function handleBlock() {
+    if (!user) return;
     try {
-      await blockEventUser(hackathonId, userId, reason);
-      await load();
+      await blockUser(user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to block");
-    } finally {
-      setBusy(false);
     }
   }
 
-  async function onUnblock() {
-    setBusy(true);
+  async function handleUnblock() {
+    if (!user) return;
     try {
-      await unblockEventUser(hackathonId, userId);
-      await load();
+      await unblockUser(user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to unblock");
-    } finally {
-      setBusy(false);
     }
   }
 
-  async function onDeactivate() {
-    if (!window.confirm("Deactivate this user (soft delete)?")) return;
-    setBusy(true);
+  async function handleActivate() {
+    if (!user) return;
     try {
-      await deleteEventUser(hackathonId, userId);
-      router.push(`/events/${hackathonId}/members`);
+      await activateUser(user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to activate");
+    }
+  }
+
+  async function handleDeactivate() {
+    if (!user) return;
+    try {
+      await deactivateUser(user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to deactivate");
-      setBusy(false);
     }
   }
 
@@ -100,8 +101,7 @@ export function EventUserDetailView({ hackathonId, userId }: Props) {
     <div className="w-full">
       <PageHeader
         eyebrow="Event workspace"
-        title={user?.full_name || user?.username || "User details"}
-        description="Full profile for this event-scoped user."
+        title={user?.full_name || user?.username || "Member details"}
         actions={
           <>
             <Link
@@ -110,27 +110,33 @@ export function EventUserDetailView({ hackathonId, userId }: Props) {
             >
               Back to members
             </Link>
-            <Button variant="secondary" onClick={() => void load()} disabled={isLoading}>
+            <Button variant="secondary" size="sm" onClick={() => void load()} disabled={isLoading}>
               Refresh
             </Button>
+            {canWrite && user && !user.teams?.length ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busyId === user.id}
+                onClick={() => setAssignTeamOpen(true)}
+              >
+                Assign to team
+              </Button>
+            ) : null}
             {canWrite && user ? (
-              <>
-                <Button variant="secondary" onClick={() => setModalOpen(true)}>
-                  Edit
-                </Button>
-                {user.is_block ? (
-                  <Button variant="secondary" disabled={busy} onClick={() => void onUnblock()}>
-                    Unblock
-                  </Button>
-                ) : (
-                  <Button variant="secondary" disabled={busy} onClick={() => void onBlock()}>
-                    Block
-                  </Button>
-                )}
-                <Button variant="ghost" disabled={busy} onClick={() => void onDeactivate()}>
-                  Deactivate
-                </Button>
-              </>
+              <EventUserRowActions
+                hackathonId={hackathonId}
+                user={user}
+                canWrite={canWrite}
+                handlers={{
+                  busyId,
+                  onEdit: () => setModalOpen(true),
+                  onBlock: () => void handleBlock(),
+                  onUnblock: () => void handleUnblock(),
+                  onActivate: () => void handleActivate(),
+                  onDeactivate: () => void handleDeactivate(),
+                }}
+              />
             ) : null}
           </>
         }
@@ -143,7 +149,7 @@ export function EventUserDetailView({ hackathonId, userId }: Props) {
       ) : null}
 
       {isLoading ? (
-        <PageLoader label="Loading user profile…" />
+        <PageLoader label="Loading member profile…" variant="form" />
       ) : user ? (
         <section className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6">
           <UserProfileSummary user={user} />
@@ -156,6 +162,14 @@ export function EventUserDetailView({ hackathonId, userId }: Props) {
         hackathonId={hackathonId}
         userId={userId}
         onClose={() => setModalOpen(false)}
+        onSaved={() => void load()}
+      />
+
+      <AssignUserToTeamModal
+        open={assignTeamOpen}
+        hackathonId={hackathonId}
+        user={user}
+        onClose={() => setAssignTeamOpen(false)}
         onSaved={() => void load()}
       />
     </div>

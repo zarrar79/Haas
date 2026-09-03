@@ -1,5 +1,11 @@
 import type { ReactNode } from "react";
 
+import {
+  InlineSkeleton,
+  PageSkeleton,
+  TableSkeleton,
+} from "@/components/ui/skeleton";
+
 type LoaderSize = "sm" | "md" | "lg";
 
 const sizeClass: Record<LoaderSize, string> = {
@@ -33,10 +39,20 @@ export function Loader({ size = "md", label, className = "" }: LoaderProps) {
   );
 }
 
-export function TableLoader({ label = "Loading records…" }: { label?: string }) {
+export function TableLoader({
+  label = "Loading records…",
+  columns = 5,
+  rows = 8,
+  selectable = false,
+}: {
+  label?: string;
+  columns?: number;
+  rows?: number;
+  selectable?: boolean;
+}) {
   return (
-    <div className="spark-card flex min-h-[220px] items-center justify-center px-4 py-12">
-      <Loader size="md" label={label} />
+    <div aria-label={label}>
+      <TableSkeleton columns={columns} rows={rows} selectable={selectable} />
     </div>
   );
 }
@@ -44,40 +60,39 @@ export function TableLoader({ label = "Loading records…" }: { label?: string }
 export function PageLoader({
   label = "Loading workspace…",
   className = "",
+  variant = "dashboard",
 }: {
   label?: string;
   className?: string;
+  variant?: "dashboard" | "form" | "table";
 }) {
   return (
-    <div
-      className={`flex min-h-[280px] w-full items-center justify-center ${className}`}
-    >
-      <div className="loader-panel rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] px-10 py-12 shadow-[var(--shadow-sm)]">
-        <Loader size="lg" label={label} />
-      </div>
+    <div className={`w-full ${className}`} aria-label={label}>
+      <PageSkeleton variant={variant} />
     </div>
   );
 }
 
 export function InlineLoader({ label }: { label?: string }) {
   return (
-    <span className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]">
-      <span className={`loader-ring ${sizeClass.sm}`} aria-hidden />
-      {label ? <span>{label}</span> : null}
-    </span>
+    <div aria-label={label || "Loading"} role="status" aria-busy="true">
+      <InlineSkeleton lines={2} />
+    </div>
   );
 }
 
 export function OverlayLoader({
   label = "Loading…",
   children,
+  variant = "table",
 }: {
   label?: string;
   children?: ReactNode;
+  variant?: "dashboard" | "form" | "table";
 }) {
   return (
-    <div className="loader-overlay absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-[var(--surface)]/80 backdrop-blur-[2px]">
-      <Loader size="md" label={label} />
+    <div className="absolute inset-0 z-10 rounded-[inherit] bg-[var(--surface)]/90 p-4 backdrop-blur-[1px]">
+      <PageSkeleton variant={variant} />
       {children}
     </div>
   );

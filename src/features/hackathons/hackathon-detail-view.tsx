@@ -8,15 +8,24 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { FormSkeleton } from "@/components/ui/skeleton";
 import { TextField } from "@/components/ui/text-field";
-import { useSelectedEvent } from "@/features/events/selected-event-context";
+import { useHaasAccess } from "@/features/auth/haas-access-context";
 import {
-  archiveHackathon,
-  breakGlassHackathon,
+  getHackathonAnalytics,
   getHackathon,
-  restoreHackathon,
   updateHackathon,
 } from "@/features/hackathons/hackathon-api";
+import { HackathonQuickActions } from "@/features/hackathons/hackathon-quick-actions";
+import { HackathonUserAssignmentSection } from "@/features/hackathons/hackathon-user-assignment-section";
+import { OrganizationPicker } from "@/features/organizations/organization-picker";
+import { SponsorPicker } from "@/features/sponsors/sponsor-picker";
+import {
+  listHackathonAdmins,
+  syncHackathonAdmins,
+  type HackathonAdminBinding,
+} from "@/features/hackathon-admins/hackathon-admin-api";
+import type { SystemUser } from "@/features/system/system-api";
 import { ApiRequestError } from "@/lib/client-api";
 import type { Hackathon } from "@/types/hackathon";
 
@@ -45,13 +54,14 @@ type HackathonDetailViewProps = {
 
 export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
   const router = useRouter();
-  const { setSelectedHackathonId } = useSelectedEvent();
+  const { isRoot, isPlatformOperator } = useHaasAccess();
   const [hackathon, setHackathon] = useState<Hackathon | null>(null);
+  const [teamCount, setTeamCount] = useState<number | null>(null);
+  const [challengeCount, setChallengeCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [actionBusy, setActionBusy] = useState(false);
 
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -62,7 +72,11 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
   const [isInfinite, setIsInfinite] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [viewOnDashboard, setViewOnDashboard] = useState(false);
-  const [breakGlassReason, setBreakGlassReason] = useState("");
+  const [adminBindings, setAdminBindings] = useState<HackathonAdminBinding[]>([]);
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  const [assigneeUsers, setAssigneeUsers] = useState<SystemUser[]>([]);
+  const [sponsorIds, setSponsorIds] = useState<string[]>([]);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
 
   function applyLoadedHackathon(data: Hackathon) {
     setName(data.name || "");
@@ -74,15 +88,41 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
     setIsInfinite(coerceBool(data.is_infinite));
     setIsActive(coerceBool(data.is_active));
     setViewOnDashboard(coerceBool(data.view_on_dashboard));
+    setSponsorIds((data.sponsors || []).map((s) => s.id));
+    setOrganizationId(data.city || data.organization?.id || null);
   }
 
   const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getHackathon(hackathonId);
+      const [data, bindings, analytics] = await Promise.all([
+        getHackathon(hackathonId),
+        isRoot || isPlatformOperator
+          ? listHackathonAdmins({
+              hackathon: hackathonId,
+              show_inactive: "true",
+            })
+          : Promise.resolve([]),
+        getHackathonAnalytics(hackathonId).catch(() => null),
+      ]);
       setHackathon(data);
       applyLoadedHackathon(data);
+      setTeamCount(analytics?.teams ?? null);
+      setChallengeCount(analytics?.challenges ?? null);
+      setAdminBindings(bindings);
+      const activeBindings = bindings.filter((b) => b.is_active !== false);
+      const ids = activeBindings.map((b) => b.user);
+      setAssigneeIds(ids);
+      setAssigneeUsers(
+        activeBindings
+          .map((b) =>
+            b.user_detail?.id
+              ? ({ ...b.user_detail, id: b.user_detail.id } as SystemUser)
+              : null,
+          )
+          .filter(Boolean) as SystemUser[],
+      );
     } catch (err) {
       if (err instanceof ApiRequestError && err.httpStatus === 401) {
         router.replace("/login");
@@ -92,7 +132,7 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [hackathonId, router]);
+  }, [hackathonId, router, isRoot, isPlatformOperator]);
 
   useEffect(() => {
     void load();
@@ -101,7 +141,6 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
   function onInfiniteChange(checked: boolean) {
     setIsInfinite(checked);
     if (!checked && hackathon && coerceBool(hackathon.is_infinite)) {
-      // Reverting from infinite — clear the far-future window so the user sets real times.
       setStartDatetime("");
       setEndDatetime("");
     }
@@ -126,6 +165,12 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
       }
     }
 
+    if ((isRoot || isPlatformOperator) && assigneeIds.length === 0) {
+      setError("Add at least one event administrator.");
+      setIsSaving(false);
+      return;
+    }
+
     try {
       const updated = await updateHackathon(hackathonId, {
         name: name.trim() || undefined,
@@ -135,6 +180,8 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
         is_infinite: isInfinite,
         is_active: isActive,
         view_on_dashboard: viewOnDashboard,
+        city: organizationId,
+        sponsor_ids: sponsorIds,
         ...(isInfinite
           ? {}
           : {
@@ -144,6 +191,27 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
       });
       setHackathon(updated);
       applyLoadedHackathon(updated);
+
+      if (isRoot || isPlatformOperator) {
+        await syncHackathonAdmins(hackathonId, assigneeIds, adminBindings);
+        const bindings = await listHackathonAdmins({
+          hackathon: hackathonId,
+          show_inactive: "true",
+        });
+        setAdminBindings(bindings);
+        const activeBindings = bindings.filter((b) => b.is_active !== false);
+        setAssigneeIds(activeBindings.map((b) => b.user));
+        setAssigneeUsers(
+          activeBindings
+            .map((b) =>
+              b.user_detail?.id
+                ? ({ ...b.user_detail, id: b.user_detail.id } as SystemUser)
+                : null,
+            )
+            .filter(Boolean) as SystemUser[],
+        );
+      }
+
       setSuccess(
         isInfinite
           ? "Event updated as infinite (no fixed end)."
@@ -156,27 +224,11 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
     }
   }
 
-  async function runAction(
-    action: () => Promise<unknown>,
-    okMessage: string,
-  ) {
-    setActionBusy(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      await action();
-      setSuccess(okMessage);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Action failed");
-    } finally {
-      setActionBusy(false);
-    }
-  }
-
   if (isLoading) {
     return (
-      <p className="text-sm text-[var(--text-muted)]">Loading hackathon…</p>
+      <div className="w-full space-y-4">
+        <FormSkeleton fields={8} />
+      </div>
     );
   }
 
@@ -189,20 +241,18 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
       <PageHeader
         eyebrow="Events"
         title={hackathon.display_name || hackathon.name}
-        description={`GET/PATCH /api/haas/hackathons/${hackathonId}/`}
         actions={
           <>
             <Link href="/hackathons">
-              <Button variant="secondary">Back</Button>
+              <Button variant="secondary" size="sm">
+                All events
+              </Button>
             </Link>
-            <Button
-              onClick={() => {
-                setSelectedHackathonId(hackathonId);
-                router.push(`/events/${hackathonId}`);
-              }}
-            >
-              Enter workspace
-            </Button>
+            <HackathonQuickActions
+              hackathonId={hackathonId}
+              teamCount={teamCount}
+              challengeCount={challengeCount}
+            />
           </>
         }
       />
@@ -236,7 +286,7 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
 
       <form
         onSubmit={handleSave}
-        className="mb-6 flex flex-col gap-4 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5"
+        className="flex flex-col gap-4 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5"
       >
         <h2 className="text-sm font-semibold text-[var(--text)]">Edit event</h2>
         <TextField
@@ -274,17 +324,8 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
             />
             <span>
               <span className="font-medium">Infinite event</span>
-              <span className="mt-0.5 block text-[var(--text-muted)]">
-                No fixed end. Uncheck to set an explicit start and end time.
-              </span>
             </span>
           </label>
-          {isInfinite ? (
-            <p className="mb-3 text-sm text-[var(--text-muted)]">
-              Open-ended schedule. Saving keeps the event infinite (server sets
-              start=now and a far-future end).
-            </p>
-          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField
               label="Start"
@@ -313,6 +354,16 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
           value={discordLink}
           onChange={(e) => setDiscordLink(e.target.value)}
         />
+        <OrganizationPicker
+          selectedId={organizationId}
+          onChange={(id) => setOrganizationId(id)}
+          disabled={isSaving}
+        />
+        <SponsorPicker
+          selectedIds={sponsorIds}
+          onChange={(ids) => setSponsorIds(ids)}
+          disabled={isSaving}
+        />
         <div className="flex flex-wrap gap-4 text-sm text-[var(--text)]">
           <label className="flex items-center gap-2">
             <input
@@ -333,88 +384,23 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
             View on dashboard
           </label>
         </div>
+
+        {isRoot || isPlatformOperator ? (
+          <HackathonUserAssignmentSection
+            selectedIds={assigneeIds}
+            selectedUsers={assigneeUsers}
+            onChange={(ids, users) => {
+              setAssigneeIds(ids);
+              setAssigneeUsers(users);
+            }}
+            disabled={isSaving}
+          />
+        ) : null}
+
         <Button type="submit" disabled={isSaving}>
           {isSaving ? "Saving…" : "Save changes"}
         </Button>
       </form>
-
-      <section className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5">
-        <h2 className="mb-3 text-sm font-semibold text-[var(--text)]">
-          Actions
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          {hackathon.is_deleted ? (
-            <Button
-              variant="secondary"
-              disabled={actionBusy}
-              onClick={() =>
-                void runAction(
-                  () => restoreHackathon(hackathonId),
-                  "Hackathon restored.",
-                )
-              }
-            >
-              Restore
-            </Button>
-          ) : (
-            <Button
-              variant="danger"
-              disabled={actionBusy}
-              onClick={() =>
-                void runAction(
-                  () => archiveHackathon(hackathonId),
-                  "Hackathon archived.",
-                )
-              }
-            >
-              Archive
-            </Button>
-          )}
-        </div>
-
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <TextField
-              label="Break-glass reason"
-              name="reason"
-              value={breakGlassReason}
-              onChange={(e) => setBreakGlassReason(e.target.value)}
-              placeholder="Customer outage"
-            />
-          </div>
-          <Button
-            variant="secondary"
-            disabled={actionBusy || !breakGlassReason.trim()}
-            onClick={() =>
-              void runAction(
-                () => breakGlassHackathon(hackathonId, breakGlassReason.trim()),
-                "Break-glass requested.",
-              )
-            }
-          >
-            Break glass
-          </Button>
-        </div>
-      </section>
-
-      {hackathon.modules ? (
-        <section className="mt-6 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5">
-          <h2 className="mb-3 text-sm font-semibold text-[var(--text)]">
-            Modules
-          </h2>
-          <ul className="space-y-1 text-sm text-[var(--text-muted)]">
-            <li>Jeopardy: {String(hackathon.modules.jeopardy_enabled)}</li>
-            <li>KoTH: {String(hackathon.modules.koth_enabled)}</li>
-            <li>
-              Attack & Defence:{" "}
-              {String(hackathon.modules.attack_defence_enabled)}
-            </li>
-            <li>
-              Viewer can export: {String(hackathon.modules.viewer_can_export)}
-            </li>
-          </ul>
-        </section>
-      ) : null}
     </div>
   );
 }

@@ -19,7 +19,7 @@ export function TextField({
       <span className="font-semibold text-[var(--text)]">{label}</span>
       <input
         id={fieldId}
-        className={`rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--input-bg)] px-3.5 py-2.5 font-medium text-[var(--text)] shadow-[var(--shadow-sm)] outline-none placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)]/40 focus:shadow-md ${className}`}
+        className={`rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--input-bg)] px-3.5 py-2.5 font-medium text-[var(--text)] shadow-[var(--shadow-sm)] outline-none placeholder:text-[var(--text-subtle)] focus:border-[var(--accent)]/40 focus:shadow-md disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
         {...props}
       />
       {errorMessage ? (

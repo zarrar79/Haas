@@ -8,10 +8,11 @@ import {
   BiHelpCircle,
   BiSearch,
   BiServer,
+  BiUser,
 } from "react-icons/bi";
 
 import { InlineLoader } from "@/components/ui/loader";
-import { useSelectedEvent } from "@/features/events/selected-event-context";
+import { useEffectiveHackathonId } from "@/features/events/use-effective-hackathon-id";
 import {
   runGlobalSearch,
   SEARCH_TYPE_LABELS,
@@ -22,6 +23,7 @@ import {
 const TYPE_ICONS: Record<GlobalSearchResultType, typeof BiSearch> = {
   challenge: BiChip,
   team: BiGroup,
+  user: BiUser,
   machine: BiServer,
   question: BiHelpCircle,
 };
@@ -35,9 +37,9 @@ type Props = {
 export function GlobalSearchBar({
   className = "",
   inputClassName = "",
-  placeholder = "Search challenges, teams, machines, IPs, questions…",
+  placeholder = "Search users, teams, challenges, machines, questions…",
 }: Props) {
-  const { selectedHackathonId } = useSelectedEvent();
+  const effectiveHackathonId = useEffectiveHackathonId();
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
@@ -62,14 +64,14 @@ export function GlobalSearchBar({
     setIsLoading(true);
     setError(null);
     try {
-      setResults(await runGlobalSearch(selectedHackathonId, debounced));
+      setResults(await runGlobalSearch(effectiveHackathonId, debounced));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Search failed");
       setResults([]);
     } finally {
       setIsLoading(false);
     }
-  }, [debounced, selectedHackathonId]);
+  }, [debounced, effectiveHackathonId]);
 
   useEffect(() => {
     if (open && debounced) void load();
@@ -114,14 +116,14 @@ export function GlobalSearchBar({
 
       <div
         id="global-search-results"
-        className={`dropdown-panel absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--surface)] shadow-[var(--shadow-lg)] ${
+        className={`dropdown-panel absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--surface)] shadow-[var(--shadow-lg)] ${
           showPanel ? "dropdown-panel-open" : ""
         }`}
       >
         {showPanel ? (
           <div className="max-h-[min(70vh,420px)] overflow-y-auto p-2">
             <p className="px-2 py-1.5 text-[0.65rem] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-              {selectedHackathonId
+              {effectiveHackathonId
                 ? "Deep search in active event"
                 : "Platform search (select an event for machines & questions)"}
             </p>
@@ -132,7 +134,7 @@ export function GlobalSearchBar({
               </div>
             ) : !debounced ? (
               <p className="px-3 py-6 text-sm text-[var(--text-muted)]">
-                Search challenges, team names, machines, IP addresses, and
+                Search users, teams, challenges, machines, IP addresses, and
                 questions across the active event.
               </p>
             ) : error ? (

@@ -143,6 +143,28 @@ export function machineRowSearchParts(row: MachineRow) {
   ];
 }
 
+export function userRowSearchParts(row: {
+  id: string;
+  username?: string | null;
+  email?: string | null;
+  name?: string | null;
+  last_name?: string | null;
+  full_name?: string | null;
+  organization_name?: string | null;
+  user_type?: string | null;
+}) {
+  return [
+    row.id,
+    row.username,
+    row.email,
+    row.name,
+    row.last_name,
+    row.full_name,
+    row.organization_name,
+    row.user_type,
+  ];
+}
+
 export function questionAnswerRowSearchParts(row: QuestionAnswerRow) {
   return [
     row.id,

@@ -10,12 +10,14 @@ import {
   type ReactNode,
 } from "react";
 
+import { SELECTED_HACKATHON_STORAGE_KEY } from "@/lib/client-session";
+
 type SelectedEventContextValue = {
   selectedHackathonId: string | null;
   setSelectedHackathonId: (id: string | null) => void;
+  clearSession: () => void;
 };
 
-const STORAGE_KEY = "has-selected-hackathon-id";
 const SelectedEventContext = createContext<SelectedEventContextValue | null>(
   null,
 );
@@ -24,19 +26,24 @@ export function SelectedEventProvider({ children }: { children: ReactNode }) {
   const [selectedHackathonId, setSelectedState] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
+    const stored = window.localStorage.getItem(SELECTED_HACKATHON_STORAGE_KEY);
     if (stored) setSelectedState(stored);
   }, []);
 
   const setSelectedHackathonId = useCallback((id: string | null) => {
     setSelectedState(id);
-    if (id) window.localStorage.setItem(STORAGE_KEY, id);
-    else window.localStorage.removeItem(STORAGE_KEY);
+    if (id) window.localStorage.setItem(SELECTED_HACKATHON_STORAGE_KEY, id);
+    else window.localStorage.removeItem(SELECTED_HACKATHON_STORAGE_KEY);
+  }, []);
+
+  const clearSession = useCallback(() => {
+    setSelectedState(null);
+    window.localStorage.removeItem(SELECTED_HACKATHON_STORAGE_KEY);
   }, []);
 
   const value = useMemo(
-    () => ({ selectedHackathonId, setSelectedHackathonId }),
-    [selectedHackathonId, setSelectedHackathonId],
+    () => ({ selectedHackathonId, setSelectedHackathonId, clearSession }),
+    [selectedHackathonId, setSelectedHackathonId, clearSession],
   );
 
   return (

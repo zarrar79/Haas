@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyableText } from "@/components/ui/copyable-text";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
+import { FormSkeleton } from "@/components/ui/skeleton";
+import { ModalShell } from "@/components/ui/modal-shell";
+import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { TextField } from "@/components/ui/text-field";
 import {
   TABLE_ELEMENT_CLASS,
@@ -390,6 +394,8 @@ function QuestionRow({
   onToggleAnswerActive: (answer: ChallengeAnswerDetail) => void;
   onDeleteAnswer: (answer: ChallengeAnswerDetail) => void;
 }) {
+  const answersTableRef = useRef<HTMLTableElement>(null);
+
   return (
     <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)]">
       <div className="flex items-center gap-2 px-2 py-2">
@@ -420,35 +426,33 @@ function QuestionRow({
             {question.is_multiple ? <Badge>Multiple</Badge> : null}
           </div>
         </button>
-        <div className="flex shrink-0 flex-wrap gap-1">
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy}
-            onClick={() => {
-              if (!expanded) onToggle();
-              onStartEdit();
-            }}
-          >
-            Edit
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy}
-            onClick={onToggleQuestionActive}
-          >
-            {question.is_active === false ? "Activate" : "Deactivate"}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={busy}
-            onClick={onDeleteQuestion}
-          >
-            Delete
-          </Button>
-        </div>
+        <RowActionsMenu
+          label={`Actions for ${question.name}`}
+          items={[
+            {
+              id: "edit",
+              label: "Edit",
+              disabled: busy,
+              onClick: () => {
+                if (!expanded) onToggle();
+                onStartEdit();
+              },
+            },
+            {
+              id: "toggle",
+              label: question.is_active === false ? "Activate" : "Deactivate",
+              disabled: busy,
+              onClick: onToggleQuestionActive,
+            },
+            {
+              id: "delete",
+              label: "Delete",
+              disabled: busy,
+              destructive: true,
+              onClick: onDeleteQuestion,
+            },
+          ]}
+        />
       </div>
 
       {expanded ? (
@@ -528,15 +532,15 @@ function QuestionRow({
                 No answer keys for this question.
               </p>
             ) : (
-              <TableScroll>
-                <table className={TABLE_ELEMENT_CLASS}>
+              <TableScroll tableRef={answersTableRef}>
+                <table ref={answersTableRef} className={TABLE_ELEMENT_CLASS}>
                   <thead>
                     <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--text-muted)]">
                       <th className="px-3 py-2">Answer</th>
                       <th className="px-3 py-2">Team</th>
                       <th className="px-3 py-2">Docker IP</th>
                       <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2 text-right">Actions</th>
+                      <th className="px-3 py-2 text-right w-12" />
                     </tr>
                   </thead>
                   <tbody>
@@ -587,35 +591,34 @@ function QuestionRow({
                               <Badge tone="success">Active</Badge>
                             )}
                           </td>
-                          <td className="px-3 py-2">
-                            <div className="flex flex-wrap justify-end gap-1">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={busy || addingAnswer}
-                                onClick={() => onStartEditAnswer(answer)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={busy}
-                                onClick={() => onToggleAnswerActive(answer)}
-                              >
-                                {answer.is_active === false
-                                  ? "Activate"
-                                  : "Deactivate"}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={busy}
-                                onClick={() => onDeleteAnswer(answer)}
-                              >
-                                Delete
-                              </Button>
-                            </div>
+                          <td className="px-3 py-2 text-right">
+                            <RowActionsMenu
+                              label={`Actions for answer ${answer.id}`}
+                              items={[
+                                {
+                                  id: "edit",
+                                  label: "Edit",
+                                  disabled: busy || addingAnswer,
+                                  onClick: () => onStartEditAnswer(answer),
+                                },
+                                {
+                                  id: "toggle",
+                                  label:
+                                    answer.is_active === false
+                                      ? "Activate"
+                                      : "Deactivate",
+                                  disabled: busy,
+                                  onClick: () => onToggleAnswerActive(answer),
+                                },
+                                {
+                                  id: "delete",
+                                  label: "Delete",
+                                  disabled: busy,
+                                  destructive: true,
+                                  onClick: () => onDeleteAnswer(answer),
+                                },
+                              ]}
+                            />
                           </td>
                         </tr>
                       ),
@@ -638,6 +641,7 @@ export function ChallengeDetailModal({
   hackathonId,
   onEdit,
 }: ChallengeDetailModalProps) {
+  const { confirm } = usePlatformDialog();
   const [challenge, setChallenge] = useState<ChallengeDetail | null>(null);
   const [questions, setQuestions] = useState<ChallengeQuestionDetail[]>([]);
   const [answers, setAnswers] = useState<ChallengeAnswerDetail[]>([]);
@@ -808,11 +812,13 @@ export function ChallengeDetailModal({
 
   async function removeQuestion(question: ChallengeQuestionDetail) {
     if (!challengeId) return;
-    if (
-      !window.confirm(
-        `Delete question "${question.name}"? This deactivates the question.`,
-      )
-    ) {
+    const ok = await confirm({
+      title: "Delete question",
+      message: `Delete question "${question.name}"? This deactivates the question.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) {
       return;
     }
     await runAction(async () => {
@@ -859,9 +865,13 @@ export function ChallengeDetailModal({
   }
 
   async function removeAnswer(answer: ChallengeAnswerDetail) {
-    if (
-      !window.confirm("Delete this answer key? This soft-deletes the answer.")
-    ) {
+    const ok = await confirm({
+      title: "Delete answer key",
+      message: "Delete this answer key? This soft-deletes the answer.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) {
       return;
     }
     await runAction(async () => {
@@ -906,8 +916,6 @@ export function ChallengeDetailModal({
     setAddingAnswerForQuestionId(null);
   }
 
-  if (!open) return null;
-
   const docker = challenge?.docker;
   const techniques =
     challenge?.technique_details?.map((t) => t.name).filter(Boolean) ??
@@ -915,14 +923,12 @@ export function ChallengeDetailModal({
     [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-[var(--overlay)]"
-        aria-label="Close dialog"
-        onClick={onClose}
-      />
-      <div className="relative z-10 flex max-h-[min(92vh,900px)] w-full max-w-4xl flex-col overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
+    <ModalShell
+      open={open}
+      onClose={onClose}
+      panelClassName="max-w-4xl"
+      ariaLabel="Challenge details"
+    >
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-4">
           <div className="min-w-0">
             <h2 className="truncate text-lg font-semibold text-[var(--text)]">
@@ -976,7 +982,7 @@ export function ChallengeDetailModal({
             </div>
           ) : null}
           {loading && !challenge ? (
-            <p className="text-sm text-[var(--text-muted)]">Loading…</p>
+            <FormSkeleton fields={8} />
           ) : challenge ? (
             <div className="flex flex-col gap-6">
               <section>
@@ -1199,7 +1205,6 @@ export function ChallengeDetailModal({
             </div>
           ) : null}
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

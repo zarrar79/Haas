@@ -12,8 +12,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { CopyableText } from "@/components/ui/copyable-text";
 import { DataTable } from "@/components/ui/data-table";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { PageHeader } from "@/components/ui/page-header";
+import {
+  ListPageStat,
+  ListPageStats,
+  ListPageStatsDot,
+} from "@/components/ui/list-page-stats";
 import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
 import { listAllChallenges } from "@/features/challenges/challenge-api";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
@@ -53,6 +60,7 @@ function formatDate(value?: string | null) {
 }
 
 export function EventQuestionAnswersView({ hackathonId }: Props) {
+  const { confirm } = usePlatformDialog();
   const router = useRouter();
   const { setSelectedHackathonId } = useSelectedEvent();
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
@@ -222,7 +230,13 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
 
   async function removeRow(row: QuestionAnswerRow) {
     if (!row.answer_key_id) return;
-    if (!window.confirm("Delete this answer key? This soft-deletes the flag.")) {
+    const ok = await confirm({
+      title: "Delete answer key",
+      message: "Delete this answer key? This soft-deletes the flag.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) {
       return;
     }
     const scope = rowScope(row);
@@ -293,13 +307,15 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
     );
   }
 
-  function bulkDelete() {
+  async function bulkDelete() {
     const targets = uniqueAnswerTargets(selectedRows);
-    if (
-      !window.confirm(
-        `Delete ${targets.length} selected answer key(s)? This soft-deletes them.`,
-      )
-    ) {
+    const ok = await confirm({
+      title: "Delete answer keys",
+      message: `Delete ${targets.length} selected answer key(s)? This soft-deletes them.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) {
       return;
     }
     void runBulk("Delete", targets, (row) =>
@@ -317,7 +333,6 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
       <PageHeader
         eyebrow="Event workspace"
         title="Question answers"
-        description="Challenge flags, submissions, and scores. Manage answer keys per challenge."
         actions={
           <>
             <Button variant="secondary" onClick={() => void load()}>
@@ -330,15 +345,13 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
 
       <StickyToolbar
         footer={
-          <>
-            <span>
-              {filteredRows.length} row{filteredRows.length === 1 ? "" : "s"}
-            </span>
-            <span>·</span>
-            <span>{dynamicCount} dynamic</span>
-            <span>·</span>
-            <span>{staticCount} static</span>
-          </>
+          <ListPageStats>
+            <ListPageStat label="Rows" value={filteredRows.length} />
+            <ListPageStatsDot />
+            <ListPageStat label="Dynamic" value={dynamicCount} />
+            <ListPageStatsDot />
+            <ListPageStat label="Static" value={staticCount} />
+          </ListPageStats>
         }
       >
         <FilterSelect
@@ -566,35 +579,33 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
           },
           {
             key: "actions",
-            header: "Actions",
-            className: "text-right",
+            header: "",
+            className: "text-right w-12",
             render: (row) => (
-              <div className="flex flex-wrap justify-end gap-1">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={!row.answer_key_id || busyId === row.id}
-                  onClick={() => openEdit(row)}
-                >
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={!row.answer_key_id || busyId === row.id}
-                  onClick={() => void toggleActive(row)}
-                >
-                  {row.is_active === false ? "Activate" : "Deactivate"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  disabled={!row.answer_key_id || busyId === row.id}
-                  onClick={() => void removeRow(row)}
-                >
-                  Delete
-                </Button>
-              </div>
+              <RowActionsMenu
+                label={`Actions for ${row.question_name || row.challenge_name || "answer"}`}
+                items={[
+                  {
+                    id: "edit",
+                    label: "Edit",
+                    disabled: !row.answer_key_id || busyId === row.id,
+                    onClick: () => openEdit(row),
+                  },
+                  {
+                    id: "toggle",
+                    label: row.is_active === false ? "Activate" : "Deactivate",
+                    disabled: !row.answer_key_id || busyId === row.id,
+                    onClick: () => void toggleActive(row),
+                  },
+                  {
+                    id: "delete",
+                    label: "Delete",
+                    disabled: !row.answer_key_id || busyId === row.id,
+                    destructive: true,
+                    onClick: () => void removeRow(row),
+                  },
+                ]}
+              />
             ),
           },
         ]}

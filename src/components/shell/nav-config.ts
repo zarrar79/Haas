@@ -75,7 +75,7 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
       {
         id: "teams",
         label: "Teams",
-        href: "/teams",
+        href: "/events/current/teams",
         icon: "teams",
       },
       {
@@ -83,6 +83,20 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         label: "Catalog",
         href: "/catalog",
         icon: "catalog",
+        platformOnly: true,
+      },
+      {
+        id: "sponsors",
+        label: "Sponsors",
+        href: "/sponsors",
+        icon: "sponsors",
+        platformOnly: true,
+      },
+      {
+        id: "organizations",
+        label: "Organizations",
+        href: "/organizations",
+        icon: "organizations",
         platformOnly: true,
       },
     ],
@@ -171,6 +185,12 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         platformOnly: true,
         children: [
           {
+            id: "system-provisioning",
+            label: "Event provisioning",
+            href: "/system/provisioning",
+            icon: "hackathons-new",
+          },
+          {
             id: "system-stats",
             label: "Stats",
             href: "/system/stats",
@@ -184,7 +204,7 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
           },
           {
             id: "system-admins",
-            label: "Admins",
+            label: "Event admins",
             href: "/system/admins",
             icon: "system-admins",
           },

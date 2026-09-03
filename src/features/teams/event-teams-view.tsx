@@ -5,17 +5,29 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
+import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   BulkActionBar,
   runBulkSequential,
 } from "@/components/ui/bulk-action-bar";
 import { Button } from "@/components/ui/button";
+import { ModalShell } from "@/components/ui/modal-shell";
 import { DataTable } from "@/components/ui/data-table";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { PageHeader } from "@/components/ui/page-header";
+import {
+  ListPageStat,
+  ListPageStats,
+  ListPageStatsDot,
+} from "@/components/ui/list-page-stats";
+import { FormSkeleton } from "@/components/ui/skeleton";
 import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { TextField } from "@/components/ui/text-field";
+import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
+import { useEffectiveHackathonId } from "@/features/events/use-effective-hackathon-id";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { useSectionSearch, applySectionSearch, teamRowSearchParts } from "@/features/search/section-search";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
@@ -28,7 +40,7 @@ import {
   listAllTeams,
   listPlayingTeams,
   listTeams,
-  removeTeam,
+  provisionTeamIpPool,
   setTeamActive,
   unblockTeam,
   updateTeam,
@@ -43,8 +55,6 @@ import { TeamEditMembersPanel } from "@/features/teams/team-edit-members-panel";
 import { eventUserDetailPath } from "@/features/users/users-api";
 import { ApiRequestError } from "@/lib/client-api";
 import type { Hackathon } from "@/types/hackathon";
-
-const ALL_HACKATHONS = "__all__";
 
 type MembershipFilter = "all" | "added" | "not_added";
 type SideFilter = "" | "red" | "blue" | "mix";
@@ -88,22 +98,9 @@ function TeamMembersCell({
   const extra = memberCount > visible.length ? memberCount - visible.length : 0;
 
   return (
-    <div className="max-w-[260px]">
+    <div className="max-w-[260px] flex items-center gap-2">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-medium">{memberCount}</span>
-        {showAdd && onAdd ? (
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-6 px-2 text-[10px]"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAdd();
-            }}
-          >
-            Add
-          </Button>
-        ) : null}
+        {/* <span className="text-xs font-medium">{memberCount}</span> */}
       </div>
       {memberCount > 0 ? (
         <div className="mt-1 flex flex-wrap gap-1">
@@ -138,6 +135,19 @@ function TeamMembersCell({
       ) : showAdd ? null : (
         <span className="mt-1 text-[10px] text-[var(--text-muted)]">No members</span>
       )}
+      {showAdd && onAdd ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-6 px-2 text-[10px]"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd();
+            }}
+          >
+            Add
+          </Button>
+        ) : null}
     </div>
   );
 }
@@ -165,6 +175,9 @@ function TeamFormModal({
   const [website, setWebsite] = useState("");
   const [registerAs, setRegisterAs] = useState("red");
   const [isActive, setIsActive] = useState(true);
+  const [pictureUrl, setPictureUrl] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [clearPicture, setClearPicture] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,6 +185,8 @@ function TeamFormModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setImageFile(null);
+    setClearPicture(false);
     if (mode === "create" || !teamId) {
       setName("");
       setDescription("");
@@ -179,6 +194,7 @@ function TeamFormModal({
       setWebsite("");
       setRegisterAs("red");
       setIsActive(true);
+      setPictureUrl(null);
       setLoading(false);
       return;
     }
@@ -193,6 +209,7 @@ function TeamFormModal({
         setWebsite(team.website || "");
         setRegisterAs(team.register_as || "red");
         setIsActive(team.is_active !== false);
+        setPictureUrl(team.team_picture_url || null);
       })
       .catch((err) => {
         if (!cancelled) {
@@ -216,21 +233,30 @@ function TeamFormModal({
     setError(null);
     try {
       if (mode === "edit" && teamId) {
-        await updateTeam(hackathonId, teamId, {
-          name: name.trim(),
-          description: description.trim() || undefined,
-          affiliation: affiliation.trim() || undefined,
-          website: website.trim() || undefined,
-          register_as: registerAs || undefined,
-          is_active: isActive,
-        });
+        await updateTeam(
+          hackathonId,
+          teamId,
+          {
+            name: name.trim(),
+            description: description.trim() || undefined,
+            affiliation: affiliation.trim() || undefined,
+            website: website.trim() || undefined,
+            register_as: registerAs || undefined,
+            is_active: isActive,
+          },
+          { file: imageFile, clearPicture },
+        );
       } else {
-        await createTeam(hackathonId, {
-          name: name.trim(),
-          description: description.trim() || undefined,
-          affiliation: affiliation.trim() || undefined,
-          register_as: registerAs || undefined,
-        });
+        await createTeam(
+          hackathonId,
+          {
+            name: name.trim(),
+            description: description.trim() || undefined,
+            affiliation: affiliation.trim() || undefined,
+            register_as: registerAs || undefined,
+          },
+          { file: imageFile },
+        );
       }
       onSaved();
       onClose();
@@ -247,23 +273,15 @@ function TeamFormModal({
     }
   }
 
-  if (!open) return null;
-
   const showMembers = mode === "edit" && Boolean(hackathonId && teamId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-[var(--overlay)]"
-        aria-label="Close dialog"
-        onClick={onClose}
-      />
-      <div
-        className={`relative z-10 flex max-h-[min(92vh,720px)] w-full flex-col overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)] ${
-          showMembers ? "max-w-2xl" : "max-w-lg"
-        }`}
-      >
+    <ModalShell
+      open={open}
+      onClose={onClose}
+      panelClassName={showMembers ? "max-w-2xl" : "max-w-lg"}
+      ariaLabel={mode === "edit" ? "Edit team" : "Create team"}
+    >
         <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
@@ -285,9 +303,19 @@ function TeamFormModal({
         <div className="space-y-3 overflow-y-auto px-5 py-4">
           {error ? <Alert variant="error">{error}</Alert> : null}
           {loading ? (
-            <p className="text-sm text-[var(--text-muted)]">Loading…</p>
+            <FormSkeleton fields={5} />
           ) : (
             <>
+              <ImageUploadField
+                label="Team image"
+                currentUrl={pictureUrl}
+                name={name}
+                file={imageFile}
+                clearRequested={clearPicture}
+                onFileChange={setImageFile}
+                onClearChange={setClearPicture}
+                rounded="md"
+              />
               <TextField
                 label="Name *"
                 name="team_name"
@@ -373,8 +401,7 @@ function TeamFormModal({
                 : "Create team"}
           </Button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -383,12 +410,15 @@ export function EventTeamsView({
   syncUrl = true,
 }: EventTeamsViewProps) {
   const router = useRouter();
+  const { confirm, prompt } = usePlatformDialog();
   const { setSelectedHackathonId } = useSelectedEvent();
   const { canMutateEvent } = useHaasAccess();
+  const effectiveHackathonId = useEffectiveHackathonId();
 
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
-  const [activeId, setActiveId] = useState(hackathonIdProp || ALL_HACKATHONS);
-  const isAllScope = activeId === ALL_HACKATHONS || !activeId;
+  const [activeId, setActiveId] = useState(
+    hackathonIdProp || effectiveHackathonId || "",
+  );
 
   const [rows, setRows] = useState<Row[]>([]);
   const { search, setSearch, debouncedSearch, focusId, clearDeepSearch } =
@@ -406,6 +436,10 @@ export function EventTeamsView({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [shownCount, setShownCount] = useState(0);
+  const onPaginationInfo = useCallback((info: { shown: number }) => {
+    setShownCount(info.shown);
+  }, []);
   const [addMemberTarget, setAddMemberTarget] = useState<{
     teamId: string;
     teamName: string;
@@ -449,86 +483,45 @@ export function EventTeamsView({
   );
 
   const load = useCallback(async () => {
+    if (!activeId) {
+      setRows([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setInfo(null);
 
     try {
-      let allTeams: EventTeam[] = [];
-      let addedIds = new Set<string>();
-      let limited = false;
+      let allTeams: EventTeam[] = await listAllTeams({
+        ...apiFilters,
+        hackathon: activeId,
+      });
 
-      if (isAllScope) {
-        try {
-          allTeams = await listAllTeams(apiFilters);
-        } catch (err) {
-          if (err instanceof ApiRequestError && err.httpStatus === 401) {
-            router.replace("/login");
-            return;
-          }
-          if (err instanceof ApiRequestError && err.httpStatus === 403) {
-            setError(
-              "Listing all teams requires Root / system.admin. Select a hackathon instead.",
-            );
-            setRows([]);
-            setCatalogLimited(true);
-            return;
-          }
-          throw err;
-        }
-        setInfo("Showing all platform teams (in any hackathon or none).");
-      } else {
-        try {
-          allTeams = await listAllTeams(apiFilters);
-        } catch (err) {
-          if (err instanceof ApiRequestError && err.httpStatus === 403) {
-            limited = true;
-            try {
-              allTeams = await listTeams(activeId, apiFilters);
-              limited = false;
-            } catch {
-              // Fall back below.
-            }
-          } else if (err instanceof ApiRequestError && err.httpStatus === 401) {
-            router.replace("/login");
-            return;
-          } else {
-            throw err;
-          }
-        }
-
-        // Event catalog (created-in / linked) so removed teams stay visible.
-        const eventCatalog = await listTeams(activeId, {
-          search: debouncedSearch || undefined,
-          limit: "100",
-        });
-        for (const team of eventCatalog) {
-          if (!allTeams.some((t) => t.id === team.id)) {
-            allTeams.push(team);
-          }
-        }
-
-        // "Added" = on the live playing roster only.
-        const playing = await listPlayingTeams(activeId, {
-          search: debouncedSearch || undefined,
-          limit: "100",
-        });
-        addedIds = new Set(playing.map((t) => t.id));
-
-        if (limited) {
-          setInfo(
-            "Showing teams for this event. Full platform catalog requires Root / system.admin.",
-          );
+      const eventCatalog = await listTeams(activeId, {
+        search: debouncedSearch || undefined,
+        limit: "100",
+      });
+      for (const team of eventCatalog) {
+        if (!allTeams.some((t) => t.id === team.id)) {
+          allTeams.push(team);
         }
       }
 
-      setCatalogLimited(limited);
+      const playing = await listPlayingTeams(activeId, {
+        search: debouncedSearch || undefined,
+        limit: "100",
+      });
+      const addedIds = new Set(playing.map((t) => t.id));
+
+      setCatalogLimited(false);
 
       const merged = new Map<string, Row>();
       for (const team of allTeams) {
         merged.set(team.id, {
           ...team,
-          isAdded: isAllScope ? false : addedIds.has(team.id),
+          isAdded: addedIds.has(team.id),
           createdInName:
             team.created_in_hackathon?.display_name ||
             team.created_in_hackathon?.name ||
@@ -542,11 +535,15 @@ export function EventTeamsView({
         ),
       );
     } catch (err) {
+      if (err instanceof ApiRequestError && err.httpStatus === 401) {
+        router.replace("/login");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to load teams");
     } finally {
       setIsLoading(false);
     }
-  }, [activeId, apiFilters, debouncedSearch, isAllScope, router]);
+  }, [activeId, apiFilters, debouncedSearch, router]);
 
   useEffect(() => {
     void load();
@@ -554,10 +551,8 @@ export function EventTeamsView({
 
   const filtered = useMemo(() => {
     const base = rows.filter((row) => {
-      if (!isAllScope) {
-        if (membership === "added" && !row.isAdded) return false;
-        if (membership === "not_added" && row.isAdded) return false;
-      }
+      if (membership === "added" && !row.isAdded) return false;
+      if (membership === "not_added" && row.isAdded) return false;
       if (sideFilter && row.register_as !== sideFilter) return false;
       if (activeFilter === "active" && row.is_active === false) return false;
       if (activeFilter === "inactive" && row.is_active !== false) return false;
@@ -575,7 +570,6 @@ export function EventTeamsView({
     membership,
     sideFilter,
     activeFilter,
-    isAllScope,
     debouncedSearch,
     focusId,
   ]);
@@ -588,17 +582,19 @@ export function EventTeamsView({
   }
 
   function onHackathonChange(nextId: string) {
-    setActiveId(nextId || ALL_HACKATHONS);
-    if (nextId && nextId !== ALL_HACKATHONS) {
+    setActiveId(nextId);
+    if (nextId) {
       setSelectedHackathonId(nextId);
       if (syncUrl) router.push(`/events/${nextId}/teams`);
-    } else if (syncUrl) {
-      router.push("/teams");
     }
   }
 
   function scopeHackathonId() {
-    return isAllScope ? null : activeId;
+    return activeId || null;
+  }
+
+  function teamHackathonId(_row: Row): string | null {
+    return activeId || null;
   }
 
   function openCreate() {
@@ -614,10 +610,7 @@ export function EventTeamsView({
   }
 
   async function onAdd(teamId: string) {
-    if (isAllScope) {
-      setError("Select a hackathon first to add a team to an event.");
-      return;
-    }
+    if (!activeId) return;
     setBusyId(teamId);
     setError(null);
     try {
@@ -650,12 +643,47 @@ export function EventTeamsView({
     }
   }
 
-  async function onBlock(row: Row) {
-    if (isAllScope) {
-      setError("Select a hackathon to block a team in that event.");
+  async function onAssignPool(row: Row) {
+    const eventId = teamHackathonId(row);
+    if (!eventId) return;
+    if (!canMutateEvent(eventId)) return;
+    if (row.is_blocked) {
+      setError("Unblock the team before assigning an IP pool.");
       return;
     }
-    const reason = window.prompt("Block reason", "Blocked in HAS admin");
+    const ok = await confirm({
+      title: "Assign IP pool",
+      message: `Assign an IP pool to "${row.name}"? The team will be deactivated and reactivated so Kubernetes can provision a namespace and pool.`,
+      confirmLabel: "Assign pool",
+    });
+    if (!ok) {
+      return;
+    }
+    setBusyId(row.id);
+    setError(null);
+    setInfo(null);
+    try {
+      await provisionTeamIpPool(eventId ?? scopeHackathonId(), row.id);
+      setInfo(
+        `IP pool provisioning started for "${row.name}". Refresh if the pool does not appear immediately.`,
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to assign IP pool");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function onBlock(row: Row) {
+    if (!activeId) return;
+    const reason = await prompt({
+      title: "Block team",
+      message: `Provide a reason for blocking "${row.name}".`,
+      label: "Block reason",
+      defaultValue: "Blocked in HAS admin",
+      confirmLabel: "Block",
+    });
     if (reason == null) return;
     setBusyId(row.id);
     try {
@@ -669,7 +697,7 @@ export function EventTeamsView({
   }
 
   async function onUnblock(row: Row) {
-    if (isAllScope) return;
+    if (!activeId) return;
     setBusyId(row.id);
     try {
       await unblockTeam(activeId, row.id);
@@ -682,12 +710,14 @@ export function EventTeamsView({
   }
 
   async function onRemoveFromHackathon(row: Row) {
-    if (isAllScope) return;
-    if (
-      !window.confirm(
-        `Remove team "${row.name}" from this hackathon? You can Add it again anytime.`,
-      )
-    ) {
+    if (!activeId) return;
+    const ok = await confirm({
+      title: "Remove from event",
+      message: `Remove team "${row.name}" from this hackathon? You can Add it again anytime.`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) {
       return;
     }
     setBusyId(row.id);
@@ -706,28 +736,8 @@ export function EventTeamsView({
     }
   }
 
-  async function onDelete(row: Row) {
-    if (
-      !window.confirm(
-        `Delete team "${row.name}"? This soft-deactivates the team.`,
-      )
-    ) {
-      return;
-    }
-    setBusyId(row.id);
-    setError(null);
-    try {
-      await removeTeam(scopeHackathonId(), row.id);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete team");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   function onRowDoubleClick(row: Row) {
-    if (isAllScope || row.isAdded || busyId) return;
+    if (!activeId || row.isAdded || busyId) return;
     void onAdd(row.id);
   }
 
@@ -775,30 +785,8 @@ export function EventTeamsView({
     );
   }
 
-  function bulkDelete() {
-    const ids = selectedRows.map((r) => r.id);
-    if (
-      !window.confirm(
-        isAllScope
-          ? `Delete ${ids.length} selected team(s)? This soft-deactivates them.`
-          : `Deactivate ${ids.length} selected team(s)?`,
-      )
-    ) {
-      return;
-    }
-    if (isAllScope) {
-      void runBulk("Delete", ids, (id) =>
-        removeTeam(null, id).then(() => undefined),
-      );
-      return;
-    }
-    void runBulk("Deactivate", ids, (id) =>
-      setTeamActive(activeId, id, false).then(() => undefined),
-    );
-  }
-
   function bulkAdd() {
-    if (isAllScope) return;
+    if (!activeId) return;
     const ids = selectedRows.filter((r) => !r.isAdded).map((r) => r.id);
     if (ids.length === 0) {
       setError("No selected teams are available to add.");
@@ -809,18 +797,20 @@ export function EventTeamsView({
     );
   }
 
-  function bulkRemoveFromEvent() {
-    if (isAllScope) return;
+  async function bulkRemoveFromEvent() {
+    if (!activeId) return;
     const ids = selectedRows.filter((r) => r.isAdded).map((r) => r.id);
     if (ids.length === 0) {
       setError("No selected teams are attached to remove.");
       return;
     }
-    if (
-      !window.confirm(
-        `Remove ${ids.length} team(s) from this hackathon? You can Add them again later.`,
-      )
-    ) {
+    const ok = await confirm({
+      title: "Remove from event",
+      message: `Remove ${ids.length} team(s) from this hackathon? You can Add them again later.`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) {
       return;
     }
     void runBulk("Remove", ids, (id) =>
@@ -842,30 +832,60 @@ export function EventTeamsView({
       <PageHeader
         eyebrow="Event workspace"
         title="Teams"
-        description="Browse all teams or scope to one hackathon. Create, add, edit, activate, or remove."
         actions={
           <>
-            <Button variant="secondary" onClick={() => void load()}>
+            <Button variant="secondary" size="sm" onClick={() => void load()}>
               Refresh
             </Button>
-            <Button onClick={openCreate}>Create team</Button>
+            <Button size="sm" onClick={openCreate} disabled={!activeId}>
+              Create team
+            </Button>
           </>
         }
       />
 
-      <StickyToolbar>
+      <StickyToolbar
+        footer={
+          <ListPageStats>
+            <ListPageStat label="Total" value={rows.length} />
+            <ListPageStatsDot />
+            <ListPageStat label="Shown" value={shownCount} />
+            <ListPageStatsDot />
+            <ListPageStat label="Added" value={addedCount} tone="accent" />
+            <ListPageStatsDot />
+            <ListPageStat
+              label="Not added"
+              value={notAddedCount}
+              tone="warning"
+            />
+            {(debouncedSearch || focusId) ? (
+              <>
+                <ListPageStatsDot />
+                <span className="text-[var(--accent)]">
+                  {focusId
+                    ? "Deep search result"
+                    : `Matching “${debouncedSearch}”`}
+                </span>
+              </>
+            ) : null}
+          </ListPageStats>
+        }
+      >
         <FilterSelect
           label="Hackathon"
-          value={activeId || ALL_HACKATHONS}
+          value={activeId}
           onChange={onHackathonChange}
           className="min-w-[180px]"
         >
-          <option value={ALL_HACKATHONS}>All teams</option>
-          {hackathons.map((h) => (
-            <option key={h.id} value={h.id}>
-              {h.display_name || h.name}
-            </option>
-          ))}
+          {hackathons.length === 0 ? (
+            <option value="">No events</option>
+          ) : (
+            hackathons.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.display_name || h.name}
+              </option>
+            ))
+          )}
         </FilterSelect>
 
         <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)]">
@@ -879,17 +899,15 @@ export function EventTeamsView({
           />
         </label>
 
-        {!isAllScope ? (
-          <FilterSelect
-            label="Membership"
-            value={membership}
-            onChange={(v) => setMembership(v as MembershipFilter)}
-          >
-            <option value="all">All</option>
-            <option value="added">Added</option>
-            <option value="not_added">Not added</option>
-          </FilterSelect>
-        ) : null}
+        <FilterSelect
+          label="Membership"
+          value={membership}
+          onChange={(v) => setMembership(v as MembershipFilter)}
+        >
+          <option value="all">All</option>
+          <option value="added">Added</option>
+          <option value="not_added">Not added</option>
+        </FilterSelect>
 
         <FilterSelect
           label="Side"
@@ -924,37 +942,12 @@ export function EventTeamsView({
         </div>
       </StickyToolbar>
 
-      <div className="mb-3 flex flex-wrap gap-4 text-xs text-[var(--text-muted)]">
-        <span>
-          Total <strong className="text-[var(--text)]">{rows.length}</strong>
-          {" · "}
-          Shown <strong className="text-[var(--text)]">{filtered.length}</strong>
-        </span>
-        {!isAllScope ? (
-          <span>
-            Added <strong className="text-[var(--accent)]">{addedCount}</strong>
-            {" · "}
-            Not added{" "}
-            <strong className="text-[var(--warning)]">{notAddedCount}</strong>
-          </span>
-        ) : null}
-        {(debouncedSearch || focusId) && (
-          <span className="text-[var(--accent)]">
-            {focusId
-              ? "Showing selected result from deep search"
-              : `Matching “${debouncedSearch}”`}
-          </span>
-        )}
-      </div>
-
       <TeamFormModal
         open={modalOpen}
         mode={modalMode}
         hackathonId={scopeHackathonId()}
         teamId={editingId}
-        canManageMembers={
-          !isAllScope && Boolean(activeId && canMutateEvent(activeId))
-        }
+        canManageMembers={Boolean(activeId && canMutateEvent(activeId))}
         onClose={() => {
           setModalOpen(false);
           setEditingId(null);
@@ -985,14 +978,6 @@ export function EventTeamsView({
         </div>
       ) : null}
 
-      {!isAllScope ? (
-        <p className="mb-2 text-xs text-[var(--text-muted)]">
-          Tip: double-click a{" "}
-          <span className="text-[var(--warning)]">Not added</span> row to attach
-          it to this hackathon.
-        </p>
-      ) : null}
-
       <BulkActionBar
         selectedCount={selectedKeys.size}
         busy={bulkBusy}
@@ -1009,25 +994,15 @@ export function EventTeamsView({
             onClick: () => bulkActivate(false),
           },
           {
-            id: "delete",
-            label: "Delete",
-            variant: "danger",
-            onClick: bulkDelete,
+            id: "add",
+            label: "Add to event",
+            onClick: bulkAdd,
           },
-          ...(!isAllScope
-            ? [
-                {
-                  id: "add",
-                  label: "Add to event",
-                  onClick: bulkAdd,
-                },
-                {
-                  id: "remove",
-                  label: "Remove from event",
-                  onClick: bulkRemoveFromEvent,
-                },
-              ]
-            : []),
+          {
+            id: "remove",
+            label: "Remove from event",
+            onClick: bulkRemoveFromEvent,
+          },
         ]}
       />
 
@@ -1039,6 +1014,7 @@ export function EventTeamsView({
         selectedKeys={selectedKeys}
         onSelectionChange={setSelectedKeys}
         onRowDoubleClick={onRowDoubleClick}
+        onPaginationInfo={onPaginationInfo}
         emptyMessage={
           catalogLimited && !hasActiveFilters
             ? "No teams to show."
@@ -1050,13 +1026,19 @@ export function EventTeamsView({
             header: "Team",
             render: (row) => (
               <div
-                className={
-                  !isAllScope && !row.isAdded ? "cursor-pointer" : undefined
-                }
+                className={`flex items-center gap-3 ${!row.isAdded ? "cursor-pointer" : ""}`}
               >
-                <div className="font-medium">{row.name}</div>
-                <div className="font-mono text-[10px] text-[var(--text-muted)]">
-                  {row.team_code || row.id}
+                <Avatar
+                  src={row.team_picture_url}
+                  name={row.name}
+                  size="sm"
+                  rounded="md"
+                />
+                <div>
+                  <div className="font-medium">{row.name}</div>
+                  <div className="font-mono text-[10px] text-[var(--text-muted)]">
+                    {row.team_code || row.id}
+                  </div>
                 </div>
               </div>
             ),
@@ -1064,11 +1046,31 @@ export function EventTeamsView({
           {
             key: "ip_pool",
             header: "IP pool",
-            render: (row) => (
-              <span className="font-mono text-xs">
-                {row.ip_pool || row.pool_ip || row.subnet || "—"}
-              </span>
-            ),
+            render: (row) => {
+              const pool =
+                row.ip_pool || row.pool_ip || row.subnet || null;
+              const eventId = teamHackathonId(row);
+              const canAssign =
+                !pool &&
+                !row.is_blocked &&
+                Boolean(eventId && canMutateEvent(eventId));
+              if (pool) {
+                return <span className="font-mono text-xs">{pool}</span>;
+              }
+              if (canAssign) {
+                return (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busyId === row.id}
+                    onClick={() => void onAssignPool(row)}
+                  >
+                    {busyId === row.id ? "Assigning…" : "Assign pool"}
+                  </Button>
+                );
+              }
+              return <span className="text-[var(--text-muted)]">—</span>;
+            },
           },
           {
             key: "namespace",
@@ -1088,8 +1090,7 @@ export function EventTeamsView({
                 typeof row.member_count === "number"
                   ? row.member_count
                   : members.length;
-              const eventId =
-                isAllScope ? row.created_in_hackathon?.id || null : activeId;
+              const eventId = activeId || null;
               const memberUserIds = members
                 .map((m) => memberUserId(m))
                 .filter((id): id is string => Boolean(id));
@@ -1136,93 +1137,68 @@ export function EventTeamsView({
               </div>
             ),
           },
-          ...(!isAllScope
-            ? [
-                {
-                  key: "membership",
-                  header: "In this hackathon",
-                  render: (row: Row) =>
-                    row.isAdded ? (
-                      <Badge tone="success">Added</Badge>
-                    ) : (
-                      <Badge tone="warning">Not added</Badge>
-                    ),
-                },
-              ]
-            : []),
+          {
+            key: "membership",
+            header: "In this hackathon",
+            render: (row: Row) =>
+              row.isAdded ? (
+                <Badge tone="success">Added</Badge>
+              ) : (
+                <Badge tone="warning">Not added</Badge>
+              ),
+          },
           {
             key: "actions",
-            header: "Actions",
-            className: "text-right",
+            header: "",
+            className: "text-right w-12",
             render: (row) => (
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busyId === row.id}
-                  onClick={() => openEdit(row.id)}
-                >
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busyId === row.id}
-                  onClick={() => void onToggleActive(row)}
-                >
-                  {row.is_active === true ? "Deactivate" : "Activate"}
-                </Button>
-                {!isAllScope ? (
-                  row.isAdded ? (
-                    <>
-                      {row.is_blocked ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={busyId === row.id}
-                          onClick={() => void onUnblock(row)}
-                        >
-                          Unblock
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={busyId === row.id}
-                          onClick={() => void onBlock(row)}
-                        >
-                          Block
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={busyId === row.id}
-                        onClick={() => void onRemoveFromHackathon(row)}
-                      >
-                        {busyId === row.id ? "Removing…" : "Remove"}
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      size="sm"
-                      disabled={busyId === row.id}
-                      onClick={() => void onAdd(row.id)}
-                    >
-                      {busyId === row.id ? "Adding…" : "Add"}
-                    </Button>
-                  )
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={busyId === row.id}
-                    onClick={() => void onDelete(row)}
-                  >
-                    Delete
-                  </Button>
-                )}
-              </div>
+              <RowActionsMenu
+                label={`Actions for ${row.name || row.team_code || "team"}`}
+                items={[
+                  {
+                    id: "edit",
+                    label: "Edit",
+                    disabled: busyId === row.id,
+                    onClick: () => openEdit(row.id),
+                  },
+                  {
+                    id: "toggle-active",
+                    label: row.is_active === true ? "Deactivate" : "Activate",
+                    disabled: busyId === row.id,
+                    onClick: () => void onToggleActive(row),
+                  },
+                  ...(row.isAdded
+                    ? [
+                        row.is_blocked
+                          ? {
+                              id: "unblock",
+                              label: "Unblock",
+                              disabled: busyId === row.id,
+                              onClick: () => void onUnblock(row),
+                            }
+                          : {
+                              id: "block",
+                              label: "Block",
+                              disabled: busyId === row.id,
+                              onClick: () => void onBlock(row),
+                            },
+                        {
+                          id: "remove",
+                          label: busyId === row.id ? "Removing…" : "Remove",
+                          disabled: busyId === row.id,
+                          onClick: () => void onRemoveFromHackathon(row),
+                        },
+                      ]
+                    : [
+                        {
+                          id: "add",
+                          label: busyId === row.id ? "Adding…" : "Add",
+                          disabled: busyId === row.id,
+                          onClick: () => void onAdd(row.id),
+                        },
+                      ]),
+                ]}
+              />
             ),
           },
         ]}

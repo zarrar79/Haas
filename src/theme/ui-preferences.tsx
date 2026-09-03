@@ -19,9 +19,7 @@ type UiPreferencesValue = {
   toggleApiTester: () => void;
   navPlacement: NavPlacement;
   setNavPlacement: (value: NavPlacement) => void;
-  sidebarCollapsed: boolean;
-  setSidebarCollapsed: (value: boolean) => void;
-  toggleSidebarCollapsed: () => void;
+  toggleNavPlacement: () => void;
   mobileNavOpen: boolean;
   setMobileNavOpen: (value: boolean) => void;
 };
@@ -31,6 +29,7 @@ const STORAGE_KEY = "has-ui-preferences";
 type StoredPrefs = {
   showApiTester?: boolean;
   navPlacement?: NavPlacement;
+  /** @deprecated migrated to navPlacement === "header" */
   sidebarCollapsed?: boolean;
 };
 
@@ -39,7 +38,6 @@ const UiPreferencesContext = createContext<UiPreferencesValue | null>(null);
 export function UiPreferencesProvider({ children }: { children: ReactNode }) {
   const [showApiTester, setShowApiTesterState] = useState(false);
   const [navPlacement, setNavPlacementState] = useState<NavPlacement>("sidebar");
-  const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -51,12 +49,14 @@ export function UiPreferencesProvider({ children }: { children: ReactNode }) {
         if (typeof parsed.showApiTester === "boolean") {
           setShowApiTesterState(parsed.showApiTester);
         }
+        let placement: NavPlacement = "sidebar";
         if (parsed.navPlacement === "sidebar" || parsed.navPlacement === "header") {
-          setNavPlacementState(parsed.navPlacement);
+          placement = parsed.navPlacement;
         }
-        if (typeof parsed.sidebarCollapsed === "boolean") {
-          setSidebarCollapsedState(parsed.sidebarCollapsed);
+        if (parsed.sidebarCollapsed && placement === "sidebar") {
+          placement = "header";
         }
+        setNavPlacementState(placement);
       }
     } catch {
       /* ignore corrupt storage */
@@ -69,10 +69,9 @@ export function UiPreferencesProvider({ children }: { children: ReactNode }) {
     const payload: StoredPrefs = {
       showApiTester,
       navPlacement,
-      sidebarCollapsed,
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }, [hydrated, showApiTester, navPlacement, sidebarCollapsed]);
+  }, [hydrated, showApiTester, navPlacement]);
 
   const setShowApiTester = useCallback((value: boolean) => {
     setShowApiTesterState(value);
@@ -86,12 +85,8 @@ export function UiPreferencesProvider({ children }: { children: ReactNode }) {
     setNavPlacementState(value);
   }, []);
 
-  const setSidebarCollapsed = useCallback((value: boolean) => {
-    setSidebarCollapsedState(value);
-  }, []);
-
-  const toggleSidebarCollapsed = useCallback(() => {
-    setSidebarCollapsedState((prev) => !prev);
+  const toggleNavPlacement = useCallback(() => {
+    setNavPlacementState((prev) => (prev === "sidebar" ? "header" : "sidebar"));
   }, []);
 
   const value = useMemo(
@@ -101,9 +96,7 @@ export function UiPreferencesProvider({ children }: { children: ReactNode }) {
       toggleApiTester,
       navPlacement,
       setNavPlacement,
-      sidebarCollapsed,
-      setSidebarCollapsed,
-      toggleSidebarCollapsed,
+      toggleNavPlacement,
       mobileNavOpen,
       setMobileNavOpen,
     }),
@@ -113,9 +106,7 @@ export function UiPreferencesProvider({ children }: { children: ReactNode }) {
       toggleApiTester,
       navPlacement,
       setNavPlacement,
-      sidebarCollapsed,
-      setSidebarCollapsed,
-      toggleSidebarCollapsed,
+      toggleNavPlacement,
       mobileNavOpen,
     ],
   );

@@ -32,6 +32,7 @@ export async function listHackathonAdmins(filters?: {
   hackathon?: string;
   user?: string;
   is_active?: string;
+  show_inactive?: string;
 }) {
   const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
     haasApiPath("hackathon-admins", {
@@ -59,4 +60,31 @@ export async function revokeHackathonAdmin(bindingId: string) {
     { method: "DELETE" },
   );
   return unwrapHaasResult(result);
+}
+
+/** Apply desired admin user ids; assigns new and revokes removed bindings. */
+export async function syncHackathonAdmins(
+  hackathonId: string,
+  desiredUserIds: string[],
+  existingBindings: HackathonAdminBinding[],
+) {
+  const desired = new Set(desiredUserIds.filter(Boolean));
+  const existingByUser = new Map(
+    existingBindings.map((b) => [b.user, b]),
+  );
+
+  const toAssign = [...desired].filter((id) => {
+    const existing = existingByUser.get(id);
+    return !existing || existing.is_active === false;
+  });
+  const toRevoke = existingBindings.filter(
+    (b) => b.is_active !== false && !desired.has(b.user),
+  );
+
+  await Promise.all([
+    ...toAssign.map((userId) =>
+      assignHackathonAdmin({ user: userId, hackathon: hackathonId }),
+    ),
+    ...toRevoke.map((binding) => revokeHackathonAdmin(binding.id)),
+  ]);
 }

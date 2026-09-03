@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ModalShell } from "@/components/ui/modal-shell";
 import { InlineLoader } from "@/components/ui/loader";
 import {
   buildTeamTypePayload,
@@ -45,6 +46,8 @@ export function UserFormModal({
   const [profile, setProfile] = useState<EventUser | null>(null);
   const [form, setForm] = useState<UserProfileEditState>(emptyUserProfileEditState());
   const [password, setPassword] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [clearImage, setClearImage] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +57,8 @@ export function UserFormModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setImageFile(null);
+    setClearImage(false);
 
     if (mode === "create") {
       setProfile(null);
@@ -91,8 +96,6 @@ export function UserFormModal({
     };
   }, [open, mode, editUserId, hackathonId, row]);
 
-  if (!open) return null;
-
   async function submit() {
     setBusy(true);
     setError(null);
@@ -103,24 +106,29 @@ export function UserFormModal({
           setBusy(false);
           return;
         }
-        await createEventUser(hackathonId, {
-          email: form.email.trim(),
-          username: form.username.trim(),
-          password: form.password,
-          name: form.name.trim() || undefined,
-          last_name: form.last_name.trim() || undefined,
-          phone_number: form.phone_number.trim() || undefined,
-          gender: form.gender.trim() || undefined,
-          education: educationToPayload(form.education),
-          certifications: certificationsToPayload(form.certifications),
-          expertise: expertiseToPayload(form.expertise),
-          team_type: buildTeamTypePayload(undefined, form.teamType),
-        });
+        await createEventUser(
+          hackathonId,
+          {
+            email: form.email.trim(),
+            username: form.username.trim(),
+            password: form.password,
+            name: form.name.trim() || undefined,
+            last_name: form.last_name.trim() || undefined,
+            phone_number: form.phone_number.trim() || undefined,
+            gender: form.gender.trim() || undefined,
+            education: educationToPayload(form.education),
+            certifications: certificationsToPayload(form.certifications),
+            expertise: expertiseToPayload(form.expertise),
+            team_type: buildTeamTypePayload(undefined, form.teamType),
+          },
+          { file: imageFile },
+        );
       } else if (editUserId) {
         await updateEventUser(
           hackathonId,
           editUserId,
           editStateToUpdatePayload(form, profile?.team_type, password || undefined),
+          { file: imageFile, clearMedia: clearImage },
         );
       }
       onSaved();
@@ -133,20 +141,16 @@ export function UserFormModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4">
-      <div
-        className="flex max-h-[min(92vh,900px)] w-full max-w-3xl flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--surface)] shadow-[var(--shadow-lg)]"
-        role="dialog"
-        aria-modal="true"
-      >
+    <ModalShell
+      open={open}
+      onClose={onClose}
+      panelClassName="max-w-3xl"
+      ariaLabel={mode === "create" ? "Create user" : "Edit user"}
+    >
         <div className="border-b border-[var(--border)] px-6 py-4">
           <h2 className="text-lg font-bold text-[var(--text)]">
             {mode === "create" ? "Create user" : "Edit user"}
           </h2>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Update account details, education, certifications, expertise, and team
-            type for this event user.
-          </p>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -161,6 +165,11 @@ export function UserFormModal({
               onChange={setForm}
               password={password}
               onPasswordChange={setPassword}
+              mediaUrl={profile?.media_url}
+              imageFile={imageFile}
+              clearImage={clearImage}
+              onImageFileChange={setImageFile}
+              onClearImageChange={setClearImage}
             />
           )}
 
@@ -182,7 +191,6 @@ export function UserFormModal({
             {busy ? "Saving…" : mode === "create" ? "Create user" : "Save changes"}
           </Button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

@@ -59,6 +59,14 @@ export async function POST(request: Request) {
 
     const loginData = decryptBackendPayload<LoginData>(payload.data);
     const accessToken = loginData?.token ?? loginData?.access;
+    const loginUser = loginData?.user as { is_staff?: boolean } | null | undefined;
+
+    if (loginUser && loginUser.is_staff !== true) {
+      return errorResponse(
+        "You do not have administrative privileges to access this console.",
+        403,
+      );
+    }
 
     if (!accessToken) {
       return errorResponse(

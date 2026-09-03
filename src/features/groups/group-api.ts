@@ -19,6 +19,7 @@ export type HaasGroup = {
   description?: string;
   hackathon?: string | null;
   can_manage_groups?: boolean;
+  user_count?: number;
   permissions?: HaasPermission[];
   users?: Array<{ id: string; username?: string }>;
 };
@@ -60,6 +61,18 @@ export async function createEventGroup(
       method: "POST",
       body: { ...body, hackathon: hackathonId },
     },
+  );
+  return unwrapHaasResult(result).data;
+}
+
+export async function createPlatformGroup(body: {
+  name: string;
+  description?: string;
+  permission_ids?: number[];
+}) {
+  const result = await callAppApi<ApiResult<HaasForwardPayload<HaasGroup>>>(
+    haasApiPath("groups"),
+    { method: "POST", body },
   );
   return unwrapHaasResult(result).data;
 }

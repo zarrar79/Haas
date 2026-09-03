@@ -8,8 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyableText } from "@/components/ui/copyable-text";
 import { DataTable } from "@/components/ui/data-table";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { PageHeader } from "@/components/ui/page-header";
+import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
 import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { ActivityLogFormModal } from "@/features/activity-logs/activity-log-form-modal";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { listEventUsers, eventUserLabel, type EventUser } from "@/features/users/users-api";
@@ -65,6 +68,7 @@ function typeBadge(type?: string) {
 }
 
 export function EventActivityLogsView({ hackathonId }: Props) {
+  const { confirm } = usePlatformDialog();
   const router = useRouter();
   const { canMutateEvent } = useHaasAccess();
   const [activeId, setActiveId] = useState(hackathonId);
@@ -148,7 +152,13 @@ export function EventActivityLogsView({ hackathonId }: Props) {
   }, [load]);
 
   async function onDelete(row: ActivityLog) {
-    if (!window.confirm("Permanently delete this activity log entry?")) return;
+    const ok = await confirm({
+      title: "Delete activity log",
+      message: "Permanently delete this activity log entry?",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusyId(String(row.id));
     try {
       await deleteActivityLog(activeId, row.id);
@@ -165,7 +175,6 @@ export function EventActivityLogsView({ hackathonId }: Props) {
       <PageHeader
         eyebrow="Event workspace"
         title="Activity logs"
-        description="Player actions for this event — submissions, spawns, logins, and errors."
         actions={
           <>
             <Button variant="secondary" onClick={() => void load()}>
@@ -185,7 +194,14 @@ export function EventActivityLogsView({ hackathonId }: Props) {
         }
       />
 
-      <StickyToolbar layout="stack">
+      <StickyToolbar
+        layout="stack"
+        footer={
+          <ListPageStats>
+            <ListPageStat label="Entries" value={rows.length} />
+          </ListPageStats>
+        }
+      >
         <div className="flex flex-wrap items-end gap-3">
           <HackathonPicker
             value={activeId}
@@ -253,9 +269,6 @@ export function EventActivityLogsView({ hackathonId }: Props) {
             />
           </label>
         </div>
-        <p className="text-xs text-[var(--text-muted)]">
-          {rows.length} log entries
-        </p>
       </StickyToolbar>
 
       {error ? (
@@ -308,30 +321,30 @@ export function EventActivityLogsView({ hackathonId }: Props) {
           {
             key: "actions",
             header: "",
-            className: "text-right",
+            className: "text-right w-12",
             render: (r) =>
               canWrite ? (
-                <div className="flex flex-wrap justify-end gap-1">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={busyId === String(r.id)}
-                    onClick={() => {
-                      setEditingRow(r);
-                      setModalOpen(true);
-                    }}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={busyId === String(r.id)}
-                    onClick={() => void onDelete(r)}
-                  >
-                    Delete
-                  </Button>
-                </div>
+                <RowActionsMenu
+                  label={`Actions for log ${r.id}`}
+                  items={[
+                    {
+                      id: "edit",
+                      label: "Edit",
+                      disabled: busyId === String(r.id),
+                      onClick: () => {
+                        setEditingRow(r);
+                        setModalOpen(true);
+                      },
+                    },
+                    {
+                      id: "delete",
+                      label: "Delete",
+                      disabled: busyId === String(r.id),
+                      destructive: true,
+                      onClick: () => void onDelete(r),
+                    },
+                  ]}
+                />
               ) : (
                 <span className="text-xs text-[var(--text-muted)]">—</span>
               ),

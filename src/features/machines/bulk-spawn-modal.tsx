@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ModalShell } from "@/components/ui/modal-shell";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
 import { bulkSpawnMachines } from "@/features/ops/ops-api";
 import type { EventTeam } from "@/features/teams/team-api";
@@ -70,24 +71,18 @@ export function BulkSpawnModal({
     }
   }
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-[var(--overlay)]"
-        aria-label="Close dialog"
-        onClick={onClose}
-      />
-      <div className="relative z-10 flex max-h-[min(92vh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
+    <ModalShell
+      open={open}
+      onClose={onClose}
+      panelClassName="max-w-2xl"
+      zIndexClass="z-[60]"
+      ariaLabel="Bulk spawn machines"
+    >
         <div className="border-b border-[var(--border)] px-5 py-4">
           <h2 className="text-lg font-semibold text-[var(--text)]">
             Bulk spawn machines
           </h2>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Spawn VMs for every selected team × challenge combination.
-          </p>
         </div>
         <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-5 py-4 sm:grid-cols-2">
           <div>
@@ -146,7 +141,6 @@ export function BulkSpawnModal({
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

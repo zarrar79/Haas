@@ -40,6 +40,7 @@ export type ChallengeSummary = {
     machine_name?: string;
     machine_description?: string;
     docker_type?: string;
+    kind?: string;
     os?: string;
     port?: number;
     flag_num?: number;
@@ -80,6 +81,7 @@ export type ChallengeListFilters = {
   is_dynamic?: string;
   has_vm?: string;
   mode?: string;
+  hackathon?: string;
 };
 
 function withQuery(path: string, query?: Record<string, string | undefined>) {
@@ -93,10 +95,10 @@ function withQuery(path: string, query?: Record<string, string | undefined>) {
   return qs ? `${path}?${qs}` : path;
 }
 
-/** All platform challenges (Root / system.admin). */
+/** Platform challenge list (scoped to assigned events for hackathon admins). */
 export async function listAllChallenges(filters?: ChallengeListFilters) {
   const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    withQuery("/api/haas/challenges/", {
+    withQuery("/api/haas/challenge-list", {
       search: filters?.search,
       limit: filters?.limit ?? "100",
       category: filters?.category,
@@ -105,6 +107,8 @@ export async function listAllChallenges(filters?: ChallengeListFilters) {
       is_dynamic: filters?.is_dynamic,
       has_vm: filters?.has_vm,
       mode: filters?.mode,
+      hackathonId: filters?.hackathon,
+      hackathon: filters?.hackathon,
     }),
   );
   const unwrapped = unwrapHaasResult(result);

@@ -1,54 +1,42 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useState, type ReactNode } from "react";
 
 import { ApiTesterDrawer } from "@/components/shell/api-tester-drawer";
 import { AppHeader } from "@/components/shell/app-header";
 import { AppSidebar } from "@/components/shell/app-sidebar";
+import { SelectWorkspaceProvider } from "@/features/events/select-workspace-modal";
+import { useLogout } from "@/features/auth/use-logout";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
-import { callAppApi } from "@/lib/client-api";
+import { useIsLgUp } from "@/lib/use-media-query";
 import { useUiPreferences } from "@/theme/ui-preferences";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const {
     navPlacement,
-    sidebarCollapsed,
     mobileNavOpen,
     setMobileNavOpen,
   } = useUiPreferences();
-  const { isPlatformOperator, userDisplayName, userEmail } = useHaasAccess();
+  const { isPlatformOperator, isEventOnlyAdmin, userDisplayName, userEmail } = useHaasAccess();
+  const { logout, isLoggingOut } = useLogout();
 
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  const handleLogout = useCallback(async () => {
-    setIsLoggingOut(true);
-    try {
-      await callAppApi("/api/auth/logout", { method: "POST" });
-      router.replace("/login");
-      router.refresh();
-    } catch {
-      setIsLoggingOut(false);
-    }
-  }, [router]);
+  const handleLogout = useCallback(() => {
+    void logout();
+  }, [logout]);
 
   const showSidebar = navPlacement === "sidebar";
-  const sidebarWidth = sidebarCollapsed
-    ? "var(--sidebar-collapsed-width)"
-    : "var(--sidebar-width)";
+  const isLgUp = useIsLgUp();
+  const sidebarVisible = showSidebar && isLgUp;
+  const mainMarginLeft = sidebarVisible ? "var(--sidebar-width)" : 0;
 
   return (
+    <SelectWorkspaceProvider>
     <div className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
-      {showSidebar ? (
-        <aside
-          className="fixed inset-y-0 left-0 z-50 hidden overflow-y-auto border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] transition-[width] duration-300 lg:block"
-          style={{ width: sidebarWidth }}
-        >
+      {sidebarVisible ? (
+        <aside className="fixed inset-y-0 left-0 z-50 hidden w-[var(--sidebar-width)] overflow-hidden border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] lg:flex lg:flex-col">
           <AppSidebar
             isPlatformOperator={isPlatformOperator}
-            userDisplayName={userDisplayName}
-            userEmail={userEmail}
+            isEventOnlyAdmin={isEventOnlyAdmin}
           />
         </aside>
       ) : null}
@@ -61,12 +49,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             aria-label="Close menu"
             onClick={() => setMobileNavOpen(false)}
           />
-          <aside className="fixed inset-y-0 left-0 z-50 w-[min(100vw,280px)] overflow-y-auto border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] lg:hidden">
+          <aside className="fixed inset-y-0 left-0 z-50 flex w-[min(100vw,280px)] flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] lg:hidden">
             <AppSidebar
               isPlatformOperator={isPlatformOperator}
-              forceExpanded
-              userDisplayName={userDisplayName}
-              userEmail={userEmail}
+              isEventOnlyAdmin={isEventOnlyAdmin}
             />
           </aside>
         </>
@@ -74,11 +60,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div
         className="flex min-h-dvh flex-col transition-[margin] duration-300"
-        style={{ marginLeft: showSidebar ? sidebarWidth : 0 }}
+        style={{ marginLeft: mainMarginLeft }}
       >
-        <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-6 lg:px-8">
+        <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden px-3 pb-4 pt-0 sm:px-6 lg:px-8">
           <AppHeader
             isPlatformOperator={isPlatformOperator}
+            isEventOnlyAdmin={isEventOnlyAdmin}
             userDisplayName={userDisplayName}
             userEmail={userEmail}
             onLogout={handleLogout}
@@ -90,5 +77,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <ApiTesterDrawer />
     </div>
+    </SelectWorkspaceProvider>
   );
 }

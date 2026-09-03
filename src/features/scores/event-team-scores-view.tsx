@@ -8,8 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyableText } from "@/components/ui/copyable-text";
 import { DataTable } from "@/components/ui/data-table";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { PageHeader } from "@/components/ui/page-header";
+import {
+  ListPageStat,
+  ListPageStats,
+  ListPageStatsDot,
+} from "@/components/ui/list-page-stats";
 import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
@@ -43,6 +50,7 @@ function userLabel(row: ScoreRow) {
 }
 
 export function EventTeamScoresView({ hackathonId }: Props) {
+  const { confirm } = usePlatformDialog();
   const router = useRouter();
   const { canMutateEvent } = useHaasAccess();
   const [activeId, setActiveId] = useState(hackathonId);
@@ -127,7 +135,13 @@ export function EventTeamScoresView({ hackathonId }: Props) {
   }, [rows]);
 
   async function onDelete(row: ScoreRow) {
-    if (!window.confirm("Delete this score entry permanently?")) return;
+    const ok = await confirm({
+      title: "Delete score",
+      message: "Delete this score entry permanently?",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusyId(row.id);
     try {
       await deleteScore(activeId, row.id);
@@ -144,7 +158,6 @@ export function EventTeamScoresView({ hackathonId }: Props) {
       <PageHeader
         eyebrow="Event workspace"
         title="Team scores"
-        description="Submission scores, bonuses, and first-blood points for this event."
         actions={
           <>
             <Button variant="secondary" onClick={() => void load()}>
@@ -164,7 +177,16 @@ export function EventTeamScoresView({ hackathonId }: Props) {
         }
       />
 
-      <StickyToolbar layout="stack">
+      <StickyToolbar
+        layout="stack"
+        footer={
+          <ListPageStats>
+            <ListPageStat label="Entries" value={totals.count} />
+            <ListPageStatsDot />
+            <ListPageStat label="Points" value={totals.points} tone="accent" />
+          </ListPageStats>
+        }
+      >
         <div className="flex flex-wrap items-end gap-3">
           <HackathonPicker
             value={activeId}
@@ -214,9 +236,6 @@ export function EventTeamScoresView({ hackathonId }: Props) {
             <option value="incorrect">Incorrect</option>
           </FilterSelect>
         </div>
-        <p className="text-xs text-[var(--text-muted)]">
-          {totals.count} entries · {totals.points} total points
-        </p>
       </StickyToolbar>
 
       {error ? (
@@ -298,30 +317,30 @@ export function EventTeamScoresView({ hackathonId }: Props) {
           {
             key: "actions",
             header: "",
-            className: "text-right",
+            className: "text-right w-12",
             render: (r) =>
               canWrite ? (
-                <div className="flex flex-wrap justify-end gap-1">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={busyId === r.id}
-                    onClick={() => {
-                      setEditingRow(r);
-                      setModalOpen(true);
-                    }}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={busyId === r.id}
-                    onClick={() => void onDelete(r)}
-                  >
-                    Delete
-                  </Button>
-                </div>
+                <RowActionsMenu
+                  label={`Actions for score ${r.id}`}
+                  items={[
+                    {
+                      id: "edit",
+                      label: "Edit",
+                      disabled: busyId === r.id,
+                      onClick: () => {
+                        setEditingRow(r);
+                        setModalOpen(true);
+                      },
+                    },
+                    {
+                      id: "delete",
+                      label: "Delete",
+                      disabled: busyId === r.id,
+                      destructive: true,
+                      onClick: () => void onDelete(r),
+                    },
+                  ]}
+                />
               ) : (
                 <span className="text-xs text-[var(--text-muted)]">—</span>
               ),

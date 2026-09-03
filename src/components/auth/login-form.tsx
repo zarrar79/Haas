@@ -1,23 +1,35 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { BiRightArrow, BiEnvelope, BiShield } from "react-icons/bi";
 
+import { useHaasAccess } from "@/features/auth/haas-access-context";
+import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { ApiRequestError, callAppApi } from "@/lib/client-api";
+import {
+  clearClientSessionStorage,
+  hardReloadApplication,
+} from "@/lib/client-session";
 import type { ApiResult } from "@/types";
 
 type LoginSuccessData = {
-  user: unknown;
+  user: { is_staff?: boolean } | null;
   message: string;
 };
 
 export function LoginForm() {
-  const router = useRouter();
+  const { clearSession: clearAccessSession } = useHaasAccess();
+  const { clearSession: clearSelectedEventSession } = useSelectedEvent();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    clearClientSessionStorage();
+    clearAccessSession();
+    clearSelectedEventSession();
+  }, [clearAccessSession, clearSelectedEventSession]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,8 +41,7 @@ export function LoginForm() {
         method: "POST",
         body: { email, password },
       });
-      router.push("/home");
-      router.refresh();
+      hardReloadApplication("/home");
     } catch (error) {
       if (error instanceof ApiRequestError) {
         setErrorMessage(error.message);
@@ -90,9 +101,24 @@ export function LoginForm() {
       </label>
 
       {errorMessage ? (
-        <p className="rounded-[var(--radius-sm)] border border-[var(--danger)]/30 bg-[var(--danger-muted)] px-3 py-2 text-sm font-medium text-[var(--danger)]">
-          {errorMessage}
-        </p>
+        <div
+          className={`rounded-[var(--radius-sm)] border px-3 py-3 text-sm font-medium ${
+            errorMessage.toLowerCase().includes("administrative")
+              ? "haas-login-denied border-[var(--warning)]/40 bg-[var(--warning)]/10 text-[var(--text)]"
+              : "border-[var(--danger)]/30 bg-[var(--danger-muted)] text-[var(--danger)]"
+          }`}
+        >
+          {errorMessage.toLowerCase().includes("administrative") ? (
+            <>
+              <p className="font-semibold">Access restricted</p>
+              <p className="mt-1 text-xs font-normal text-[var(--text-muted)]">
+                {errorMessage}
+              </p>
+            </>
+          ) : (
+            errorMessage
+          )}
+        </div>
       ) : null}
 
       <button

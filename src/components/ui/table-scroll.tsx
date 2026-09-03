@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /** Outer bordered shell for scrollable tables — Spark Admin style. */
 export const TABLE_SHELL_CLASS =
@@ -12,15 +14,103 @@ export const TABLE_SCROLL_CLASS =
 export const TABLE_ELEMENT_CLASS =
   "w-max min-w-full border-collapse text-left text-sm [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap [&_thead]:bg-[var(--surface-raised)] [&_th]:px-4 [&_th]:py-3 [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-[var(--text-subtle)] [&_td]:border-t [&_td]:border-[var(--border)] [&_td]:px-4 [&_td]:py-3 [&_td]:text-[var(--text)]";
 
+export function SyncedHorizontalScroll({
+  children,
+  tableRef,
+}: {
+  children: ReactNode;
+  tableRef: React.RefObject<HTMLTableElement | null>;
+}) {
+  const topRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const [spacerWidth, setSpacerWidth] = useState(0);
+  const [showTopBar, setShowTopBar] = useState(false);
+
+  useEffect(() => {
+    const table = tableRef.current;
+    const bottom = bottomRef.current;
+    if (!table || !bottom) return;
+
+    const update = () => {
+      setSpacerWidth(table.scrollWidth);
+      setShowTopBar(table.scrollWidth > bottom.clientWidth + 2);
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(table);
+    ro.observe(bottom);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [tableRef]);
+
+  useEffect(() => {
+    const top = topRef.current;
+    const bottom = bottomRef.current;
+    if (!top || !bottom) return;
+
+    let syncing = false;
+    const syncFromTop = () => {
+      if (syncing) return;
+      syncing = true;
+      bottom.scrollLeft = top.scrollLeft;
+      syncing = false;
+    };
+    const syncFromBottom = () => {
+      if (syncing) return;
+      syncing = true;
+      top.scrollLeft = bottom.scrollLeft;
+      syncing = false;
+    };
+
+    top.addEventListener("scroll", syncFromTop);
+    bottom.addEventListener("scroll", syncFromBottom);
+    return () => {
+      top.removeEventListener("scroll", syncFromTop);
+      bottom.removeEventListener("scroll", syncFromBottom);
+    };
+  }, [showTopBar]);
+
+  return (
+    <>
+      {showTopBar ? (
+        <div
+          ref={topRef}
+          className={`${TABLE_SCROLL_CLASS} haas-table-scroll-top border-b border-[var(--border)]`}
+          aria-hidden
+        >
+          <div style={{ width: spacerWidth, height: 1 }} />
+        </div>
+      ) : null}
+      <div ref={bottomRef} className={TABLE_SCROLL_CLASS}>
+        {children}
+      </div>
+    </>
+  );
+}
+
 type TableScrollProps = {
   children: ReactNode;
   className?: string;
+  tableRef?: React.RefObject<HTMLTableElement | null>;
 };
 
-export function TableScroll({ children, className = "" }: TableScrollProps) {
+export function TableScroll({
+  children,
+  className = "",
+  tableRef,
+}: TableScrollProps) {
+  const fallbackRef = useRef<HTMLTableElement>(null);
+  const resolvedRef = tableRef ?? fallbackRef;
+
   return (
     <div className={`${TABLE_SHELL_CLASS} ${className}`.trim()}>
-      <div className={TABLE_SCROLL_CLASS}>{children}</div>
+      <SyncedHorizontalScroll tableRef={resolvedRef}>
+        {children}
+      </SyncedHorizontalScroll>
     </div>
   );
 }

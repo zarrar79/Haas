@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Avatar } from "@/components/ui/avatar";
 import {
   UserCertificationsSection,
   UserEducationSection,
@@ -49,34 +50,22 @@ type Props = {
 
 export function UserProfileSummary({ user, compact }: Props) {
   const displayName = user.full_name || eventUserLabel(user);
-  const initials = displayName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("");
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start gap-4">
-        {user.media_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={user.media_url}
-            alt=""
-            className="size-16 rounded-full border border-[var(--border)] object-cover"
-          />
-        ) : (
-          <div className="flex size-16 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--accent-muted)] text-lg font-bold text-[var(--accent)]">
-            {initials || "?"}
-          </div>
-        )}
+        <Avatar
+          src={user.media_url}
+          name={displayName}
+          size="lg"
+        />
         <div className="min-w-0 flex-1">
           <h3 className="text-xl font-bold text-[var(--text)]">{displayName}</h3>
           <p className="mt-0.5 text-sm text-[var(--text-muted)]">
             {user.email || user.username}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
+            {user.is_staff ? <Badge tone="success">Staff</Badge> : null}
             {user.is_block ? (
               <Badge tone="danger">Blocked</Badge>
             ) : user.is_active === false ? (

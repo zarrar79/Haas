@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InlineLoader } from "@/components/ui/loader";
+import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { AddTeamMemberModal, MAX_TEAM_MEMBERS } from "@/features/teams/add-team-member-modal";
 import {
   listTeamMembers,
@@ -39,6 +40,7 @@ export function TeamEditMembersPanel({
   canManage,
   onChanged,
 }: Props) {
+  const { confirm } = usePlatformDialog();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -88,11 +90,13 @@ export function TeamEditMembersPanel({
 
   async function onRemove(member: TeamMember) {
     const label = memberLabel(member);
-    if (
-      !window.confirm(
-        `Remove ${label} from ${teamName}? Their membership will be deactivated.`,
-      )
-    ) {
+    const ok = await confirm({
+      title: "Remove member",
+      message: `Remove ${label} from ${teamName}? Their membership will be deactivated.`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) {
       return;
     }
     setBusyId(member.id);

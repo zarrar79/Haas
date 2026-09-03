@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ModalShell } from "@/components/ui/modal-shell";
 import { TextField } from "@/components/ui/text-field";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
 import {
@@ -121,24 +122,18 @@ export function MachineFormModal({
     }
   }
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-[var(--overlay)]"
-        aria-label="Close dialog"
-        onClick={onClose}
-      />
-      <div className="relative z-10 flex max-h-[min(92vh,820px)] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
+    <ModalShell
+      open={open}
+      onClose={onClose}
+      panelClassName="max-w-2xl"
+      zIndexClass="z-[60]"
+      ariaLabel={mode === "edit" ? "Edit spawned machine" : "Spawn machine"}
+    >
         <div className="border-b border-[var(--border)] px-5 py-4">
           <h2 className="text-lg font-semibold text-[var(--text)]">
             {mode === "edit" ? "Edit spawned machine" : "Spawn machine"}
           </h2>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Challenge VM instance for a team. Active spawns may trigger K8s.
-          </p>
         </div>
         <div className="flex flex-col gap-4 overflow-y-auto px-5 py-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -252,7 +247,6 @@ export function MachineFormModal({
             {busy ? "Saving…" : mode === "edit" ? "Save changes" : "Create"}
           </Button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

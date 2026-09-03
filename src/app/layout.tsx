@@ -11,8 +11,8 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "HAS — Hackathon Admin",
-  description: "Hackathon as a Service — admin console",
+  title: "Cyber Range Digiinn360",
+  description: "Cyber Range Digiinn360 — admin console",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

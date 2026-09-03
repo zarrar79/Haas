@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { BiStar } from "react-icons/bi";
 
 import { LoginForm } from "@/components/auth/login-form";
+import { AppBrandMark } from "@/components/shell/app-brand-mark";
 import { ThemeToggleButton } from "@/components/shell/theme-toggle-button";
 
 export default function LoginPage() {
@@ -17,10 +17,13 @@ export default function LoginPage() {
       <div className="login-card">
         <Link
           href="/login"
-          className="mb-6 flex items-center justify-center gap-3 text-2xl font-extrabold text-[var(--brand-forest-dark)]"
+          className="mb-6 flex items-center justify-center gap-3 text-xl font-extrabold text-[var(--brand-forest-dark)] sm:text-2xl"
         >
-          <BiStar className="text-[1.75rem] text-[var(--brand-forest-medium)]" />
-          <span>HAS Admin</span>
+          <AppBrandMark size={40} />
+          <span>
+            <span className="text-[var(--brand-forest-medium)]">Cyber Range</span>
+            <span> Digiinn360</span>
+          </span>
         </Link>
 
         <p className="mb-8 text-center text-sm font-medium text-[var(--text-muted)]">
@@ -29,10 +32,7 @@ export default function LoginPage() {
 
         <LoginForm />
 
-        <p className="mt-6 text-center text-xs text-[var(--text-muted)]">
-          Credentials stay on this app. The BFF talks to Django using a
-          server-only backend URL.
-        </p>
+     
       </div>
     </div>
   );

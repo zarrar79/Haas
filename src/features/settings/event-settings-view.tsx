@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/loader";
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { TextField } from "@/components/ui/text-field";
+import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
 import {
@@ -58,6 +60,7 @@ const MANAGER_SETTING_KEYS = [
 ] as const;
 
 export function EventSettingsView({ hackathonId }: Props) {
+  const { confirm } = usePlatformDialog();
   const router = useRouter();
   const { canMutateEvent, isRoot } = useHaasAccess();
   const [activeId, setActiveId] = useState(hackathonId);
@@ -188,7 +191,13 @@ export function EventSettingsView({ hackathonId }: Props) {
   }
 
   async function onRevokeAdmin(bindingId: string) {
-    if (!window.confirm("Revoke this hackathon admin binding?")) return;
+    const ok = await confirm({
+      title: "Revoke admin",
+      message: "Revoke this hackathon admin binding?",
+      confirmLabel: "Revoke",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await revokeHackathonAdmin(bindingId);
       await load();
@@ -212,7 +221,6 @@ export function EventSettingsView({ hackathonId }: Props) {
       <PageHeader
         eyebrow="Event workspace"
         title="Settings"
-        description="Event settings, modules, user rules, and live playing flags."
         actions={
           <Button variant="secondary" onClick={() => void load()}>
             Refresh
@@ -252,7 +260,7 @@ export function EventSettingsView({ hackathonId }: Props) {
         </div>
       ) : null}
 
-      {isLoading ? <PageLoader label="Loading settings…" /> : null}
+      {isLoading ? <PageLoader label="Loading settings…" variant="form" /> : null}
 
       {!isLoading && tab === "settings" ? (
         <div className="space-y-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4">
@@ -566,15 +574,19 @@ export function EventSettingsView({ hackathonId }: Props) {
               {
                 key: "actions",
                 header: "",
-                className: "text-right",
+                className: "text-right w-12",
                 render: (row) => (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => void onRevokeAdmin(row.id)}
-                  >
-                    Revoke
-                  </Button>
+                  <RowActionsMenu
+                    label="Admin actions"
+                    items={[
+                      {
+                        id: "revoke",
+                        label: "Revoke",
+                        onClick: () => void onRevokeAdmin(row.id),
+                        destructive: true,
+                      },
+                    ]}
+                  />
                 ),
               },
             ]}

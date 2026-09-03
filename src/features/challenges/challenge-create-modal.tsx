@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/text-field";
+import { FormSkeleton } from "@/components/ui/skeleton";
+import { ModalShell } from "@/components/ui/modal-shell";
 import {
   createCatalogItem,
   listCatalog,
@@ -17,6 +19,9 @@ import {
   getChallenge,
   updateChallengeMultipart,
 } from "@/features/challenges/challenge-api";
+import { parseChallengeYamlFile } from "@/features/challenges/parse-challenge-yaml";
+import { useHaasAccess } from "@/features/auth/haas-access-context";
+import { getAssignedHackathons } from "@/lib/assigned-events";
 
 const STEPS = [
   { id: "basics", label: "Basics" },
@@ -59,12 +64,14 @@ function SelectField({
   value,
   onChange,
   required,
+  disabled,
   children,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -74,8 +81,9 @@ function SelectField({
         {required ? " *" : ""}
       </span>
       <select
-        className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]"
+        className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
       >
         {children}
@@ -181,6 +189,9 @@ export function ChallengeCreateModal({
   challengeId,
 }: ChallengeCreateModalProps) {
   const isEdit = Boolean(challengeId);
+  const { me, isPlatformOperator } = useHaasAccess();
+  const assignedHackathons = getAssignedHackathons(me);
+  const [targetHackathonId, setTargetHackathonId] = useState("");
 
   const [step, setStep] = useState<StepId>("basics");
   const [error, setError] = useState<string | null>(null);
@@ -210,6 +221,8 @@ export function ChallengeCreateModal({
   const [dockerPort, setDockerPort] = useState("80");
   const [dockerFlagNum, setDockerFlagNum] = useState("1");
   const [dockerTimeLimit, setDockerTimeLimit] = useState("120");
+  const [dockerKind, setDockerKind] = useState("Pod");
+  const [yamlSourceName, setYamlSourceName] = useState<string | null>(null);
   const [staticFile, setStaticFile] = useState<File | null>(null);
   const [dockerMedia, setDockerMedia] = useState<File | null>(null);
 
@@ -279,6 +292,8 @@ export function ChallengeCreateModal({
     setDockerPort("80");
     setDockerFlagNum("1");
     setDockerTimeLimit("120");
+    setDockerKind("Pod");
+    setYamlSourceName(null);
     setStaticFile(null);
     setDockerMedia(null);
     setSkillId("");
@@ -294,6 +309,18 @@ export function ChallengeCreateModal({
       setError(err instanceof Error ? err.message : "Failed to load catalogs");
     });
   }, [open, loadCatalogs]);
+
+  useEffect(() => {
+    if (!open) return;
+    setTargetHackathonId(
+      hackathonId || assignedHackathons[0]?.hackathon_id || "",
+    );
+  }, [open, hackathonId, assignedHackathons]);
+
+  const createHackathonId = hackathonId || targetHackathonId || null;
+  const createHackathonLabel =
+    assignedHackathons.find((row) => row.hackathon_id === createHackathonId)
+      ?.hackathon_name || null;
 
   useEffect(() => {
     if (!open || !skillId) {
@@ -352,6 +379,10 @@ export function ChallengeCreateModal({
           setDockerPort(String(docker.port ?? 80));
           setDockerFlagNum(String(docker.flag_num ?? 1));
           setDockerTimeLimit(String(docker.time_limit ?? 120));
+          setDockerKind(
+            docker.kind ||
+              (docker.docker_type === "vm" ? "VirtualMachine" : "Pod"),
+          );
         }
         setStep("basics");
       })
@@ -376,6 +407,29 @@ export function ChallengeCreateModal({
   function handleClose() {
     reset();
     onClose();
+  }
+
+  async function handleDockerMediaUpload(file: File | null) {
+    setDockerMedia(file);
+    if (!file) return;
+
+    const parsed = await parseChallengeYamlFile(file);
+    if (!parsed.ok) {
+      setError(parsed.error);
+      setDockerMedia(null);
+      return;
+    }
+
+    const { data } = parsed;
+    setDockerType(data.dockerType);
+    setDockerKind(data.kind);
+    setDockerOs(data.os);
+    setDockerImageName(data.imageName);
+    setDockerImageTag(data.imageTag);
+    setDockerMachineName(data.machineName);
+    setDockerFlagNum(data.flagNum);
+    setYamlSourceName(file.name);
+    setError(null);
   }
 
   function canJumpTo(targetIndex: number): boolean {
@@ -418,6 +472,22 @@ export function ChallengeCreateModal({
     setBusy(true);
     setError(null);
     try {
+      if (!isEdit && !isPlatformOperator && !createHackathonId) {
+        setError("Select one of your assigned hackathons before creating.");
+        setBusy(false);
+        return;
+      }
+      if (
+        !isEdit &&
+        !isPlatformOperator &&
+        createHackathonId &&
+        !assignedHackathons.some((row) => row.hackathon_id === createHackathonId)
+      ) {
+        setError("You can only create challenges for hackathons assigned to you.");
+        setBusy(false);
+        return;
+      }
+
       const form = new FormData();
       form.set("name", name.trim());
       form.set("description", description.trim());
@@ -429,8 +499,8 @@ export function ChallengeCreateModal({
       form.set("challenge_for", "hackathon");
       form.set("is_active", String(isActive));
 
-      if (hackathonId) {
-        form.set("hackathon", hackathonId);
+      if (createHackathonId) {
+        form.set("hackathon", createHackathonId);
       }
 
       for (const techId of techniqueIds) {
@@ -457,7 +527,7 @@ export function ChallengeCreateModal({
             flag_num: Number(dockerFlagNum) || 1,
             time_limit: Number(dockerTimeLimit) || 120,
             use_hackathon_end_time: false,
-            kind: "Pod",
+            kind: dockerKind,
           }),
         );
       }
@@ -469,12 +539,12 @@ export function ChallengeCreateModal({
         await updateChallengeMultipart(
           challengeId,
           form,
-          hackathonId || null,
+          createHackathonId || hackathonId || null,
         );
       } else {
         const challenge = await createChallengeMultipart(
           form,
-          hackathonId || null,
+          createHackathonId || null,
         );
 
         if (!isDynamic) {
@@ -490,7 +560,7 @@ export function ChallengeCreateModal({
                 score: Number(q.score) || 0,
                 is_active: true,
               },
-              hackathonId || null,
+              hackathonId || createHackathonId || null,
             );
             await createChallengeAnswer(
               challenge.id,
@@ -499,7 +569,7 @@ export function ChallengeCreateModal({
                 answer: q.answer.trim(),
                 team: null,
               },
-              hackathonId || null,
+              hackathonId || createHackathonId || null,
             );
           }
         }
@@ -521,17 +591,13 @@ export function ChallengeCreateModal({
     }
   }
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-[var(--overlay)]"
-        aria-label="Close dialog"
-        onClick={handleClose}
-      />
-      <div className="relative z-10 flex max-h-[min(92vh,880px)] w-full max-w-3xl flex-col overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
+    <ModalShell
+      open={open}
+      onClose={handleClose}
+      panelClassName="max-w-3xl"
+      ariaLabel={isEdit ? "Edit challenge" : "Create challenge"}
+    >
         <div className="border-b border-[var(--border)] px-5 py-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -542,12 +608,11 @@ export function ChallengeCreateModal({
                 {isEdit ? "Edit challenge" : "Create challenge"}
               </h2>
               <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {hackathonId
-                  ? "Scoped to the selected hackathon."
-                  : "Platform catalog (Root / system.admin)."}
-                {" "}
-                Required by API: name
-                {!isDynamic && !isEdit ? "; static needs question name + answer" : ""}.
+                {createHackathonId
+                  ? createHackathonLabel || createHackathonId
+                  : isPlatformOperator
+                    ? "Platform catalog"
+                    : "Select an assigned hackathon"}
               </p>
             </div>
             <Button variant="ghost" size="sm" onClick={handleClose}>
@@ -594,7 +659,23 @@ export function ChallengeCreateModal({
           ) : null}
 
           {loadingEdit ? (
-            <p className="text-sm text-[var(--text-muted)]">Loading challenge…</p>
+            <FormSkeleton fields={6} />
+          ) : null}
+
+          {!isEdit && !isPlatformOperator && !hackathonId && assignedHackathons.length > 1 ? (
+            <SelectField
+              label="Assigned hackathon"
+              value={targetHackathonId}
+              onChange={setTargetHackathonId}
+              required
+            >
+              <option value="">Select event…</option>
+              {assignedHackathons.map((row) => (
+                <option key={row.hackathon_id} value={row.hackathon_id}>
+                  {row.hackathon_name}
+                </option>
+              ))}
+            </SelectField>
           ) : null}
 
           {!loadingEdit && step === "basics" ? (
@@ -687,6 +768,33 @@ export function ChallengeCreateModal({
 
           {!loadingEdit && step === "config" ? (
             <div className="space-y-4">
+              <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-4">
+                <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
+                  <span className="font-medium text-[var(--text)]">
+                    Docker / K8s manifest (YAML) *
+                  </span>
+                  <input
+                    type="file"
+                    accept=".yaml,.yml,text/yaml,application/x-yaml"
+                    className="text-sm text-[var(--text)]"
+                    onChange={(e) =>
+                      void handleDockerMediaUpload(e.target.files?.[0] ?? null)
+                    }
+                  />
+                  <span className="text-[10px] leading-relaxed">
+                    Upload your Pod or VM YAML to pre-fill docker type, machine
+                    name, image, flag count, and OS. All fields remain editable;
+                    port is set manually.
+                    {isEdit ? " Upload a new file to replace the manifest." : ""}
+                  </span>
+                </label>
+                {yamlSourceName ? (
+                  <p className="mt-2 text-xs font-medium text-[var(--accent)]">
+                    Prefilled from {yamlSourceName}. You can adjust any field below.
+                  </p>
+                ) : null}
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 <SelectField
                   label="Docker type"
@@ -718,6 +826,12 @@ export function ChallengeCreateModal({
                   name="docker_machine_name"
                   value={dockerMachineName}
                   onChange={(e) => setDockerMachineName(e.target.value)}
+                />
+                <TextField
+                  label="Resource kind"
+                  name="docker_kind"
+                  value={dockerKind}
+                  onChange={(e) => setDockerKind(e.target.value)}
                 />
                 <TextField
                   label="Port"
@@ -764,21 +878,6 @@ export function ChallengeCreateModal({
                   <span className="text-[10px]">
                     Optional zip/pdf/asset for players
                     {isEdit ? " (upload to replace)" : ""}
-                  </span>
-                </label>
-                <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-                  <span className="font-medium text-[var(--text)]">
-                    Docker / K8s media
-                  </span>
-                  <input
-                    type="file"
-                    className="text-sm text-[var(--text)]"
-                    onChange={(e) =>
-                      setDockerMedia(e.target.files?.[0] ?? null)
-                    }
-                  />
-                  <span className="text-[10px]">
-                    Optional Dockerfile or manifest YAML
                   </span>
                 </label>
               </div>
@@ -1039,7 +1138,6 @@ export function ChallengeCreateModal({
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

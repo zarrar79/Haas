@@ -13,6 +13,8 @@ type HackathonPickerProps = {
   onChange: (id: string) => void;
   /** When set, changing selection navigates to `/events/{id}/{section}` */
   section?: string;
+  /** When false, only calls onChange (no router navigation). Default true when section is set. */
+  navigateOnChange?: boolean;
   className?: string;
 };
 
@@ -20,6 +22,7 @@ export function HackathonPicker({
   value,
   onChange,
   section,
+  navigateOnChange,
   className,
 }: HackathonPickerProps) {
   const router = useRouter();
@@ -41,10 +44,12 @@ export function HackathonPicker({
     })();
   }, [router]);
 
+  const shouldNavigate = navigateOnChange ?? Boolean(section);
+
   function handleChange(next: string) {
     onChange(next);
     setSelectedHackathonId(next || null);
-    if (section && next) {
+    if (shouldNavigate && section && next) {
       router.push(`/events/${next}/${section}`);
     }
   }
@@ -59,6 +64,7 @@ export function HackathonPicker({
         value={value}
         onChange={(e) => handleChange(e.target.value)}
       >
+        {!shouldNavigate ? <option value="">All hackathons</option> : null}
         {items.length === 0 ? (
           <option value="">No hackathons available</option>
         ) : (

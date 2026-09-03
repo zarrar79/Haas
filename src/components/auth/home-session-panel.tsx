@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/loader";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
+import { AssignedEventsPanel } from "@/features/events/assigned-events-panel";
+import { useSelectedEvent } from "@/features/events/selected-event-context";
 import {
   getHackathonDashboard,
   getPlatformDashboard,
@@ -17,14 +19,18 @@ import {
 } from "@/features/dashboard/dashboard-api";
 import { HackathonDashboardView } from "@/features/dashboard/hackathon-dashboard-view";
 import { PlatformDashboardView } from "@/features/dashboard/platform-dashboard-view";
-import { useSelectedEvent } from "@/features/events/selected-event-context";
+import {
+  getAssignedHackathons,
+  resolveAssignedEventId,
+} from "@/lib/assigned-events";
 import { useUiPreferences } from "@/theme/ui-preferences";
 
 export function HomeSessionPanel() {
   const router = useRouter();
   const { setShowApiTester } = useUiPreferences();
-  const { me, isLoading, userDisplayName, isRoot } = useHaasAccess();
-  const { selectedHackathonId } = useSelectedEvent();
+  const { me, isLoading, userDisplayName, isPlatformOperator, isEventOnlyAdmin } =
+    useHaasAccess();
+  const { selectedHackathonId, setSelectedHackathonId } = useSelectedEvent();
   const [eventDashboard, setEventDashboard] =
     useState<HackathonDashboard | null>(null);
   const [platformDashboard, setPlatformDashboard] =
@@ -32,8 +38,8 @@ export function HomeSessionPanel() {
   const [error, setError] = useState<string | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(false);
 
-  const primaryEventId =
-    selectedHackathonId || me?.hackathon_admins?.[0]?.hackathon_id || null;
+  const assigned = getAssignedHackathons(me);
+  const primaryEventId = resolveAssignedEventId(me, selectedHackathonId);
 
   const loadDashboards = useCallback(async () => {
     setDashboardLoading(true);
@@ -49,7 +55,7 @@ export function HomeSessionPanel() {
       } else {
         setEventDashboard(null);
       }
-      if (isRoot) {
+      if (isPlatformOperator) {
         tasks.push(
           getPlatformDashboard({ hours: "24", limit: "8" }).then(
             setPlatformDashboard,
@@ -64,85 +70,75 @@ export function HomeSessionPanel() {
     } finally {
       setDashboardLoading(false);
     }
-  }, [isRoot, primaryEventId]);
+  }, [isPlatformOperator, primaryEventId]);
 
   useEffect(() => {
     if (!isLoading) void loadDashboards();
   }, [isLoading, loadDashboards]);
+
+  useEffect(() => {
+    if (primaryEventId && primaryEventId !== selectedHackathonId) {
+      setSelectedHackathonId(primaryEventId);
+    }
+  }, [primaryEventId, selectedHackathonId, setSelectedHackathonId]);
 
   return (
     <div className="flex w-full flex-col gap-4">
       <PageHeader
         eyebrow="Dashboard"
         title={`Welcome back, ${userDisplayName || "Operator"}`}
-        description="Live analytics for your events — teams, submissions, machines, and activity at a glance."
+        description={
+          isEventOnlyAdmin
+            ? "Your assigned hackathons — members, teams, scores, and activity for each event."
+            : "Live analytics for your events — teams, submissions, machines, and activity at a glance."
+        }
         actions={
           <>
             <Button variant="secondary" onClick={() => void loadDashboards()}>
               Refresh
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => router.push("/hackathons")}
-            >
-              Hackathons
-            </Button>
+            {!isEventOnlyAdmin ? (
+              <Button
+                variant="secondary"
+                onClick={() => router.push("/hackathons")}
+              >
+                Hackathons
+              </Button>
+            ) : null}
             {primaryEventId ? (
               <Link href={`/events/${primaryEventId}`}>
-                <Button>Full event view</Button>
+                <Button>Event workspace</Button>
               </Link>
             ) : null}
-            <Button variant="secondary" onClick={() => setShowApiTester(true)}>
-              API tester
-            </Button>
+            {/*   */}
           </>
         }
       />
+
+      {isEventOnlyAdmin ? <AssignedEventsPanel /> : null}
 
       {isLoading || dashboardLoading ? (
         <PageLoader label="Loading analytics…" />
       ) : null}
 
-      {error ? (
-        <Alert variant="error">{error}</Alert>
-      ) : null}
+      {error ? <Alert variant="error">{error}</Alert> : null}
 
       {!isLoading && !dashboardLoading ? (
         <>
-          {isRoot && platformDashboard ? (
+          {isPlatformOperator && platformDashboard ? (
             <PlatformDashboardView data={platformDashboard} />
           ) : null}
 
           {eventDashboard ? (
-            <div className="space-y-2">
-              {!isRoot && primaryEventId ? (
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm text-[var(--text-muted)]">
-                    Showing analytics for your active event
-                  </p>
-                  {me?.hackathon_admins && me.hackathon_admins.length > 1 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {me.hackathon_admins.map((row) => (
-                        <Link key={row.hackathon_id} href={`/events/${row.hackathon_id}`}>
-                          <Button
-                            size="sm"
-                            variant={
-                              row.hackathon_id === primaryEventId
-                                ? "primary"
-                                : "secondary"
-                            }
-                          >
-                            {row.hackathon_name}
-                          </Button>
-                        </Link>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              <HackathonDashboardView data={eventDashboard} />
+            <HackathonDashboardView data={eventDashboard} />
+          ) : isEventOnlyAdmin && assigned.length === 0 ? (
+            <div className="spark-card flex min-h-[160px] flex-col items-center justify-center gap-3 p-5 text-center">
+              <p className="text-sm text-[var(--text-muted)]">
+                No hackathons have been assigned to your account yet. Ask a
+                platform administrator to provision access.
+              </p>
             </div>
-          ) : !isRoot && !primaryEventId ? (
+          ) : !isPlatformOperator && !primaryEventId ? (
             <div className="spark-card flex min-h-[160px] flex-col items-center justify-center gap-3 p-5 text-center">
               <p className="text-sm text-[var(--text-muted)]">
                 Select a hackathon to view live analytics charts.

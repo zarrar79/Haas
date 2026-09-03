@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { DashboardSkeleton, TableSkeleton } from "@/components/ui/skeleton";
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { TextField } from "@/components/ui/text-field";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
@@ -123,7 +124,6 @@ export function EventOpsView({ hackathonId }: Props) {
       <PageHeader
         eyebrow="Event workspace"
         title="Operations"
-        description="Run-day analytics, notifications, and admin audit. Scores, machines, and player logs have dedicated sections."
         actions={
           <>
             <Button variant="secondary" onClick={() => void load()}>
@@ -160,7 +160,11 @@ export function EventOpsView({ hackathonId }: Props) {
       ) : null}
 
       {isLoading ? (
-        <p className="text-sm text-[var(--text-muted)]">Loading…</p>
+        tab === "overview" ? (
+          <DashboardSkeleton />
+        ) : (
+          <TableSkeleton columns={4} rows={8} />
+        )
       ) : null}
 
       {!isLoading && tab === "overview" ? (

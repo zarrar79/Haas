@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ModalShell } from "@/components/ui/modal-shell";
 import { InlineLoader } from "@/components/ui/loader";
 import {
   addTeamMember,
@@ -119,22 +120,18 @@ export function AddTeamMemberModal({
     }
   }
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-[var(--overlay)]"
-        aria-label="Close dialog"
-        onClick={onClose}
-      />
-      <div className="relative z-10 flex max-h-[min(92vh,640px)] w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--surface)] shadow-[var(--shadow-lg)]">
+    <ModalShell
+      open={open}
+      onClose={onClose}
+      panelClassName="max-w-lg"
+      zIndexClass="z-[60]"
+      ariaLabel="Add team member"
+    >
         <div className="border-b border-[var(--border)] px-5 py-4">
           <h2 className="text-lg font-bold text-[var(--text)]">Add team member</h2>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Add a user to <strong className="text-[var(--text)]">{teamName}</strong>.
-            Teams can have up to {MAX_TEAM_MEMBERS} members.
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            {teamName} · up to {MAX_TEAM_MEMBERS} members
           </p>
         </div>
 
@@ -221,7 +218,6 @@ export function AddTeamMemberModal({
             {busy ? "Adding…" : transferTeams.length > 0 ? "Transfer & add" : "Add member"}
           </Button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

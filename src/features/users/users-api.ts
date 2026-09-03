@@ -41,6 +41,7 @@ export type EventUser = {
   media?: string | null;
   media_url?: string | null;
   is_block?: boolean;
+  is_staff?: boolean;
   blocked_at?: string | null;
   block_reason?: string;
   is_active?: boolean;
@@ -102,6 +103,7 @@ export type EventUserUpdateInput = {
   }[];
   team_type?: Record<string, unknown>;
   is_block?: boolean;
+  is_active?: boolean;
 };
 
 export async function listEventUsers(
@@ -131,27 +133,73 @@ export async function getEventUser(hackathonId: string, userId: string) {
   return unwrapHaasResult(result).data;
 }
 
-export async function createEventUser(
-  hackathonId: string,
-  body: EventUserCreateInput,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventUser>>>(
-    haasApiPath(`hackathons/${hackathonId}/users`),
-    { method: "POST", body },
-  );
-  return unwrapHaasResult(result).data;
-}
-
 export async function updateEventUser(
   hackathonId: string,
   userId: string,
   body: EventUserUpdateInput,
+  options?: { file?: File | null; clearMedia?: boolean },
 ) {
+  const needsMultipart = Boolean(options?.file || options?.clearMedia);
+  if (!needsMultipart) {
+    const result = await callAppApi<ApiResult<HaasForwardPayload<EventUser>>>(
+      haasApiPath(`hackathons/${hackathonId}/users/${userId}`),
+      { method: "PATCH", body },
+    );
+    return unwrapHaasResult(result).data;
+  }
+
+  const form = new FormData();
+  for (const [key, value] of Object.entries(body)) {
+    if (value === undefined) continue;
+    if (value !== null && typeof value === "object") {
+      form.append(key, JSON.stringify(value));
+    } else {
+      form.append(key, String(value));
+    }
+  }
+  if (options?.file) form.append("file", options.file);
+  if (options?.clearMedia) form.append("clear_media", "true");
+
   const result = await callAppApi<ApiResult<HaasForwardPayload<EventUser>>>(
     haasApiPath(`hackathons/${hackathonId}/users/${userId}`),
-    { method: "PATCH", body },
+    { method: "PATCH", body: form },
   );
   return unwrapHaasResult(result).data;
+}
+
+export async function createEventUser(
+  hackathonId: string,
+  body: EventUserCreateInput,
+  options?: { file?: File | null },
+) {
+  if (!options?.file) {
+    const result = await callAppApi<ApiResult<HaasForwardPayload<EventUser>>>(
+      haasApiPath(`hackathons/${hackathonId}/users`),
+      { method: "POST", body },
+    );
+    return unwrapHaasResult(result).data;
+  }
+
+  const form = new FormData();
+  for (const [key, value] of Object.entries(body)) {
+    if (value === undefined) continue;
+    if (value !== null && typeof value === "object") {
+      form.append(key, JSON.stringify(value));
+    } else {
+      form.append(key, String(value));
+    }
+  }
+  form.append("file", options.file);
+
+  const result = await callAppApi<ApiResult<HaasForwardPayload<EventUser>>>(
+    haasApiPath(`hackathons/${hackathonId}/users`),
+    { method: "POST", body: form },
+  );
+  return unwrapHaasResult(result).data;
+}
+
+export async function activateEventUser(hackathonId: string, userId: string) {
+  return updateEventUser(hackathonId, userId, { is_active: true });
 }
 
 export async function deleteEventUser(hackathonId: string, userId: string) {

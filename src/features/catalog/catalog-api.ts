@@ -12,6 +12,9 @@ export type CatalogItem = {
   name?: string;
   description?: string;
   source_type?: string;
+  text?: string;
+  score_limit?: number;
+  is_visible?: boolean;
   is_active?: boolean;
   parent_tag?: string | null;
   parent_tag_name?: string | null;

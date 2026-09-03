@@ -4,23 +4,27 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
+import { useEffectiveHackathonId } from "@/features/events/use-effective-hackathon-id";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 
-/** Resolves /events/current → /events/{selectedId} */
+/** Resolves /events/current → /events/{assigned or selected id} */
 export default function CurrentEventRedirectPage() {
   const router = useRouter();
-  const { selectedHackathonId } = useSelectedEvent();
+  const effectiveHackathonId = useEffectiveHackathonId();
+  const { setSelectedHackathonId } = useSelectedEvent();
 
   useEffect(() => {
-    if (selectedHackathonId) {
-      router.replace(`/events/${selectedHackathonId}`);
+    if (effectiveHackathonId) {
+      setSelectedHackathonId(effectiveHackathonId);
+      router.replace(`/events/${effectiveHackathonId}`);
     }
-  }, [selectedHackathonId, router]);
+  }, [effectiveHackathonId, router, setSelectedHackathonId]);
 
-  if (!selectedHackathonId) {
+  if (!effectiveHackathonId) {
     return (
       <Alert variant="info">
-        No event selected yet. Open Hackathons and click Enter on an event.
+        No hackathon is assigned to your account yet. Ask a platform admin to assign
+        you as an event administrator.
       </Alert>
     );
   }

@@ -60,7 +60,6 @@ export function EventOverview() {
       <PageHeader
         eyebrow="Event workspace"
         title={hackathon?.display_name || hackathon?.name || "Event dashboard"}
-        description="Live analytics from the dashboard API — teams, submissions, machines, members, and activity."
         actions={
           <>
             <Button variant="secondary" onClick={() => void load()}>

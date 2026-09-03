@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { TextField } from "@/components/ui/text-field";
 import type {
   EducationEntry,
@@ -26,6 +27,11 @@ type Props = {
   mode: "create" | "edit";
   password?: string;
   onPasswordChange?: (value: string) => void;
+  mediaUrl?: string | null;
+  imageFile?: File | null;
+  clearImage?: boolean;
+  onImageFileChange?: (file: File | null) => void;
+  onClearImageChange?: (clear: boolean) => void;
 };
 
 function SectionTitle({ children }: { children: ReactNode }) {
@@ -42,6 +48,11 @@ export function UserProfileEditFields({
   mode,
   password = "",
   onPasswordChange,
+  mediaUrl = null,
+  imageFile = null,
+  clearImage = false,
+  onImageFileChange,
+  onClearImageChange,
 }: Props) {
   function patch(partial: Partial<UserProfileEditState>) {
     onChange({ ...state, ...partial });
@@ -107,6 +118,21 @@ export function UserProfileEditFields({
 
   return (
     <div className="space-y-6">
+      {onImageFileChange && onClearImageChange ? (
+        <section className="space-y-3">
+          <SectionTitle>Profile image</SectionTitle>
+          <ImageUploadField
+            label="Photo"
+            currentUrl={mediaUrl}
+            name={[state.name, state.last_name].filter(Boolean).join(" ") || state.username}
+            file={imageFile}
+            clearRequested={clearImage}
+            onFileChange={onImageFileChange}
+            onClearChange={onClearImageChange}
+          />
+        </section>
+      ) : null}
+
       <section className="space-y-3">
         <SectionTitle>Account</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">

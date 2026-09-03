@@ -11,6 +11,13 @@ export type Hackathon = {
   display_name?: string;
   description?: string;
   city?: string | null;
+  organization?: {
+    id: string;
+    name: string;
+    description?: string | null;
+    media_url?: string | null;
+    is_active?: boolean;
+  } | null;
   start_datetime?: string | null;
   end_datetime?: string | null;
   is_infinite?: boolean;
@@ -19,6 +26,14 @@ export type Hackathon = {
   view_on_dashboard?: boolean;
   discord_link?: string;
   created_at?: string;
+  sponsors?: Array<{
+    id: string;
+    name: string;
+    tag?: string;
+    organization_type?: string;
+    active?: boolean;
+    image_url?: string | null;
+  }>;
   modules?: HackathonModules | null;
   my_roles?: string[];
 };
@@ -35,4 +50,5 @@ export type HackathonWriteInput = {
   view_on_dashboard?: boolean;
   discord_link?: string;
   organizer_id?: string | null;
+  sponsor_ids?: string[];
 };

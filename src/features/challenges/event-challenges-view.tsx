@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
@@ -11,12 +11,23 @@ import {
 } from "@/components/ui/bulk-action-bar";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import {
+  ListPageStat,
+  ListPageStats,
+  ListPageStatsDot,
+} from "@/components/ui/list-page-stats";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
+import {
+  DEFAULT_TABLE_PAGE_SIZE,
+  TablePagination,
+} from "@/components/ui/table-pagination";
 import {
   TABLE_ELEMENT_CLASS,
   TableScroll,
 } from "@/components/ui/table-scroll";
-import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { ChallengeCreateModal } from "@/features/challenges/challenge-create-modal";
 import { ChallengeDetailModal } from "@/features/challenges/challenge-detail-modal";
 import {
@@ -35,12 +46,16 @@ import {
   type CatalogItem,
 } from "@/features/catalog/catalog-api";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
+import { useHaasAccess } from "@/features/auth/haas-access-context";
 import {
   applySectionSearch,
   challengeRowSearchParts,
   useSectionSearch,
 } from "@/features/search/section-search";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
+import {
+  getAssignedHackathons,
+} from "@/lib/assigned-events";
 import { ApiRequestError } from "@/lib/client-api";
 import type { Hackathon } from "@/types/hackathon";
 
@@ -136,7 +151,10 @@ export function EventChallengesView({
   syncUrl = true,
 }: EventChallengesViewProps) {
   const router = useRouter();
+  const { confirm, alert } = usePlatformDialog();
   const { setSelectedHackathonId } = useSelectedEvent();
+  const { me, isPlatformOperator, isEventOnlyAdmin } = useHaasAccess();
+  const assignedHackathons = getAssignedHackathons(me);
 
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
   const [activeId, setActiveId] = useState<string>(
@@ -160,6 +178,7 @@ export function EventChallengesView({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
   const [catalogLimited, setCatalogLimited] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [editingChallengeId, setEditingChallengeId] = useState<string | null>(
@@ -170,6 +189,8 @@ export function EventChallengesView({
   );
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_TABLE_PAGE_SIZE);
 
   useEffect(() => {
     if (hackathonIdProp) {
@@ -241,64 +262,27 @@ export function EventChallengesView({
 
     try {
       let allChallenges: ChallengeSummary[] = [];
-      let limited = false;
       const links: ChallengeLink[] = [];
 
       if (isAllScope) {
-        try {
-          allChallenges = await listAllChallenges(apiFilters);
-        } catch (err) {
-          if (err instanceof ApiRequestError && err.httpStatus === 401) {
-            router.replace("/login");
-            return;
-          }
-          if (err instanceof ApiRequestError && err.httpStatus === 403) {
-            setError(
-              "Listing all challenges requires Root / system.admin. Select a hackathon instead.",
-            );
-            setRows([]);
-            setCatalogLimited(true);
-            return;
-          }
-          throw err;
-        }
+        allChallenges = await listAllChallenges(apiFilters);
         setInfo(
-          "Showing all platform challenges (in any hackathon or none).",
+          "Showing all challenges in the platform catalog. Select a hackathon to attach challenges to an event.",
         );
       } else {
-        try {
-          allChallenges = await listAllChallenges(apiFilters);
-        } catch (err) {
-          if (err instanceof ApiRequestError && err.httpStatus === 403) {
-            limited = true;
-            try {
-              allChallenges = await listChallengeAdmin(activeId, apiFilters);
-              limited = false;
-            } catch {
-              // Fall back to linked only.
-            }
-          } else if (err instanceof ApiRequestError && err.httpStatus === 401) {
-            router.replace("/login");
-            return;
-          } else {
-            throw err;
-          }
-        }
+        allChallenges = await listAllChallenges({
+          ...apiFilters,
+          hackathon: activeId,
+        });
 
         const eventLinks = await listEventChallengeLinks(activeId, {
           search: debouncedSearch || undefined,
           show_deleted: "false",
         });
         links.push(...eventLinks);
-
-        if (limited) {
-          setInfo(
-            "Showing challenges already linked to this event. Full catalog requires Root / system.admin.",
-          );
-        }
       }
 
-      setCatalogLimited(limited);
+      setCatalogLimited(false);
 
       const linkByChallengeId = new Map<string, ChallengeLink>();
       for (const link of links) {
@@ -335,6 +319,10 @@ export function EventChallengesView({
         Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name)),
       );
     } catch (err) {
+      if (err instanceof ApiRequestError && err.httpStatus === 401) {
+        router.replace("/login");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to load challenges");
     } finally {
       setIsLoading(false);
@@ -395,6 +383,17 @@ export function EventChallengesView({
     focusId,
   ]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [filtered, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize) || 1);
+  const safePage = Math.min(page, totalPages);
+  const pageRows = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePage, pageSize]);
+
   function clearFilters() {
     clearDeepSearch();
     setMembership("all");
@@ -448,11 +447,14 @@ export function EventChallengesView({
 
   async function removeLink(linkId: string, challengeId: string) {
     if (isAllScope) return;
-    if (
-      !window.confirm(
+    const ok = await confirm({
+      title: "Remove from event",
+      message:
         "Remove this challenge from the hackathon? It stays in the platform catalog.",
-      )
-    ) {
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) {
       return;
     }
     setBusyId(linkId || challengeId);
@@ -470,6 +472,12 @@ export function EventChallengesView({
   function scopeHackathonId() {
     return isAllScope ? null : activeId;
   }
+
+  const canCreateChallenge =
+    isPlatformOperator ||
+    Boolean(scopeHackathonId() && me && assignedHackathons.some(
+      (row) => row.hackathon_id === scopeHackathonId(),
+    ));
 
   async function toggleActive(row: Row) {
     const next = !(row.isActive === true);
@@ -492,11 +500,13 @@ export function EventChallengesView({
   }
 
   async function removeChallenge(row: Row) {
-    if (
-      !window.confirm(
-        `Delete challenge "${row.name}"? This soft-deletes it (sets inactive).`,
-      )
-    ) {
+    const ok = await confirm({
+      title: "Delete challenge",
+      message: `Delete challenge "${row.name}"? This soft-deletes it (sets inactive).`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) {
       return;
     }
     setBusyId(row.challengeId);
@@ -555,13 +565,15 @@ export function EventChallengesView({
     );
   }
 
-  function bulkDelete() {
+  async function bulkDelete() {
     const ids = selectedRows.map((r) => r.challengeId);
-    if (
-      !window.confirm(
-        `Delete ${ids.length} selected challenge(s)? This soft-deletes them.`,
-      )
-    ) {
+    const ok = await confirm({
+      title: "Delete challenges",
+      message: `Delete ${ids.length} selected challenge(s)? This soft-deletes them.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) {
       return;
     }
     void runBulk("Delete", ids, (id) =>
@@ -583,18 +595,20 @@ export function EventChallengesView({
     );
   }
 
-  function bulkRemoveFromEvent() {
+  async function bulkRemoveFromEvent() {
     if (isAllScope) return;
     const targets = selectedRows.filter((r) => r.isAdded && r.link);
     if (targets.length === 0) {
       setError("No selected challenges are attached to remove.");
       return;
     }
-    if (
-      !window.confirm(
-        `Remove ${targets.length} challenge(s) from this hackathon?`,
-      )
-    ) {
+    const ok = await confirm({
+      title: "Remove from event",
+      message: `Remove ${targets.length} challenge(s) from this hackathon?`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) {
       return;
     }
     void runBulk(
@@ -609,14 +623,22 @@ export function EventChallengesView({
   }
 
   function toggleSelectAllVisible() {
-    const ids = filtered.map((r) => r.challengeId);
+    const ids = pageRows.map((r) => r.challengeId);
     const allSelected =
       ids.length > 0 && ids.every((id) => selectedKeys.has(id));
     if (allSelected) {
-      setSelectedKeys(new Set());
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
       return;
     }
-    setSelectedKeys(new Set(ids));
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.add(id);
+      return next;
+    });
   }
 
   function toggleSelectOne(id: string) {
@@ -628,7 +650,27 @@ export function EventChallengesView({
     });
   }
 
-  function openCreate() {
+  async function openCreate() {
+    if (!canCreateChallenge) {
+      await alert({
+        title: "Action not allowed",
+        message:
+          isEventOnlyAdmin
+            ? "Select one of your assigned hackathons before creating a challenge."
+            : "You do not have permission to create challenges here.",
+        variant: "warning",
+      });
+      return;
+    }
+    if (!isPlatformOperator && isAllScope) {
+      await alert({
+        title: "Select an event",
+        message:
+          "Select an assigned hackathon — challenges can only be created inside your events.",
+        variant: "warning",
+      });
+      return;
+    }
     setEditingChallengeId(null);
     setShowCreate(true);
   }
@@ -674,25 +716,68 @@ export function EventChallengesView({
       <PageHeader
         eyebrow="Event workspace"
         title="Challenges"
-        description="Browse all challenges or scope to one hackathon. Create, edit, activate, or remove."
         actions={
           <>
             <Button variant="secondary" onClick={() => void load()}>
               Refresh
             </Button>
-            <Button onClick={openCreate}>Create challenge</Button>
+            {canCreateChallenge || isEventOnlyAdmin ? (
+              <Button
+                onClick={openCreate}
+                disabled={!canCreateChallenge}
+                title={
+                  !canCreateChallenge
+                    ? "Select an assigned hackathon first"
+                    : undefined
+                }
+              >
+                Create challenge
+              </Button>
+            ) : null}
           </>
         }
       />
 
-      <StickyToolbar>
+      <StickyToolbar
+        footer={
+          <ListPageStats>
+            <ListPageStat label="Total" value={rows.length} />
+            <ListPageStatsDot />
+            <ListPageStat label="Shown" value={pageRows.length} />
+            {!isAllScope ? (
+              <>
+                <ListPageStatsDot />
+                <ListPageStat label="Added" value={addedCount} tone="accent" />
+                <ListPageStatsDot />
+                <ListPageStat
+                  label="Not added"
+                  value={notAddedCount}
+                  tone="warning"
+                />
+              </>
+            ) : null}
+            {(debouncedSearch || focusId) ? (
+              <>
+                <ListPageStatsDot />
+                <span className="text-[var(--accent)]">
+                  {focusId
+                    ? "Deep search result"
+                    : `Matching “${debouncedSearch}”`}
+                </span>
+              </>
+            ) : null}
+          </ListPageStats>
+        }
+      >
         <FilterSelect
           label="Hackathon"
           value={activeId || ALL_HACKATHONS}
           onChange={onHackathonChange}
           className="min-w-[180px]"
         >
-          <option value={ALL_HACKATHONS}>All challenges</option>
+          {!hackathonIdProp ? (
+            <option value={ALL_HACKATHONS}>All challenges</option>
+          ) : null}
           {hackathons.map((h) => (
             <option key={h.id} value={h.id}>
               {h.display_name || h.name}
@@ -794,29 +879,6 @@ export function EventChallengesView({
         </div>
       </StickyToolbar>
 
-      <div className="mb-3 flex flex-wrap gap-4 text-xs text-[var(--text-muted)]">
-        <span>
-          Total <strong className="text-[var(--text)]">{rows.length}</strong>
-          {" · "}
-          Shown <strong className="text-[var(--text)]">{filtered.length}</strong>
-        </span>
-        {!isAllScope ? (
-          <span>
-            Added <strong className="text-[var(--accent)]">{addedCount}</strong>
-            {" · "}
-            Not added{" "}
-            <strong className="text-[var(--warning)]">{notAddedCount}</strong>
-          </span>
-        ) : null}
-        {(debouncedSearch || focusId) && (
-          <span className="text-[var(--accent)]">
-            {focusId
-              ? "Showing selected result from deep search"
-              : `Matching “${debouncedSearch}”`}
-          </span>
-        )}
-      </div>
-
       <ChallengeCreateModal
         open={showCreate}
         onClose={closeModal}
@@ -844,7 +906,7 @@ export function EventChallengesView({
         </div>
       ) : null}
 
-      {!isAllScope ? (
+      {/* {!isAllScope ? (
         <p className="mb-2 text-xs text-[var(--text-muted)]">
           Tip: click a row to view challenge details. Double-click a{" "}
           <span className="text-[var(--warning)]">Not added</span> row to attach
@@ -854,7 +916,7 @@ export function EventChallengesView({
         <p className="mb-2 text-xs text-[var(--text-muted)]">
           Tip: click a row to view challenge details.
         </p>
-      )}
+      )} */}
 
       <BulkActionBar
         selectedCount={selectedKeys.size}
@@ -895,9 +957,7 @@ export function EventChallengesView({
       />
 
       {isLoading ? (
-        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-4 py-10 text-center text-sm text-[var(--text-muted)]">
-          Loading challenges…
-        </div>
+        <TableSkeleton columns={9} rows={10} selectable />
       ) : filtered.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-10 text-center text-sm text-[var(--text-muted)]">
           {catalogLimited && !hasActiveFilters
@@ -905,8 +965,9 @@ export function EventChallengesView({
             : "No challenges match your filters."}
         </div>
       ) : (
-        <TableScroll>
-          <table className={TABLE_ELEMENT_CLASS}>
+        <div>
+          <TableScroll tableRef={tableRef}>
+            <table ref={tableRef} className={TABLE_ELEMENT_CLASS}>
                 <thead className="border-b border-[var(--border)] bg-[var(--surface-raised)] text-xs uppercase tracking-wide text-[var(--text-muted)]">
               <tr>
                 <th className="w-10 px-3 py-3">
@@ -914,17 +975,17 @@ export function EventChallengesView({
                     type="checkbox"
                     aria-label="Select all challenges"
                     checked={
-                      filtered.length > 0 &&
-                      filtered.every((r) => selectedKeys.has(r.challengeId))
+                      pageRows.length > 0 &&
+                      pageRows.every((r) => selectedKeys.has(r.challengeId))
                     }
                     ref={(el) => {
                       if (!el) return;
-                      const some = filtered.some((r) =>
+                      const some = pageRows.some((r) =>
                         selectedKeys.has(r.challengeId),
                       );
                       const all =
-                        filtered.length > 0 &&
-                        filtered.every((r) => selectedKeys.has(r.challengeId));
+                        pageRows.length > 0 &&
+                        pageRows.every((r) => selectedKeys.has(r.challengeId));
                       el.indeterminate = some && !all;
                     }}
                     onChange={toggleSelectAllVisible}
@@ -940,24 +1001,19 @@ export function EventChallengesView({
                 {!isAllScope ? (
                   <th className="px-4 py-3">In this hackathon</th>
                 ) : null}
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3 text-right w-12" />
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => (
+              {pageRows.map((row) => (
                 <tr
                   key={row.challengeId}
-                  onClick={() => openDetail(row.challengeId)}
                   onDoubleClick={() => onRowDoubleClick(row)}
-                  className={`cursor-pointer border-b border-[var(--border)] last:border-b-0 ${
+                  className={`border-b border-[var(--border)] last:border-b-0 ${
                     selectedKeys.has(row.challengeId)
                       ? "bg-[var(--accent-muted)]/30"
                       : ""
-                  } hover:bg-[var(--surface-raised)]/50 ${
-                    !isAllScope && !row.isAdded
-                      ? "hover:bg-[var(--accent-muted)]/40"
-                      : ""
-                  }`}
+                  } hover:bg-[var(--surface-raised)]/50`}
                 >
                   <td className="px-3 py-3">
                     <input
@@ -1039,83 +1095,94 @@ export function EventChallengesView({
                       )}
                     </td>
                   ) : null}
-                  <td className="px-4 py-3 text-right">
-                    <div
-                      className="flex flex-wrap justify-end gap-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => openDetail(row.challengeId)}
-                      >
-                        View
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={busyId === row.challengeId}
-                        onClick={() => openEdit(row.challengeId)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={busyId === row.challengeId}
-                        onClick={() => void toggleActive(row)}
-                      >
-                        {row.isActive === true ? "Deactivate" : "Activate"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busyId === row.challengeId}
-                        onClick={() => void removeChallenge(row)}
-                      >
-                        Delete
-                      </Button>
-                      {!isAllScope ? (
-                        row.isAdded && row.link ? (
-                          <>
-                            {row.link.status === "draft" ? (
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={busyId === row.link.id}
-                                onClick={() => void approveLink(row.link!.id)}
-                              >
-                                Approve
-                              </Button>
-                            ) : null}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busyId === row.link.id}
-                              onClick={() =>
-                                void removeLink(row.link!.id, row.challengeId)
-                              }
-                            >
-                              {busyId === row.link.id ? "Removing…" : "Remove"}
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            size="sm"
-                            disabled={busyId === row.challengeId}
-                            onClick={() => void addChallenge(row.challengeId)}
-                          >
-                            {busyId === row.challengeId ? "Adding…" : "Add"}
-                          </Button>
-                        )
-                      ) : null}
-                    </div>
+                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <RowActionsMenu
+                      label={`Actions for ${row.name}`}
+                      items={[
+                        {
+                          id: "view",
+                          label: "View",
+                          onClick: () => openDetail(row.challengeId),
+                        },
+                        {
+                          id: "edit",
+                          label: "Edit",
+                          disabled: busyId === row.challengeId,
+                          onClick: () => openEdit(row.challengeId),
+                        },
+                        {
+                          id: "toggle",
+                          label: row.isActive === true ? "Deactivate" : "Activate",
+                          disabled: busyId === row.challengeId,
+                          onClick: () => void toggleActive(row),
+                        },
+                        {
+                          id: "delete",
+                          label: "Delete",
+                          disabled: busyId === row.challengeId,
+                          destructive: true,
+                          onClick: () => void removeChallenge(row),
+                        },
+                        ...(!isAllScope
+                          ? row.isAdded && row.link
+                            ? [
+                                ...(row.link.status === "draft"
+                                  ? [
+                                      {
+                                        id: "approve",
+                                        label: "Approve",
+                                        disabled: busyId === row.link!.id,
+                                        onClick: () =>
+                                          void approveLink(row.link!.id),
+                                      },
+                                    ]
+                                  : []),
+                                {
+                                  id: "remove-link",
+                                  label:
+                                    busyId === row.link.id
+                                      ? "Removing…"
+                                      : "Remove from event",
+                                  disabled: busyId === row.link.id,
+                                  onClick: () =>
+                                    void removeLink(
+                                      row.link!.id,
+                                      row.challengeId,
+                                    ),
+                                },
+                              ]
+                            : [
+                                {
+                                  id: "add",
+                                  label:
+                                    busyId === row.challengeId
+                                      ? "Adding…"
+                                      : "Add to event",
+                                  disabled: busyId === row.challengeId,
+                                  onClick: () =>
+                                    void addChallenge(row.challengeId),
+                                },
+                              ]
+                          : []),
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </TableScroll>
+          <TablePagination
+            page={safePage}
+            pageSize={pageSize}
+            total={filtered.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        </div>
       )}
     </div>
   );

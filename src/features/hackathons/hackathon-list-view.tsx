@@ -8,7 +8,9 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { PageHeader } from "@/components/ui/page-header";
+import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { TextField } from "@/components/ui/text-field";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
@@ -127,7 +129,6 @@ export function HackathonListView() {
       <PageHeader
         eyebrow="Events"
         title="Hackathons"
-        description="Open Teams or Challenges per event. Counts come from event analytics."
         actions={
           <>
             <Button variant="secondary" onClick={() => void load()}>
@@ -145,7 +146,14 @@ export function HackathonListView() {
         }
       />
 
-      <StickyToolbar layout="grid">
+      <StickyToolbar
+        layout="grid"
+        footer={
+          <ListPageStats>
+            <ListPageStat label="Events" value={items.length} />
+          </ListPageStats>
+        }
+      >
         <TextField
           label="Search"
           name="search"
@@ -233,37 +241,34 @@ export function HackathonListView() {
           },
           {
             key: "actions",
-            header: "Quick open",
-            className: "text-right",
+            header: "",
+            className: "text-right w-12",
             render: (row) => (
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => goTeams(row.id)}
-                >
-                  Teams
-                  {row.teamCount != null ? ` (${row.teamCount})` : ""}
-                </Button>
-                <Button size="sm" onClick={() => goChallenges(row.id)}>
-                  Challenges
-                  {row.challengeCount != null
-                    ? ` (${row.challengeCount})`
-                    : ""}
-                </Button>
-                <Link href={`/hackathons/${row.id}`}>
-                  <Button variant="ghost" size="sm">
-                    View
-                  </Button>
-                </Link>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => enterEvent(row.id)}
-                >
-                  Enter
-                </Button>
-              </div>
+              <RowActionsMenu
+                label={`Actions for ${row.display_name || row.name || "event"}`}
+                items={[
+                  {
+                    id: "teams",
+                    label: `Teams${row.teamCount != null ? ` (${row.teamCount})` : ""}`,
+                    onClick: () => goTeams(row.id),
+                  },
+                  {
+                    id: "challenges",
+                    label: `Challenges${row.challengeCount != null ? ` (${row.challengeCount})` : ""}`,
+                    onClick: () => goChallenges(row.id),
+                  },
+                  {
+                    id: "view",
+                    label: "View",
+                    href: `/hackathons/${row.id}`,
+                  },
+                  {
+                    id: "enter",
+                    label: "Enter workspace",
+                    onClick: () => enterEvent(row.id),
+                  },
+                ]}
+              />
             ),
           },
         ]}

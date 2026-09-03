@@ -12,8 +12,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { CopyableText } from "@/components/ui/copyable-text";
 import { DataTable } from "@/components/ui/data-table";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { PageHeader } from "@/components/ui/page-header";
+import {
+  ListPageStat,
+  ListPageStats,
+  ListPageStatsDot,
+} from "@/components/ui/list-page-stats";
 import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
@@ -55,6 +62,7 @@ function spawnedByLabel(row: MachineRow) {
 }
 
 export function EventMachinesView({ hackathonId }: Props) {
+  const { confirm } = usePlatformDialog();
   const router = useRouter();
   const [activeId, setActiveId] = useState(hackathonId);
   const [rows, setRows] = useState<MachineRow[]>([]);
@@ -180,7 +188,13 @@ export function EventMachinesView({ hackathonId }: Props) {
   }
 
   async function onDelete(row: MachineRow) {
-    if (!window.confirm("Soft-delete this machine record?")) return;
+    const ok = await confirm({
+      title: "Delete machine",
+      message: "Soft-delete this machine record?",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusyId(row.id);
     try {
       await deleteMachine(activeId, row.id);
@@ -193,7 +207,13 @@ export function EventMachinesView({ hackathonId }: Props) {
   }
 
   async function onBulkStopAll() {
-    if (!window.confirm("Stop all active machines for this event?")) return;
+    const ok = await confirm({
+      title: "Stop all machines",
+      message: "Stop all active machines for this event?",
+      confirmLabel: "Stop all",
+      destructive: true,
+    });
+    if (!ok) return;
     setBulkBusy(true);
     try {
       await bulkStopMachines(activeId, { all_active: true });
@@ -244,7 +264,6 @@ export function EventMachinesView({ hackathonId }: Props) {
       <PageHeader
         eyebrow="Event workspace"
         title="Machines"
-        description="Spawned challenge VMs per team. Stop, block, or bulk-manage K8s instances."
         actions={
           <>
             <Button variant="secondary" onClick={() => void load()}>
@@ -265,7 +284,28 @@ export function EventMachinesView({ hackathonId }: Props) {
         }
       />
 
-      <StickyToolbar layout="stack">
+      <StickyToolbar
+        layout="stack"
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <ListPageStats>
+              <ListPageStat label="Total" value={stats.total} />
+              <ListPageStatsDot />
+              <ListPageStat label="Active" value={stats.active} tone="accent" />
+              <ListPageStatsDot />
+              <ListPageStat label="Blocked" value={stats.blocked} tone="warning" />
+            </ListPageStats>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={bulkBusy}
+              onClick={() => void onBulkStopAll()}
+            >
+              Stop all active
+            </Button>
+          </div>
+        }
+      >
         <div className="flex flex-wrap items-end gap-3">
           <HackathonPicker
             value={activeId}
@@ -342,20 +382,6 @@ export function EventMachinesView({ hackathonId }: Props) {
             />
             Show deleted
           </label>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-[var(--text-muted)]">
-            {stats.total} machines · {stats.active} active · {stats.blocked}{" "}
-            blocked
-          </p>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={bulkBusy}
-            onClick={() => void onBulkStopAll()}
-          >
-            Stop all active
-          </Button>
         </div>
       </StickyToolbar>
 
@@ -488,45 +514,41 @@ export function EventMachinesView({ hackathonId }: Props) {
           {
             key: "actions",
             header: "",
-            className: "text-right",
+            className: "text-right w-12",
             render: (r) => (
-              <div className="flex flex-wrap justify-end gap-1">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busyId === r.id || !r.is_active || r.is_deleted}
-                  onClick={() => void onStop(r)}
-                >
-                  Stop
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busyId === r.id || r.blocked || r.is_deleted}
-                  onClick={() => void onBlock(r)}
-                >
-                  Block
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busyId === r.id || r.is_deleted}
-                  onClick={() => {
-                    setEditingRow(r);
-                    setSpawnModalOpen(true);
-                  }}
-                >
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busyId === r.id || r.is_deleted}
-                  onClick={() => void onDelete(r)}
-                >
-                  Delete
-                </Button>
-              </div>
+              <RowActionsMenu
+                label={`Actions for machine ${r.id}`}
+                items={[
+                  {
+                    id: "stop",
+                    label: "Stop",
+                    disabled: busyId === r.id || !r.is_active || r.is_deleted,
+                    onClick: () => void onStop(r),
+                  },
+                  {
+                    id: "block",
+                    label: "Block",
+                    disabled: busyId === r.id || r.blocked || r.is_deleted,
+                    onClick: () => void onBlock(r),
+                  },
+                  {
+                    id: "edit",
+                    label: "Edit",
+                    disabled: busyId === r.id || r.is_deleted,
+                    onClick: () => {
+                      setEditingRow(r);
+                      setSpawnModalOpen(true);
+                    },
+                  },
+                  {
+                    id: "delete",
+                    label: "Delete",
+                    disabled: busyId === r.id || r.is_deleted,
+                    destructive: true,
+                    onClick: () => void onDelete(r),
+                  },
+                ]}
+              />
             ),
           },
         ]}

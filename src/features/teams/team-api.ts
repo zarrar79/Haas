@@ -23,6 +23,7 @@ export type TeamMember = {
     email?: string;
     name?: string;
     last_name?: string;
+    media_url?: string | null;
   };
 };
 
@@ -43,6 +44,8 @@ export type EventTeam = {
   ip_pool?: string | null;
   pool_ip?: string | null;
   subnet?: string | null;
+  team_picture?: string | null;
+  team_picture_url?: string | null;
   member_count?: number;
   members?: TeamMember[];
   created_in?: string | null;
@@ -122,17 +125,30 @@ export async function createTeam(
     register_as?: string;
     affiliation?: string;
   },
+  options?: { file?: File | null },
 ) {
-  if (hackathonId) {
+  const path = hackathonId
+    ? haasApiPath(`hackathons/${hackathonId}/teams`)
+    : haasApiPath("teams");
+
+  if (!options?.file) {
     const result = await callAppApi<ApiResult<HaasForwardPayload<EventTeam>>>(
-      haasApiPath(`hackathons/${hackathonId}/teams`),
+      path,
       { method: "POST", body },
     );
     return unwrapHaasResult(result).data;
   }
+
+  const form = new FormData();
+  for (const [key, value] of Object.entries(body)) {
+    if (value === undefined) continue;
+    form.append(key, String(value));
+  }
+  form.append("file", options.file);
+
   const result = await callAppApi<ApiResult<HaasForwardPayload<EventTeam>>>(
-    haasApiPath("teams"),
-    { method: "POST", body },
+    path,
+    { method: "POST", body: form },
   );
   return unwrapHaasResult(result).data;
 }
@@ -141,13 +157,32 @@ export async function updateTeam(
   hackathonId: string | null | undefined,
   teamId: string,
   body: TeamWriteInput,
+  options?: { file?: File | null; clearPicture?: boolean },
 ) {
   const path = hackathonId
     ? haasApiPath(`hackathons/${hackathonId}/teams/${teamId}`)
     : haasApiPath(`teams/${teamId}`);
+
+  const needsMultipart = Boolean(options?.file || options?.clearPicture);
+  if (!needsMultipart) {
+    const result = await callAppApi<ApiResult<HaasForwardPayload<EventTeam>>>(
+      path,
+      { method: "PATCH", body },
+    );
+    return unwrapHaasResult(result).data;
+  }
+
+  const form = new FormData();
+  for (const [key, value] of Object.entries(body)) {
+    if (value === undefined) continue;
+    form.append(key, String(value));
+  }
+  if (options?.file) form.append("file", options.file);
+  if (options?.clearPicture) form.append("clear_team_picture", "true");
+
   const result = await callAppApi<ApiResult<HaasForwardPayload<EventTeam>>>(
     path,
-    { method: "PATCH", body },
+    { method: "PATCH", body: form },
   );
   return unwrapHaasResult(result).data;
 }
@@ -158,6 +193,19 @@ export async function setTeamActive(
   isActive: boolean,
 ) {
   return updateTeam(hackathonId, teamId, { is_active: isActive });
+}
+
+/** Re-provision K8s namespace + IP pool (deactivate then activate). */
+export async function provisionTeamIpPool(
+  hackathonId: string | null | undefined,
+  teamId: string,
+) {
+  await setTeamActive(hackathonId, teamId, false);
+  return setTeamActive(hackathonId, teamId, true);
+}
+
+export function teamHasIpPool(team: Pick<EventTeam, "ip_pool" | "pool_ip" | "subnet">) {
+  return Boolean(team.ip_pool?.trim() || team.pool_ip?.trim() || team.subnet?.trim());
 }
 
 export async function attachTeam(hackathonId: string, teamId: string) {

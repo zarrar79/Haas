@@ -3,10 +3,18 @@ import { listAllChallenges } from "@/features/challenges/challenge-api";
 import { listMachines } from "@/features/ops/ops-api";
 import { listQuestionAnswerRows } from "@/features/question-answers/question-answers-api";
 import { listAllTeams, listTeams } from "@/features/teams/team-api";
+import { listSystemUsers } from "@/features/system/system-api";
+import {
+  eventUserDetailPath,
+  eventUserLabel,
+  listEventUsers,
+  type EventUser,
+} from "@/features/users/users-api";
 
 export type GlobalSearchResultType =
   | "challenge"
   | "team"
+  | "user"
   | "machine"
   | "question";
 
@@ -38,7 +46,16 @@ function sectionHref(
   }
   if (section === "teams") return `/teams${suffix}`;
   if (section === "challenges") return `/challenges${suffix}`;
+  if (section === "members") return `/hackathons${suffix}`;
   return `/hackathons${suffix}`;
+}
+
+function userHref(hackathonId: string, userId: string, query: string) {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  params.set("focus", userId);
+  const qs = params.toString();
+  return `${eventUserDetailPath(hackathonId, userId)}${qs ? `?${qs}` : ""}`;
 }
 
 export async function runGlobalSearch(
@@ -52,20 +69,28 @@ export async function runGlobalSearch(
   const ipLike = looksLikeIp(q);
 
   if (hackathonId) {
-    const [challenges, teams, machines, questionReport] = await Promise.all([
-      listChallengeAdmin(hackathonId, { search: q }).catch(() => []),
-      listTeams(hackathonId, { search: q, limit: "30" }).catch(() => []),
-      listMachines(hackathonId, {
-        search: ipLike ? undefined : q,
-        ip: ipLike ? q : undefined,
-        limit: "30",
-      }).catch(() => []),
-      listQuestionAnswerRows(hackathonId, {
-        search: q,
-        docker_ip: ipLike ? q : undefined,
-        limit: "30",
-      }).catch(() => ({ items: [] as Awaited<ReturnType<typeof listQuestionAnswerRows>>["items"] })),
-    ]);
+    const [challenges, teams, users, machines, questionReport] =
+      await Promise.all([
+        listChallengeAdmin(hackathonId, { search: q }).catch(() => []),
+        listTeams(hackathonId, { search: q, limit: "30" }).catch(() => []),
+        listEventUsers(hackathonId, { search: q, limit: "30" }).catch(
+          () => [] as EventUser[],
+        ),
+        listMachines(hackathonId, {
+          search: ipLike ? undefined : q,
+          ip: ipLike ? q : undefined,
+          limit: "30",
+        }).catch(() => []),
+        listQuestionAnswerRows(hackathonId, {
+          search: q,
+          docker_ip: ipLike ? q : undefined,
+          limit: "30",
+        }).catch(() => ({
+          items: [] as Awaited<
+            ReturnType<typeof listQuestionAnswerRows>
+          >["items"],
+        })),
+      ]);
     const questions = questionReport.items;
 
     for (const row of challenges.slice(0, 8)) {
@@ -85,6 +110,18 @@ export async function runGlobalSearch(
         title: row.name || "Team",
         subtitle: row.team_code || row.register_as || undefined,
         href: sectionHref(hackathonId, "teams", q, row.id),
+      });
+    }
+
+    for (const row of users.slice(0, 8)) {
+      results.push({
+        id: `user-${row.id}`,
+        type: "user",
+        title: eventUserLabel(row),
+        subtitle: [row.email, row.username, row.organization_name]
+          .filter(Boolean)
+          .join(" · "),
+        href: userHref(hackathonId, row.id, q),
       });
     }
 
@@ -115,9 +152,10 @@ export async function runGlobalSearch(
     return results;
   }
 
-  const [teams, challenges] = await Promise.all([
+  const [teams, challenges, systemUsers] = await Promise.all([
     listAllTeams({ search: q, limit: "15" }).catch(() => []),
     listAllChallenges({ search: q, limit: "15" }).catch(() => []),
+    listSystemUsers({ search: q }).catch(() => []),
   ]);
 
   for (const row of challenges.slice(0, 6)) {
@@ -140,12 +178,30 @@ export async function runGlobalSearch(
     });
   }
 
+  for (const row of systemUsers.slice(0, 6)) {
+    const label =
+      [row.name, row.last_name].filter(Boolean).join(" ").trim() ||
+      row.username ||
+      row.email ||
+      row.id;
+    results.push({
+      id: `user-${row.id}`,
+      type: "user",
+      title: label,
+      subtitle: [row.email, row.username, row.user_type]
+        .filter(Boolean)
+        .join(" · "),
+      href: `/system/users?q=${encodeURIComponent(q)}&focus=${row.id}`,
+    });
+  }
+
   return results;
 }
 
 export const SEARCH_TYPE_LABELS: Record<GlobalSearchResultType, string> = {
   challenge: "Challenge",
   team: "Team",
+  user: "User",
   machine: "Machine",
   question: "Question",
 };

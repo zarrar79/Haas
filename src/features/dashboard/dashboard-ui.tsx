@@ -1,8 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 
 import { GuidanceHint } from "@/components/ui/tooltip";
+import {
+  TABLE_ELEMENT_CLASS,
+  TABLE_SHELL_CLASS,
+  SyncedHorizontalScroll,
+} from "@/components/ui/table-scroll";
 import {
   formatDashboardNumber,
   DASHBOARD_SECTION_TIPS,
@@ -96,6 +101,8 @@ export function DashboardTable({
   rows: (string | ReactNode)[][];
   emptyMessage?: string;
 }) {
+  const tableRef = useRef<HTMLTableElement>(null);
+
   if (rows.length === 0) {
     return (
       <p className="rounded-[var(--radius-sm)] border border-dashed border-[var(--border)] px-4 py-8 text-center text-sm text-[var(--text-muted)]">
@@ -105,35 +112,27 @@ export function DashboardTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-[var(--radius-sm)] border border-[var(--border)]">
-      <table className="min-w-full text-left text-sm">
-        <thead className="bg-[var(--surface-raised)] text-xs uppercase tracking-wide text-[var(--text-muted)]">
-          <tr>
-            {headers.map((header) => (
-              <th key={header} className="px-3 py-2 font-semibold">
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[var(--border)]">
-          {rows.map((row, rowIndex) => (
-            <tr
-              key={`row-${rowIndex}`}
-              className="transition hover:bg-[var(--surface-hover)]"
-            >
-              {row.map((cell, cellIndex) => (
-                <td
-                  key={`cell-${rowIndex}-${cellIndex}`}
-                  className="px-3 py-2.5 text-[var(--text)]"
-                >
-                  {cell}
-                </td>
+    <div className={TABLE_SHELL_CLASS}>
+      <SyncedHorizontalScroll tableRef={tableRef}>
+        <table ref={tableRef} className={TABLE_ELEMENT_CLASS}>
+          <thead>
+            <tr>
+              {headers.map((header) => (
+                <th key={header}>{header}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, rowIndex) => (
+              <tr key={`row-${rowIndex}`}>
+                {row.map((cell, cellIndex) => (
+                  <td key={`cell-${rowIndex}-${cellIndex}`}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SyncedHorizontalScroll>
     </div>
   );
 }

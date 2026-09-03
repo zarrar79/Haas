@@ -389,6 +389,31 @@ export async function sendNotification(
   return unwrapHaasResult(result).data;
 }
 
+export async function updateNotification(
+  hackathonId: string,
+  notificationId: string,
+  body: { title?: string; message?: string },
+) {
+  const result = await callAppApi<
+    ApiResult<HaasForwardPayload<NotificationRow>>
+  >(haasApiPath(`hackathons/${hackathonId}/notifications/${notificationId}`), {
+    method: "PATCH",
+    body,
+  });
+  return unwrapHaasResult(result).data;
+}
+
+export async function deleteNotification(
+  hackathonId: string,
+  notificationId: string,
+) {
+  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
+    haasApiPath(`hackathons/${hackathonId}/notifications/${notificationId}`),
+    { method: "DELETE" },
+  );
+  return unwrapHaasResult(result);
+}
+
 export async function listActivityLogs(
   hackathonId: string,
   filters?: ActivityLogListFilters,
