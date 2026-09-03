@@ -355,11 +355,13 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
           onChange={(e) => setDiscordLink(e.target.value)}
         />
         <OrganizationPicker
+          hackathonId={hackathonId}
           selectedId={organizationId}
           onChange={(id) => setOrganizationId(id)}
           disabled={isSaving}
         />
         <SponsorPicker
+          hackathonId={hackathonId}
           selectedIds={sponsorIds}
           onChange={(ids) => setSponsorIds(ids)}
           disabled={isSaving}

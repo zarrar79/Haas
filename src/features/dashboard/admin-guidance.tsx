@@ -63,13 +63,6 @@ export const EVENT_ADMIN_GUIDANCE: AdminGuidanceItem[] = [
     tip: "Set spawn limits and playing roster before going live.",
     href: (id) => `/events/${id}/settings`,
   },
-  {
-    id: "ops",
-    title: "Operations",
-    description: "Analytics snapshot, notifications, audit trail.",
-    tip: "Send broadcast notifications from Ops during the event.",
-    href: (id) => `/events/${id}/ops`,
-  },
 ];
 
 export const DASHBOARD_SECTION_TIPS: Record<string, string> = {

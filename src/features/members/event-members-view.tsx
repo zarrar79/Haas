@@ -186,22 +186,17 @@ export function EventMembersView({ hackathonId }: Props) {
         eyebrow="Event workspace"
         title="Members"
         actions={
-          <>
-            <Button variant="secondary" size="sm" onClick={() => void load()}>
-              Refresh
+          canWrite ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingRow(null);
+                setModalOpen(true);
+              }}
+            >
+              Create user
             </Button>
-            {canWrite ? (
-              <Button
-                size="sm"
-                onClick={() => {
-                  setEditingRow(null);
-                  setModalOpen(true);
-                }}
-              >
-                Create user
-              </Button>
-            ) : null}
-          </>
+          ) : undefined
         }
       />
 

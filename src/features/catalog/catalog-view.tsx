@@ -98,15 +98,7 @@ export function CatalogView() {
 
   return (
     <div className="w-full">
-      <PageHeader
-        eyebrow="Platform"
-        title="Catalog"
-        actions={
-          <Button variant="secondary" onClick={() => void load()}>
-            Refresh
-          </Button>
-        }
-      />
+      <PageHeader eyebrow="Platform" title="Catalog" />
 
       <StickyToolbar
         layout="plain"

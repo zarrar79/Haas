@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { CopyableText } from "@/components/ui/copyable-text";
 import { DataTable } from "@/components/ui/data-table";
 import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
@@ -211,9 +210,6 @@ export function SystemActivityView() {
               onChange={(e) => setDateBefore(e.target.value)}
             />
           </label>
-          <Button variant="secondary" onClick={() => void load()}>
-            Refresh
-          </Button>
         </div>
       </StickyToolbar>
 

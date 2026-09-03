@@ -176,21 +176,16 @@ export function EventActivityLogsView({ hackathonId }: Props) {
         eyebrow="Event workspace"
         title="Activity logs"
         actions={
-          <>
-            <Button variant="secondary" onClick={() => void load()}>
-              Refresh
+          canWrite ? (
+            <Button
+              onClick={() => {
+                setEditingRow(null);
+                setModalOpen(true);
+              }}
+            >
+              Record log
             </Button>
-            {canWrite ? (
-              <Button
-                onClick={() => {
-                  setEditingRow(null);
-                  setModalOpen(true);
-                }}
-              >
-                Record log
-              </Button>
-            ) : null}
-          </>
+          ) : undefined
         }
       />
 

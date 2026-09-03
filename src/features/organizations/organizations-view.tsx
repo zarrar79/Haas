@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
 import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
+import { HackathonPicker } from "@/features/events/hackathon-picker";
 import {
   listOrganizations,
   type Organization,
@@ -23,11 +24,12 @@ type ActiveFilter = "all" | "active" | "inactive";
 
 export function OrganizationsView() {
   const router = useRouter();
+  const [hackathonId, setHackathonId] = useState("");
   const [rows, setRows] = useState<Organization[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
@@ -43,11 +45,16 @@ export function OrganizationsView() {
   }, [search]);
 
   const load = useCallback(async () => {
+    if (!hackathonId) {
+      setRows([]);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
       setRows(
         await listOrganizations({
+          hackathon: hackathonId,
           search: debouncedSearch || undefined,
           is_active:
             activeFilter === "active"
@@ -68,7 +75,7 @@ export function OrganizationsView() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearch, activeFilter, router]);
+  }, [hackathonId, debouncedSearch, activeFilter, router]);
 
   useEffect(() => {
     void load();
@@ -81,14 +88,12 @@ export function OrganizationsView() {
       <PageHeader
         eyebrow="Platform"
         title="Organizations"
-        description="Create and edit organizations, then assign them to hackathons."
+        description="Organizations belong to a hackathon. Select an event, then create or edit orgs."
         actions={
           <>
-            <Button variant="secondary" size="sm" onClick={() => void load()}>
-              Refresh
-            </Button>
             <Button
               size="sm"
+              disabled={!hackathonId}
               onClick={() => {
                 setModalMode("create");
                 setEditingId(null);
@@ -109,6 +114,13 @@ export function OrganizationsView() {
           </ListPageStats>
         }
       >
+        <HackathonPicker
+          value={hackathonId}
+          onChange={setHackathonId}
+          navigateOnChange={false}
+          emptyLabel="Select hackathon…"
+          className="min-w-[180px]"
+        />
         <label className="flex min-w-[11rem] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)] sm:max-w-xs">
           <span className="font-medium text-[var(--text)]">Search</span>
           <input
@@ -135,73 +147,80 @@ export function OrganizationsView() {
         </div>
       ) : null}
 
-      <DataTable
-        isLoading={isLoading}
-        rows={filtered}
-        rowKey={(r) => r.id}
-        onPaginationInfo={onPaginationInfo}
-        emptyMessage="No organizations yet. Create one to assign to events."
-        columns={[
-          {
-            key: "name",
-            header: "Organization",
-            render: (row) => (
-              <div className="flex items-center gap-3">
-                <Avatar
-                  src={row.media_url}
-                  name={row.name}
-                  size="sm"
-                  rounded="md"
-                />
-                <div>
-                  <div className="font-medium">{row.name}</div>
-                  <div className="max-w-md truncate text-xs text-[var(--text-muted)]">
-                    {row.description || "—"}
+      {!hackathonId ? (
+        <Alert variant="info">Select a hackathon to manage its organizations.</Alert>
+      ) : (
+        <DataTable
+          isLoading={isLoading}
+          rows={filtered}
+          rowKey={(r) => r.id}
+          onPaginationInfo={onPaginationInfo}
+          emptyMessage="No organizations for this hackathon yet."
+          columns={[
+            {
+              key: "name",
+              header: "Organization",
+              render: (row) => (
+                <div className="flex items-center gap-3">
+                  <Avatar
+                    src={row.media_url}
+                    name={row.name}
+                    size="sm"
+                    rounded="md"
+                  />
+                  <div>
+                    <div className="font-medium">{row.name}</div>
+                    <div className="max-w-md truncate text-xs text-[var(--text-muted)]">
+                      {row.description || "—"}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ),
-          },
-          {
-            key: "status",
-            header: "Status",
-            render: (row) =>
-              row.is_active === false ? (
-                <Badge>Inactive</Badge>
-              ) : (
-                <Badge tone="success">Active</Badge>
               ),
-          },
-          {
-            key: "actions",
-            header: "",
-            className: "text-right w-12",
-            render: (row) => (
-              <RowActionsMenu
-                items={[
-                  {
-                    id: "edit",
-                    label: "Edit",
-                    onClick: () => {
-                      setModalMode("edit");
-                      setEditingId(row.id);
-                      setModalOpen(true);
+            },
+            {
+              key: "status",
+              header: "Status",
+              render: (row) =>
+                row.is_active === false ? (
+                  <Badge>Inactive</Badge>
+                ) : (
+                  <Badge tone="success">Active</Badge>
+                ),
+            },
+            {
+              key: "actions",
+              header: "",
+              className: "text-right w-12",
+              render: (row) => (
+                <RowActionsMenu
+                  items={[
+                    {
+                      id: "edit",
+                      label: "Edit",
+                      onClick: () => {
+                        setModalMode("edit");
+                        setEditingId(row.id);
+                        setModalOpen(true);
+                      },
                     },
-                  },
-                ]}
-              />
-            ),
-          },
-        ]}
-      />
+                  ]}
+                />
+              ),
+            },
+          ]}
+        />
+      )}
 
-      <OrganizationFormModal
-        open={modalOpen}
-        mode={modalMode}
-        organizationId={editingId}
-        onClose={() => setModalOpen(false)}
-        onSaved={() => void load()}
-      />
+      {hackathonId ? (
+        <OrganizationFormModal
+          open={modalOpen}
+          mode={modalMode}
+          hackathonId={hackathonId}
+          organizationId={editingId}
+          onClose={() => setModalOpen(false)}
+          onSaved={() => void load()}
+        />
+      ) : null}
     </div>
   );
 }

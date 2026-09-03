@@ -109,12 +109,11 @@ export function AppHeader({
           {headerNavMode ? (
             <Link
               href="/home"
-              className="mr-1 hidden min-w-0 items-center gap-2 sm:flex"
+              className="mr-1 hidden items-center gap-2 sm:flex"
               aria-label="Cyber Range Digiinn360 home"
             >
-              <AppBrandMark size={32} className="sm:hidden" />
-              <AppBrandMark size={36} className="hidden sm:block" />
-              <span className="hidden truncate text-sm font-extrabold tracking-tight md:inline">
+              <AppBrandMark size={36} />
+              <span className="whitespace-nowrap text-sm font-extrabold leading-none tracking-tight">
                 <span className="text-[var(--accent)]">Cyber Range</span>
                 <span className="text-[var(--text)]"> Digiinn360</span>
               </span>

@@ -9,13 +9,15 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/loader";
 import {
-  getHackathonDashboard,
-  type HackathonDashboard,
-} from "@/features/dashboard/dashboard-api";
-import { HackathonDashboardView } from "@/features/dashboard/hackathon-dashboard-view";
+  getOverviewAnalyticsBundle,
+  type OverviewAnalyticsBundle,
+} from "@/features/dashboard/overview-analytics-api";
+import { OverviewAnalyticsView } from "@/features/dashboard/overview-analytics-view";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { getHackathon } from "@/features/hackathons/hackathon-api";
 import type { Hackathon } from "@/types/hackathon";
+
+const DEFAULT_PERIOD = "7d";
 
 export function EventOverview() {
   const params = useParams<{ hackathonId: string }>();
@@ -23,7 +25,9 @@ export function EventOverview() {
   const router = useRouter();
   const { setSelectedHackathonId } = useSelectedEvent();
   const [hackathon, setHackathon] = useState<Hackathon | null>(null);
-  const [dashboard, setDashboard] = useState<HackathonDashboard | null>(null);
+  const [analytics, setAnalytics] = useState<OverviewAnalyticsBundle | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -32,14 +36,17 @@ export function EventOverview() {
     setIsLoading(true);
     setError(null);
     try {
-      const [h, dash] = await Promise.all([
+      const [h, bundle] = await Promise.all([
         getHackathon(hackathonId),
-        getHackathonDashboard(hackathonId, { hours: "24", limit: "10" }),
+        getOverviewAnalyticsBundle(hackathonId, {
+          period: DEFAULT_PERIOD,
+          limit: "15",
+        }),
       ]);
       setHackathon(h);
-      setDashboard(dash);
+      setAnalytics(bundle);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load dashboard");
+      setError(err instanceof Error ? err.message : "Failed to load overview");
     } finally {
       setIsLoading(false);
     }
@@ -62,12 +69,6 @@ export function EventOverview() {
         title={hackathon?.display_name || hackathon?.name || "Event dashboard"}
         actions={
           <>
-            <Button variant="secondary" onClick={() => void load()}>
-              Refresh
-            </Button>
-            <Link href={`/events/${hackathonId}/ops`}>
-              <Button variant="secondary">Operations</Button>
-            </Link>
             <Link href={`/hackathons/${hackathonId}`}>
               <Button variant="secondary">Event details</Button>
             </Link>
@@ -85,9 +86,9 @@ export function EventOverview() {
       ) : null}
 
       {isLoading ? (
-        <PageLoader label="Loading event dashboard…" />
-      ) : dashboard ? (
-        <HackathonDashboardView data={dashboard} />
+        <PageLoader label="Loading event overview…" />
+      ) : analytics ? (
+        <OverviewAnalyticsView data={analytics} periodLabel={DEFAULT_PERIOD} />
       ) : null}
     </div>
   );

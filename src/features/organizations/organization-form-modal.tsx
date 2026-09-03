@@ -17,6 +17,7 @@ import {
 type Props = {
   open: boolean;
   mode: "create" | "edit";
+  hackathonId: string;
   organizationId?: string | null;
   onClose: () => void;
   onSaved: (org: Organization) => void;
@@ -25,6 +26,7 @@ type Props = {
 export function OrganizationFormModal({
   open,
   mode,
+  hackathonId,
   organizationId,
   onClose,
   onSaved,
@@ -82,6 +84,10 @@ export function OrganizationFormModal({
       setError("Organization name is required.");
       return;
     }
+    if (!hackathonId) {
+      setError("Select a hackathon first.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -89,6 +95,7 @@ export function OrganizationFormModal({
         name: name.trim(),
         description: description.trim() || undefined,
         is_active: isActive,
+        hackathon: hackathonId,
       };
       const saved =
         mode === "edit" && organizationId
@@ -118,7 +125,7 @@ export function OrganizationFormModal({
           {mode === "edit" ? "Edit organization" : "Create organization"}
         </h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Organizations can be assigned to hackathons later.
+          Organizations belong to a hackathon.
         </p>
       </div>
       <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">

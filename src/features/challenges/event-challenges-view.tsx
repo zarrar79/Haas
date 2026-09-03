@@ -717,24 +717,19 @@ export function EventChallengesView({
         eyebrow="Event workspace"
         title="Challenges"
         actions={
-          <>
-            <Button variant="secondary" onClick={() => void load()}>
-              Refresh
+          canCreateChallenge || isEventOnlyAdmin ? (
+            <Button
+              onClick={openCreate}
+              disabled={!canCreateChallenge}
+              title={
+                !canCreateChallenge
+                  ? "Select an assigned hackathon first"
+                  : undefined
+              }
+            >
+              Create challenge
             </Button>
-            {canCreateChallenge || isEventOnlyAdmin ? (
-              <Button
-                onClick={openCreate}
-                disabled={!canCreateChallenge}
-                title={
-                  !canCreateChallenge
-                    ? "Select an assigned hackathon first"
-                    : undefined
-                }
-              >
-                Create challenge
-              </Button>
-            ) : null}
-          </>
+          ) : undefined
         }
       />
 

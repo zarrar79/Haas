@@ -110,9 +110,6 @@ export function EventUserDetailView({ hackathonId, userId }: Props) {
             >
               Back to members
             </Link>
-            <Button variant="secondary" size="sm" onClick={() => void load()} disabled={isLoading}>
-              Refresh
-            </Button>
             {canWrite && user && !user.teams?.length ? (
               <Button
                 size="sm"

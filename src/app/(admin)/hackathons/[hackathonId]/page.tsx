@@ -1,10 +1,11 @@
-import { HackathonDetailView } from "@/features/hackathons/hackathon-detail-view";
+import { redirect } from "next/navigation";
 
 type PageProps = {
   params: Promise<{ hackathonId: string }>;
 };
 
-export default async function HackathonDetailPage({ params }: PageProps) {
+/** Platform detail → Event workspace Hackathon (same complete editor). */
+export default async function HackathonDetailRedirectPage({ params }: PageProps) {
   const { hackathonId } = await params;
-  return <HackathonDetailView hackathonId={hackathonId} />;
+  redirect(`/events/${hackathonId}/hackathon`);
 }

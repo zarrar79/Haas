@@ -131,9 +131,6 @@ export function HackathonListView() {
         title="Hackathons"
         actions={
           <>
-            <Button variant="secondary" onClick={() => void load()}>
-              Refresh
-            </Button>
             <Link href="/challenges">
               <Button variant="secondary">All challenges</Button>
             </Link>
@@ -260,7 +257,7 @@ export function HackathonListView() {
                   {
                     id: "view",
                     label: "View",
-                    href: `/hackathons/${row.id}`,
+                    href: `/events/${row.id}/hackathon`,
                   },
                   {
                     id: "enter",

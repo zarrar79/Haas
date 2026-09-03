@@ -290,11 +290,11 @@ export function NotificationsPanel({
                       </Button>
                       {hackathonId ? (
                         <Link
-                          href={`/events/${hackathonId}/ops`}
+                          href={`/events/${hackathonId}`}
                           className="text-xs font-semibold text-[var(--accent)]"
                           onClick={() => setOpen(false)}
                         >
-                          Ops page
+                          Event overview
                         </Link>
                       ) : null}
                     </div>
@@ -401,17 +401,6 @@ export function NotificationsPanel({
                   })}
                 </ul>
               )}
-
-              <div className="border-t border-[var(--border)] px-4 py-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => void load()}
-                >
-                  Refresh
-                </Button>
-              </div>
             </>
           )}
         </div>

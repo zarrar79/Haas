@@ -1,13 +1,16 @@
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
+
+import { PlaceholderPage } from "@/components/shell/placeholder-page";
 import { EventActivityLogsView } from "@/features/activity-logs/event-activity-logs-view";
 import { EventChallengesView } from "@/features/challenges/event-challenges-view";
+import { EventHackathonView } from "@/features/events/event-hackathon-view";
 import { EventMachinesView } from "@/features/machines/event-machines-view";
 import { EventMembersView } from "@/features/members/event-members-view";
-import { EventOpsView } from "@/features/ops/event-ops-view";
 import { EventQuestionAnswersView } from "@/features/question-answers/event-question-answers-view";
 import { EventTeamScoresView } from "@/features/scores/event-team-scores-view";
 import { EventSettingsView } from "@/features/settings/event-settings-view";
 import { EventTeamsView } from "@/features/teams/event-teams-view";
-import { PlaceholderPage } from "@/components/shell/placeholder-page";
 
 type PageProps = {
   params: Promise<{ hackathonId: string; section: string }>;
@@ -16,6 +19,23 @@ type PageProps = {
 export default async function EventSectionPage({ params }: PageProps) {
   const { hackathonId, section } = await params;
 
+  if (section === "hackathon") {
+    return (
+      <Suspense
+        fallback={
+          <p className="text-sm text-[var(--text-muted)]">Loading hackathon…</p>
+        }
+      >
+        <EventHackathonView hackathonId={hackathonId} />
+      </Suspense>
+    );
+  }
+  if (section === "organizations") {
+    redirect(`/events/${hackathonId}/hackathon?tab=organizations`);
+  }
+  if (section === "sponsors") {
+    redirect(`/events/${hackathonId}/hackathon?tab=sponsors`);
+  }
   if (section === "challenges") {
     return <EventChallengesView hackathonId={hackathonId} />;
   }
@@ -29,7 +49,7 @@ export default async function EventSectionPage({ params }: PageProps) {
     return <EventSettingsView hackathonId={hackathonId} />;
   }
   if (section === "ops") {
-    return <EventOpsView hackathonId={hackathonId} />;
+    redirect(`/events/${hackathonId}`);
   }
   if (section === "question-answers") {
     return <EventQuestionAnswersView hackathonId={hackathonId} />;

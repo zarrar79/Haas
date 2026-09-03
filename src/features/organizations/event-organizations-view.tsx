@@ -10,17 +10,33 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
-import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
-import { listSponsors, type Sponsor } from "@/features/sponsors/sponsor-api";
-import { SponsorFormModal } from "@/features/sponsors/sponsor-form-modal";
+import { HackathonPicker } from "@/features/events/hackathon-picker";
+import { useSelectedEvent } from "@/features/events/selected-event-context";
+import {
+  listOrganizations,
+  type Organization,
+} from "@/features/organizations/organization-api";
+import { OrganizationFormModal } from "@/features/organizations/organization-form-modal";
 import { ApiRequestError } from "@/lib/client-api";
+
+type Props = {
+  hackathonId: string;
+  /** When true, omit page chrome (used inside Hackathon tab). */
+  embedded?: boolean;
+};
 
 type ActiveFilter = "all" | "active" | "inactive";
 
-export function SponsorsView() {
+export function EventOrganizationsView({
+  hackathonId,
+  embedded = false,
+}: Props) {
   const router = useRouter();
-  const [rows, setRows] = useState<Sponsor[]>([]);
+  const { setSelectedHackathonId } = useSelectedEvent();
+  const [activeId, setActiveId] = useState(hackathonId);
+  const [rows, setRows] = useState<Organization[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
@@ -35,18 +51,24 @@ export function SponsorsView() {
   }, []);
 
   useEffect(() => {
+    setActiveId(hackathonId);
+  }, [hackathonId]);
+
+  useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
     return () => window.clearTimeout(t);
   }, [search]);
 
   const load = useCallback(async () => {
+    if (!activeId) return;
     setIsLoading(true);
     setError(null);
     try {
       setRows(
-        await listSponsors({
+        await listOrganizations({
+          hackathon: activeId,
           search: debouncedSearch || undefined,
-          active:
+          is_active:
             activeFilter === "active"
               ? "true"
               : activeFilter === "inactive"
@@ -59,39 +81,56 @@ export function SponsorsView() {
         router.replace("/login");
         return;
       }
-      setError(err instanceof Error ? err.message : "Failed to load sponsors");
+      setError(
+        err instanceof Error ? err.message : "Failed to load organizations",
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearch, activeFilter, router]);
+  }, [activeId, debouncedSearch, activeFilter, router]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  function onHackathonChange(nextId: string) {
+    setActiveId(nextId);
+    setSelectedHackathonId(nextId || null);
+    if (nextId) router.push(`/events/${nextId}/hackathon?tab=organizations`);
+  }
+
   const filtered = useMemo(() => rows, [rows]);
 
+  const createButton = (
+    <Button
+      size="sm"
+      onClick={() => {
+        setModalMode("create");
+        setEditingId(null);
+        setModalOpen(true);
+      }}
+    >
+      Create organization
+    </Button>
+  );
+
   return (
-    <div className="w-full">
-      <PageHeader
-        eyebrow="Platform"
-        title="Sponsors"
-        description="Create and edit sponsors, then attach them to hackathons."
-        actions={
-          <>
-            <Button
-              size="sm"
-              onClick={() => {
-                setModalMode("create");
-                setEditingId(null);
-                setModalOpen(true);
-              }}
-            >
-              Create sponsor
-            </Button>
-          </>
-        }
-      />
+    <div className="w-full space-y-3">
+      {!embedded ? (
+        <PageHeader
+          eyebrow="Event workspace"
+          title="Organizations"
+          description="Organizations for this hackathon."
+          actions={createButton}
+        />
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-[var(--text-muted)]">
+            Organizations belonging to this hackathon.
+          </p>
+          {createButton}
+        </div>
+      )}
 
       <StickyToolbar
         footer={
@@ -101,24 +140,35 @@ export function SponsorsView() {
           </ListPageStats>
         }
       >
+        {!embedded ? (
+          <HackathonPicker
+            value={activeId}
+            onChange={onHackathonChange}
+            section="hackathon"
+            className="min-w-[180px]"
+          />
+        ) : null}
         <label className="flex min-w-[11rem] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)] sm:max-w-xs">
           <span className="font-medium text-[var(--text)]">Search</span>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Sponsor name…"
+            placeholder="Organization name…"
             className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--input-bg)] px-2 py-2 text-sm text-[var(--text)] outline-none"
           />
         </label>
-        <FilterSelect
-          label="Status"
-          value={activeFilter}
-          onChange={(v) => setActiveFilter(v as ActiveFilter)}
-        >
-          <option value="all">All</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </FilterSelect>
+        <label className="flex min-w-[8rem] flex-col gap-1 text-xs text-[var(--text-muted)]">
+          <span className="font-medium text-[var(--text)]">Status</span>
+          <select
+            value={activeFilter}
+            onChange={(e) => setActiveFilter(e.target.value as ActiveFilter)}
+            className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--text)]"
+          >
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </label>
       </StickyToolbar>
 
       {error ? (
@@ -132,24 +182,23 @@ export function SponsorsView() {
         rows={filtered}
         rowKey={(r) => r.id}
         onPaginationInfo={onPaginationInfo}
-        emptyMessage="No sponsors yet. Create one to attach to events."
+        emptyMessage="No organizations for this hackathon yet."
         columns={[
           {
             key: "name",
-            header: "Sponsor",
+            header: "Organization",
             render: (row) => (
               <div className="flex items-center gap-3">
                 <Avatar
-                  src={row.image_url}
+                  src={row.media_url}
                   name={row.name}
                   size="sm"
                   rounded="md"
                 />
                 <div>
                   <div className="font-medium">{row.name}</div>
-                  <div className="text-xs text-[var(--text-muted)]">
-                    {[row.tag, row.organization_type].filter(Boolean).join(" · ") ||
-                      "—"}
+                  <div className="max-w-md truncate text-xs text-[var(--text-muted)]">
+                    {row.description || "—"}
                   </div>
                 </div>
               </div>
@@ -159,7 +208,7 @@ export function SponsorsView() {
             key: "status",
             header: "Status",
             render: (row) =>
-              row.active === false ? (
+              row.is_active === false ? (
                 <Badge>Inactive</Badge>
               ) : (
                 <Badge tone="success">Active</Badge>
@@ -188,10 +237,11 @@ export function SponsorsView() {
         ]}
       />
 
-      <SponsorFormModal
+      <OrganizationFormModal
         open={modalOpen}
         mode={modalMode}
-        sponsorId={editingId}
+        hackathonId={activeId}
+        organizationId={editingId}
         onClose={() => setModalOpen(false)}
         onSaved={() => void load()}
       />

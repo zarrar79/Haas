@@ -333,14 +333,7 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
       <PageHeader
         eyebrow="Event workspace"
         title="Question answers"
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => void load()}>
-              Refresh
-            </Button>
-            <Button onClick={openCreate}>Create answer</Button>
-          </>
-        }
+        actions={<Button onClick={openCreate}>Create answer</Button>}
       />
 
       <StickyToolbar

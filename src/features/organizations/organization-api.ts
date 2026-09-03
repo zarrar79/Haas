@@ -9,6 +9,7 @@ import type { ApiResult } from "@/types";
 
 export type Organization = {
   id: string;
+  hackathon?: string | null;
   name: string;
   description?: string | null;
   media?: string | null;
@@ -19,18 +20,21 @@ export type Organization = {
 };
 
 export type OrganizationWriteInput = {
+  hackathon?: string;
   name?: string;
   description?: string;
   is_active?: boolean;
 };
 
 export async function listOrganizations(filters?: {
+  hackathon?: string;
   search?: string;
   is_active?: string;
   limit?: string;
 }) {
   const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
     haasApiPath("organizations", {
+      hackathon: filters?.hackathon,
       search: filters?.search,
       is_active: filters?.is_active,
       limit: filters?.limit ?? "200",
@@ -47,7 +51,7 @@ export async function getOrganization(id: string) {
 }
 
 export async function createOrganization(
-  body: OrganizationWriteInput & { name: string },
+  body: OrganizationWriteInput & { name: string; hackathon: string },
   options?: { file?: File | null },
 ) {
   if (!options?.file) {

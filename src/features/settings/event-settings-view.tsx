@@ -221,11 +221,6 @@ export function EventSettingsView({ hackathonId }: Props) {
       <PageHeader
         eyebrow="Event workspace"
         title="Settings"
-        actions={
-          <Button variant="secondary" onClick={() => void load()}>
-            Refresh
-          </Button>
-        }
       />
 
       <StickyToolbar layout="stack">

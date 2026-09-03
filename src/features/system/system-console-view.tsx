@@ -65,7 +65,6 @@ export function SystemConsoleView({ section }: Props) {
 
   const nav = [
     { id: "stats", href: "/system/stats", label: "Stats" },
-    { id: "provisioning", href: "/system/provisioning", label: "Provisioning" },
     { id: "users", href: "/system/users", label: "Users" },
     { id: "admins", href: "/system/admins", label: "Event admins" },
     { id: "audit", href: "/system/audit", label: "Audit" },
@@ -78,17 +77,7 @@ export function SystemConsoleView({ section }: Props) {
 
   return (
     <div className="w-full">
-      <PageHeader
-        eyebrow="Platform"
-        title="System"
-        actions={
-          active === "stats" || active === "audit" ? (
-            <Button variant="secondary" onClick={() => void load()}>
-              Refresh
-            </Button>
-          ) : null
-        }
-      />
+      <PageHeader eyebrow="Platform" title="System" />
 
       <StickyToolbar layout="plain">
         <div className="flex flex-wrap gap-2">

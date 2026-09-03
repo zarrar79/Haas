@@ -46,7 +46,7 @@ export function HackathonQuickActions({
         Challenges{challengeCount != null ? ` (${challengeCount})` : ""}
       </Button>
       {showView ? (
-        <Link href={`/hackathons/${hackathonId}`}>
+        <Link href={`/events/${hackathonId}/hackathon`}>
           <Button variant="secondary" size="sm">
             View
           </Button>

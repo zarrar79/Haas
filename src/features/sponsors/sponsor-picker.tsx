@@ -11,10 +11,16 @@ import { SponsorFormModal } from "@/features/sponsors/sponsor-form-modal";
 type Props = {
   selectedIds: string[];
   onChange: (ids: string[], sponsors: Sponsor[]) => void;
+  hackathonId?: string;
   disabled?: boolean;
 };
 
-export function SponsorPicker({ selectedIds, onChange, disabled = false }: Props) {
+export function SponsorPicker({
+  selectedIds,
+  onChange,
+  hackathonId,
+  disabled = false,
+}: Props) {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Sponsor[]>([]);
   const [selected, setSelected] = useState<Sponsor[]>([]);
@@ -89,12 +95,14 @@ export function SponsorPicker({ selectedIds, onChange, disabled = false }: Props
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium text-[var(--text)]">Sponsors</p>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/sponsors"
-            className="text-xs font-medium text-[var(--accent)] hover:underline"
-          >
-            Manage sponsors
-          </Link>
+          {hackathonId ? (
+            <Link
+              href={`/events/${hackathonId}/hackathon?tab=sponsors`}
+              className="text-xs font-medium text-[var(--accent)] hover:underline"
+            >
+              Manage sponsors
+            </Link>
+          ) : null}
           <Button
             type="button"
             size="sm"

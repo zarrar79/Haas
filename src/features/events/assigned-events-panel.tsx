@@ -19,7 +19,6 @@ const QUICK_LINKS = [
   { label: "Machines", section: "machines" },
   { label: "Activity", section: "activity-logs" },
   { label: "Settings", section: "settings" },
-  { label: "Ops", section: "ops" },
 ] as const;
 
 export function AssignedEventsPanel() {

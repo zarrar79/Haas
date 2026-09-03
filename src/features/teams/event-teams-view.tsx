@@ -833,14 +833,9 @@ export function EventTeamsView({
         eyebrow="Event workspace"
         title="Teams"
         actions={
-          <>
-            <Button variant="secondary" size="sm" onClick={() => void load()}>
-              Refresh
-            </Button>
-            <Button size="sm" onClick={openCreate} disabled={!activeId}>
-              Create team
-            </Button>
-          </>
+          <Button size="sm" onClick={openCreate} disabled={!activeId}>
+            Create team
+          </Button>
         }
       />
 

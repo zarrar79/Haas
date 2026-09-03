@@ -15,6 +15,8 @@ type HackathonPickerProps = {
   section?: string;
   /** When false, only calls onChange (no router navigation). Default true when section is set. */
   navigateOnChange?: boolean;
+  /** Label for the empty option when navigateOnChange is false. */
+  emptyLabel?: string;
   className?: string;
 };
 
@@ -23,6 +25,7 @@ export function HackathonPicker({
   onChange,
   section,
   navigateOnChange,
+  emptyLabel = "All hackathons",
   className,
 }: HackathonPickerProps) {
   const router = useRouter();
@@ -34,6 +37,7 @@ export function HackathonPicker({
       try {
         const { items: rows } = await listHackathons({
           show_deleted: "false",
+          is_active: "true",
         });
         setItems(rows);
       } catch (err) {
@@ -64,7 +68,7 @@ export function HackathonPicker({
         value={value}
         onChange={(e) => handleChange(e.target.value)}
       >
-        {!shouldNavigate ? <option value="">All hackathons</option> : null}
+        {!shouldNavigate ? <option value="">{emptyLabel}</option> : null}
         {items.length === 0 ? (
           <option value="">No hackathons available</option>
         ) : (

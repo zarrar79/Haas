@@ -85,20 +85,6 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         icon: "catalog",
         platformOnly: true,
       },
-      {
-        id: "sponsors",
-        label: "Sponsors",
-        href: "/sponsors",
-        icon: "sponsors",
-        platformOnly: true,
-      },
-      {
-        id: "organizations",
-        label: "Organizations",
-        href: "/organizations",
-        icon: "organizations",
-        platformOnly: true,
-      },
     ],
   },
   {
@@ -115,6 +101,12 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
             label: "Overview",
             href: "/events/current",
             icon: "event-home",
+          },
+          {
+            id: "event-hackathon",
+            label: "Hackathon",
+            href: "/events/current/hackathon",
+            icon: "event-hackathon",
           },
           {
             id: "event-members",
@@ -164,12 +156,6 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
             href: "/events/current/settings",
             icon: "event-settings",
           },
-          {
-            id: "event-ops",
-            label: "Operations",
-            href: "/events/current/ops",
-            icon: "event-ops",
-          },
         ],
       },
     ],
@@ -184,12 +170,6 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         icon: "system",
         platformOnly: true,
         children: [
-          {
-            id: "system-provisioning",
-            label: "Event provisioning",
-            href: "/system/provisioning",
-            icon: "hackathons-new",
-          },
           {
             id: "system-stats",
             label: "Stats",

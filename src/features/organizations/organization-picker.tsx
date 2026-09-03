@@ -12,12 +12,14 @@ import {
 import { OrganizationFormModal } from "@/features/organizations/organization-form-modal";
 
 type Props = {
+  hackathonId: string;
   selectedId: string | null;
   onChange: (id: string | null, org: Organization | null) => void;
   disabled?: boolean;
 };
 
 export function OrganizationPicker({
+  hackathonId,
   selectedId,
   onChange,
   disabled = false,
@@ -28,20 +30,28 @@ export function OrganizationPicker({
   const [isSearching, setIsSearching] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
-  const runSearch = useCallback(async (q: string) => {
-    setIsSearching(true);
-    try {
-      const rows = await listOrganizations({
-        search: q.trim() || undefined,
-        is_active: "true",
-      });
-      setResults(rows);
-    } catch {
-      setResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
+  const runSearch = useCallback(
+    async (q: string) => {
+      if (!hackathonId) {
+        setResults([]);
+        return;
+      }
+      setIsSearching(true);
+      try {
+        const rows = await listOrganizations({
+          hackathon: hackathonId,
+          search: q.trim() || undefined,
+          is_active: "true",
+        });
+        setResults(rows);
+      } catch {
+        setResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [hackathonId],
+  );
 
   useEffect(() => {
     void runSearch("");
@@ -59,15 +69,16 @@ export function OrganizationPicker({
       return;
     }
     let cancelled = false;
-    void listOrganizations({ limit: "200" }).then((rows) => {
-      if (cancelled) return;
-      const match = rows.find((r) => r.id === selectedId) || null;
-      setSelected(match);
-    });
+    void listOrganizations({ hackathon: hackathonId, limit: "200" }).then(
+      (rows) => {
+        if (cancelled) return;
+        setSelected(rows.find((r) => r.id === selectedId) || null);
+      },
+    );
     return () => {
       cancelled = true;
     };
-  }, [selectedId, results, selected?.id]);
+  }, [selectedId, results, selected?.id, hackathonId]);
 
   function pick(org: Organization) {
     setSelected(org);
@@ -79,13 +90,21 @@ export function OrganizationPicker({
     onChange(null, null);
   }
 
+  if (!hackathonId) {
+    return (
+      <p className="text-sm text-[var(--text-muted)]">
+        Save the hackathon first, then add organizations for this event.
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-[var(--text)]">Organization</p>
         <div className="flex flex-wrap gap-2">
           <Link
-            href="/organizations"
+            href={`/events/${hackathonId}/hackathon?tab=organizations`}
             className="text-xs font-medium text-[var(--accent)] hover:underline"
           >
             Manage organizations
@@ -178,6 +197,7 @@ export function OrganizationPicker({
       <OrganizationFormModal
         open={createOpen}
         mode="create"
+        hackathonId={hackathonId}
         onClose={() => setCreateOpen(false)}
         onSaved={(org) => {
           pick(org);

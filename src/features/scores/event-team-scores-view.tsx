@@ -159,21 +159,16 @@ export function EventTeamScoresView({ hackathonId }: Props) {
         eyebrow="Event workspace"
         title="Team scores"
         actions={
-          <>
-            <Button variant="secondary" onClick={() => void load()}>
-              Refresh
+          canWrite ? (
+            <Button
+              onClick={() => {
+                setEditingRow(null);
+                setModalOpen(true);
+              }}
+            >
+              Record score
             </Button>
-            {canWrite ? (
-              <Button
-                onClick={() => {
-                  setEditingRow(null);
-                  setModalOpen(true);
-                }}
-              >
-                Record score
-              </Button>
-            ) : null}
-          </>
+          ) : undefined
         }
       />
 

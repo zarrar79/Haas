@@ -9,10 +9,19 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { TextField } from "@/components/ui/text-field";
 import { assignHackathonAdmin } from "@/features/hackathon-admins/hackathon-admin-api";
-import { createHackathon } from "@/features/hackathons/hackathon-api";
+import {
+  createHackathon,
+  updateHackathon,
+} from "@/features/hackathons/hackathon-api";
 import { HackathonUserAssignmentSection } from "@/features/hackathons/hackathon-user-assignment-section";
+import {
+  createOrganization,
+} from "@/features/organizations/organization-api";
+import {
+  PendingOrganizationFields,
+  type PendingOrganization,
+} from "@/features/organizations/pending-organization-fields";
 import { SponsorPicker } from "@/features/sponsors/sponsor-picker";
-import { OrganizationPicker } from "@/features/organizations/organization-picker";
 import { ApiRequestError } from "@/lib/client-api";
 import type { SystemUser } from "@/features/system/system-api";
 
@@ -22,6 +31,12 @@ function toIsoLocal(value: string) {
   if (Number.isNaN(date.getTime())) return value;
   return date.toISOString();
 }
+
+const EMPTY_ORG: PendingOrganization = {
+  name: "",
+  description: "",
+  file: null,
+};
 
 export function HackathonCreateForm() {
   const router = useRouter();
@@ -37,7 +52,7 @@ export function HackathonCreateForm() {
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [assigneeUsers, setAssigneeUsers] = useState<SystemUser[]>([]);
   const [sponsorIds, setSponsorIds] = useState<string[]>([]);
-  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [pendingOrg, setPendingOrg] = useState<PendingOrganization>(EMPTY_ORG);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -72,7 +87,7 @@ export function HackathonCreateForm() {
         name,
         display_name: displayName || name,
         description,
-        city: organizationId,
+        city: null,
         is_infinite: isInfinite,
         is_active: isActive,
         view_on_dashboard: viewOnDashboard,
@@ -97,7 +112,21 @@ export function HackathonCreateForm() {
         ),
       );
 
-      router.push(`/hackathons/${created.id}`);
+      const orgName = pendingOrg.name.trim();
+      if (orgName) {
+        const org = await createOrganization(
+          {
+            hackathon: created.id,
+            name: orgName,
+            description: pendingOrg.description.trim() || undefined,
+            is_active: true,
+          },
+          { file: pendingOrg.file },
+        );
+        await updateHackathon(created.id, { city: org.id });
+      }
+
+      router.push(`/events/${created.id}/hackathon`);
       router.refresh();
     } catch (err) {
       if (err instanceof ApiRequestError && err.httpStatus === 401) {
@@ -115,7 +144,7 @@ export function HackathonCreateForm() {
       <PageHeader
         eyebrow="Events"
         title="Create hackathon"
-        description="Create a new event and assign administrators."
+        description="Same setup as Event workspace → Hackathon: details, organization, sponsors, and admins."
         actions={
           <Link href="/hackathons">
             <Button variant="secondary" size="sm">
@@ -136,89 +165,98 @@ export function HackathonCreateForm() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
+            disabled={isSubmitting}
           />
           <TextField
             label="Display name"
             name="display_name"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
+            disabled={isSubmitting}
           />
           <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
             <span className="font-medium text-[var(--text)]">Description</span>
             <textarea
-              className="min-h-24 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]"
+              className="min-h-24 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)] disabled:opacity-60"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              disabled={isSubmitting}
             />
           </label>
-          <label className="flex items-start gap-2 text-sm text-[var(--text)]">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={isInfinite}
-              onChange={(e) => setIsInfinite(e.target.checked)}
-            />
-            <span>
-              <span className="font-medium">Infinite event</span>
-              <span className="mt-0.5 block text-[var(--text-muted)]">
-                No fixed end window. Uncheck to set start and end times.
+
+          <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-4">
+            <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">
+              Schedule
+            </h3>
+            <label className="mb-3 flex items-start gap-2 text-sm text-[var(--text)]">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0"
+                checked={isInfinite}
+                onChange={(e) => setIsInfinite(e.target.checked)}
+                disabled={isSubmitting}
+              />
+              <span>
+                <span className="font-medium">Infinite event</span>
+                <span className="mt-0.5 block text-[var(--text-muted)]">
+                  No fixed end window. Uncheck to set start and end times.
+                </span>
               </span>
-            </span>
-          </label>
-          {isInfinite ? (
-            <p className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text-muted)]">
-              Schedule will be open-ended (server sets a far-future end).
-            </p>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <TextField
-                label="Start"
-                name="start"
-                type="datetime-local"
-                required
-                value={startDatetime}
-                onChange={(e) => setStartDatetime(e.target.value)}
-              />
-              <TextField
-                label="End"
-                name="end"
-                type="datetime-local"
-                required
-                value={endDatetime}
-                onChange={(e) => setEndDatetime(e.target.value)}
-              />
-            </div>
-          )}
+            </label>
+            {isInfinite ? (
+              <p className="text-sm text-[var(--text-muted)]">
+                Schedule will be open-ended (server sets a far-future end).
+              </p>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TextField
+                  label="Start"
+                  name="start"
+                  type="datetime-local"
+                  required
+                  value={startDatetime}
+                  onChange={(e) => setStartDatetime(e.target.value)}
+                  disabled={isSubmitting}
+                />
+                <TextField
+                  label="End"
+                  name="end"
+                  type="datetime-local"
+                  required
+                  value={endDatetime}
+                  onChange={(e) => setEndDatetime(e.target.value)}
+                  disabled={isSubmitting}
+                />
+              </div>
+            )}
+          </div>
+
           <TextField
             label="Discord link"
             name="discord"
             value={discordLink}
             onChange={(e) => setDiscordLink(e.target.value)}
-          />
-          <OrganizationPicker
-            selectedId={organizationId}
-            onChange={(id) => setOrganizationId(id)}
             disabled={isSubmitting}
           />
-          <SponsorPicker
-            selectedIds={sponsorIds}
-            onChange={(ids) => setSponsorIds(ids)}
-            disabled={isSubmitting}
-          />
+
           <div className="flex flex-wrap gap-4 text-sm text-[var(--text)]">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
+                className="h-4 w-4"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
+                disabled={isSubmitting}
               />
               Active
             </label>
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
+                className="h-4 w-4"
                 checked={viewOnDashboard}
                 onChange={(e) => setViewOnDashboard(e.target.checked)}
+                disabled={isSubmitting}
               />
               View on dashboard
             </label>
@@ -231,16 +269,37 @@ export function HackathonCreateForm() {
           </Button>
         </div>
 
-        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5">
-          <HackathonUserAssignmentSection
-            selectedIds={assigneeIds}
-            selectedUsers={assigneeUsers}
-            onChange={(ids, users) => {
-              setAssigneeIds(ids);
-              setAssigneeUsers(users);
-            }}
-            disabled={isSubmitting}
-          />
+        <div className="flex flex-col gap-4">
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5">
+            <PendingOrganizationFields
+              value={pendingOrg}
+              onChange={setPendingOrg}
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5">
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">
+              Sponsors
+            </h2>
+            <SponsorPicker
+              selectedIds={sponsorIds}
+              onChange={(ids) => setSponsorIds(ids)}
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5">
+            <HackathonUserAssignmentSection
+              selectedIds={assigneeIds}
+              selectedUsers={assigneeUsers}
+              onChange={(ids, users) => {
+                setAssigneeIds(ids);
+                setAssigneeUsers(users);
+              }}
+              disabled={isSubmitting}
+            />
+          </div>
         </div>
       </form>
     </div>

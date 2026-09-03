@@ -266,9 +266,6 @@ export function EventMachinesView({ hackathonId }: Props) {
         title="Machines"
         actions={
           <>
-            <Button variant="secondary" onClick={() => void load()}>
-              Refresh
-            </Button>
             <Button variant="secondary" onClick={() => setBulkSpawnOpen(true)}>
               Bulk spawn
             </Button>

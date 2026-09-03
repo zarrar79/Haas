@@ -13,7 +13,6 @@ import {
   resolveNavHref,
 } from "@/components/shell/nav-utils";
 import { WorkspaceNavLink } from "@/components/shell/workspace-nav-link";
-import { useHackathonDisplayName } from "@/features/events/select-workspace-modal";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { useEffectiveHackathonId } from "@/features/events/use-effective-hackathon-id";
 import { useScrollThumbVisible } from "@/lib/use-scroll-thumb-visible";
@@ -42,7 +41,6 @@ export function AppSidebar({
   const { selectedHackathonId } = useSelectedEvent();
   const effectiveHackathonId = useEffectiveHackathonId();
   const workspaceHackathonId = effectiveHackathonId ?? selectedHackathonId;
-  const workspaceLabel = useHackathonDisplayName(workspaceHackathonId);
   const { setMobileNavOpen } = useUiPreferences();
   const { ref: navScrollRef, className: navScrollClass } = useScrollThumbVisible();
 
@@ -86,13 +84,12 @@ export function AppSidebar({
       <Link
         href="/home"
         onClick={() => setMobileNavOpen(false)}
-        className="mb-3 flex h-[var(--header-height)] w-full shrink-0 items-center gap-2.5 overflow-visible transition hover:opacity-90"
+        className="mb-3 flex h-[var(--header-height)] w-full shrink-0 items-center gap-2.5"
         aria-label="Cyber Range Digiinn360 home"
       >
         <AppBrandMark size={40} />
-        <span className="min-w-0 truncate text-[1rem] font-extrabold leading-snug tracking-[0.01em] sm:text-[1.0625rem]">
-          <span className="text-[var(--sidebar-accent)]">Cyber Range</span>
-          <span className="text-[var(--sidebar-text)]"> Digiinn360</span>
+        <span className="text-[1rem] font-extrabold leading-none tracking-[0.01em] text-[var(--sidebar-accent)] sm:text-[1.0625rem]">
+          Cyber Range
         </span>
       </Link>
 
@@ -135,13 +132,8 @@ export function AppSidebar({
                           name={item.icon}
                           className="shrink-0 text-[1.15rem] leading-none"
                         />
-                        <span className="min-w-0 flex-1 leading-snug">
-                          <span className="block truncate">{item.label}</span>
-                          {item.id === "event" && workspaceLabel ? (
-                            <span className="mt-0.5 block truncate text-[0.6875rem] font-semibold leading-tight text-[var(--sidebar-accent)]">
-                              {workspaceLabel}
-                            </span>
-                          ) : null}
+                        <span className="min-w-0 flex-1 truncate leading-snug">
+                          {item.label}
                         </span>
                       </span>
                       <BiChevronDown
