@@ -1,10 +1,4 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { haasGet } from "@/lib/haas-api";
 
 export type DashboardHackathonMeta = {
   id: string;
@@ -257,7 +251,7 @@ export type PlatformDashboard = {
   }[];
 };
 
-export async function getHackathonDashboard(
+export function getHackathonDashboard(
   hackathonId: string,
   filters?: {
     hours?: string;
@@ -266,18 +260,15 @@ export async function getHackathonDashboard(
     sections?: string;
   },
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<HackathonDashboard>>>(
-    haasApiPath(`hackathons/${hackathonId}/dashboard`, filters),
+  return haasGet<HackathonDashboard>(
+    `hackathons/${hackathonId}/dashboard`,
+    filters,
   );
-  return unwrapHaasResult(result).data;
 }
 
-export async function getPlatformDashboard(filters?: {
+export function getPlatformDashboard(filters?: {
   hours?: string;
   limit?: string;
 }) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<PlatformDashboard>>>(
-    haasApiPath("system/dashboard", filters),
-  );
-  return unwrapHaasResult(result).data;
+  return haasGet<PlatformDashboard>("system/dashboard", filters);
 }

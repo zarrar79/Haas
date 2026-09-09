@@ -1,10 +1,4 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { haasGet } from "@/lib/haas-api";
 import type { OverviewPeriod } from "@/features/dashboard/overview-analytics-api";
 
 export type EventLifecycleItem = {
@@ -88,14 +82,11 @@ async function getLifecycleSection<T>(
   section: string,
   filters?: { period?: string; limit?: string; event_id?: string },
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<T>>>(
-    haasApiPath(`dashboard/${section}`, {
-      period: filters?.period,
-      limit: filters?.limit,
-      event_id: filters?.event_id,
-    }),
-  );
-  return unwrapHaasResult(result).data;
+  return haasGet<T>(`dashboard/${section}`, {
+    period: filters?.period,
+    limit: filters?.limit,
+    event_id: filters?.event_id,
+  });
 }
 
 export async function getLifecycleAnalyticsBundle(filters?: {

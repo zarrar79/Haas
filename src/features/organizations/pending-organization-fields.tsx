@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ImageUploadField } from "@/components/ui/image-upload-field";
+import { FormTextarea } from "@/components/ui/form-fields";
 import { TextField } from "@/components/ui/text-field";
 
 export type PendingOrganization = {
@@ -59,16 +60,14 @@ export function PendingOrganizationFields({
         placeholder="e.g. Cyber Corps"
         disabled={disabled}
       />
-      <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-        <span className="font-medium text-[var(--text)]">Description</span>
-        <textarea
-          className="min-h-[80px] rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] disabled:opacity-60"
-          value={value.description}
-          onChange={(e) => onChange({ ...value, description: e.target.value })}
-          disabled={disabled}
-          placeholder="Optional"
-        />
-      </label>
+      <FormTextarea
+        label="Description"
+        controlClassName="min-h-[80px]"
+        value={value.description}
+        onChange={(description) => onChange({ ...value, description })}
+        disabled={disabled}
+        placeholder="Optional"
+      />
     </div>
   );
 }

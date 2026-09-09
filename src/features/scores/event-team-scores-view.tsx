@@ -15,7 +15,7 @@ import {
   ListPageStats,
   ListPageStatsDot,
 } from "@/components/ui/list-page-stats";
-import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
@@ -29,24 +29,16 @@ import {
 import { ScoreFormModal } from "@/features/scores/score-form-modal";
 import { listTeams, type EventTeam } from "@/features/teams/team-api";
 import { listEventUsers, type EventUser } from "@/features/users/users-api";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
+import { formatDate } from "@/lib/format";
+import { formatPersonName } from "@/lib/display-name";
 
 type Props = { hackathonId: string };
 
 type ValidityFilter = "all" | "correct" | "incorrect";
 
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
 function userLabel(row: ScoreRow) {
-  const d = row.user_detail;
-  if (!d) return row.user || "—";
-  const name = [d.name, d.last_name].filter(Boolean).join(" ").trim();
-  return name || d.username || d.email || row.user || "—";
+  return formatPersonName(row.user_detail, row.user || "—");
 }
 
 export function EventTeamScoresView({ hackathonId }: Props) {
@@ -106,10 +98,7 @@ export function EventTeamScoresView({ hackathonId }: Props) {
       setChallenges(challengeList);
       setUsers(userList);
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load scores");
     } finally {
       setIsLoading(false);
@@ -188,15 +177,12 @@ export function EventTeamScoresView({ hackathonId }: Props) {
             onChange={setActiveId}
             section="scores"
           />
-          <label className="flex min-w-[180px] flex-col gap-1 text-xs text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">Search</span>
-            <input
-              className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Team, challenge, answer…"
-            />
-          </label>
+          <FilterTextField
+            label="Search"
+            value={search}
+            onChange={setSearch}
+            placeholder="Team, challenge, answer…"
+          />
           <FilterSelect
             label="Team"
             value={teamFilter}

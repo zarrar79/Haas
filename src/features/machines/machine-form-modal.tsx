@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormCheckbox, FormSelect } from "@/components/ui/form-fields";
 import { ModalShell } from "@/components/ui/modal-shell";
 import { TextField } from "@/components/ui/text-field";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
@@ -25,9 +26,6 @@ type Props = {
   onClose: () => void;
   onSaved: () => void;
 };
-
-const INPUT_CLASS =
-  "rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]";
 
 export function MachineFormModal({
   open,
@@ -137,36 +135,27 @@ export function MachineFormModal({
         </div>
         <div className="flex flex-col gap-4 overflow-y-auto px-5 py-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-              <span className="font-medium text-[var(--text)]">Challenge *</span>
-              <select
-                className={INPUT_CLASS}
-                value={challengeId}
-                onChange={(e) => setChallengeId(e.target.value)}
-              >
-                <option value="">Select challenge</option>
-                {challenges.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-              <span className="font-medium text-[var(--text)]">Team *</span>
-              <select
-                className={INPUT_CLASS}
-                value={teamId}
-                onChange={(e) => setTeamId(e.target.value)}
-              >
-                <option value="">Select team</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <FormSelect
+              label="Challenge"
+              required
+              value={challengeId}
+              onChange={setChallengeId}
+            >
+              <option value="">Select challenge</option>
+              {challenges.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </FormSelect>
+            <FormSelect label="Team" required value={teamId} onChange={setTeamId}>
+              <option value="">Select team</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </FormSelect>
             <TextField
               label="Namespace"
               name="namespace"
@@ -211,31 +200,10 @@ export function MachineFormModal({
               onChange={(e) => setExpiresAt(e.target.value)}
             />
           </div>
-          <div className="flex flex-wrap gap-4 text-sm text-[var(--text)]">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-              />
-              Active
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={blocked}
-                onChange={(e) => setBlocked(e.target.checked)}
-              />
-              Blocked
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={isForLms}
-                onChange={(e) => setIsForLms(e.target.checked)}
-              />
-              For LMS
-            </label>
+          <div className="flex flex-wrap gap-4">
+            <FormCheckbox label="Active" checked={isActive} onChange={setIsActive} />
+            <FormCheckbox label="Blocked" checked={blocked} onChange={setBlocked} />
+            <FormCheckbox label="For LMS" checked={isForLms} onChange={setIsForLms} />
           </div>
           {error ? <Alert variant="error">{error}</Alert> : null}
         </div>

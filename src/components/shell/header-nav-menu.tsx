@@ -21,6 +21,7 @@ import { useSelectWorkspace } from "@/features/events/select-workspace-modal";
 import { useEffectiveHackathonId } from "@/features/events/use-effective-hackathon-id";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
+import { hackathonLabel } from "@/lib/display-name";
 import type { NavChild, NavItem } from "@/components/shell/nav-config";
 
 type HackathonOption = { id: string; label: string };
@@ -293,7 +294,7 @@ export function HeaderNavMenu() {
         setHackathons(
           rows.map((h) => ({
             id: h.id,
-            label: h.display_name || h.name || h.id,
+            label: hackathonLabel(h),
           })),
         );
       } catch {
@@ -312,7 +313,7 @@ export function HeaderNavMenu() {
 
   return (
     <nav
-      className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-visible lg:flex"
+      className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-visible xl:flex"
       aria-label="Primary navigation"
     >
       <HeaderEventPicker />

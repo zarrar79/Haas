@@ -14,6 +14,9 @@ export const TABLE_SCROLL_CLASS =
 export const TABLE_ELEMENT_CLASS =
   "w-max min-w-full border-collapse text-left text-sm [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap [&_thead]:bg-[var(--surface-raised)] [&_th]:px-4 [&_th]:py-3 [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-[var(--text-subtle)] [&_td]:border-t [&_td]:border-[var(--border)] [&_td]:px-4 [&_td]:py-3 [&_td]:text-[var(--text)]";
 
+/** Right-frozen actions (three-dot) column. */
+export const TABLE_STICKY_ACTIONS_CLASS = "haas-table-sticky-actions";
+
 export function SyncedHorizontalScroll({
   children,
   tableRef,

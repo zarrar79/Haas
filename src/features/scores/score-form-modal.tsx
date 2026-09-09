@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormCheckbox, FormSelect } from "@/components/ui/form-fields";
 import { ModalShell } from "@/components/ui/modal-shell";
 import { TextField } from "@/components/ui/text-field";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
@@ -29,9 +30,6 @@ type Props = {
   onClose: () => void;
   onSaved: () => void;
 };
-
-const INPUT_CLASS =
-  "rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]";
 
 export function ScoreFormModal({
   open,
@@ -169,70 +167,51 @@ export function ScoreFormModal({
         </div>
         <div className="flex flex-col gap-4 overflow-y-auto px-5 py-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-              <span className="font-medium text-[var(--text)]">Team *</span>
-              <select
-                className={INPUT_CLASS}
-                value={teamId}
-                onChange={(e) => setTeamId(e.target.value)}
-              >
-                <option value="">Select team</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-              <span className="font-medium text-[var(--text)]">User</span>
-              <select
-                className={INPUT_CLASS}
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-              >
-                <option value="">None</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {userOptionLabel(u)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-              <span className="font-medium text-[var(--text)]">Challenge *</span>
-              <select
-                className={INPUT_CLASS}
-                value={challengeId}
-                onChange={(e) => {
-                  setChallengeId(e.target.value);
-                  setQuestionId("");
-                }}
-              >
-                <option value="">Select challenge</option>
-                {challenges.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-              <span className="font-medium text-[var(--text)]">Question</span>
-              <select
-                className={INPUT_CLASS}
-                value={questionId}
-                disabled={!challengeId}
-                onChange={(e) => setQuestionId(e.target.value)}
-              >
-                <option value="">None</option>
-                {questions.map((q) => (
-                  <option key={q.id} value={q.id}>
-                    {q.name || q.id}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <FormSelect label="Team" required value={teamId} onChange={setTeamId}>
+              <option value="">Select team</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </FormSelect>
+            <FormSelect label="User" value={userId} onChange={setUserId}>
+              <option value="">None</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {userOptionLabel(u)}
+                </option>
+              ))}
+            </FormSelect>
+            <FormSelect
+              label="Challenge"
+              required
+              value={challengeId}
+              onChange={(value) => {
+                setChallengeId(value);
+                setQuestionId("");
+              }}
+            >
+              <option value="">Select challenge</option>
+              {challenges.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </FormSelect>
+            <FormSelect
+              label="Question"
+              value={questionId}
+              disabled={!challengeId}
+              onChange={setQuestionId}
+            >
+              <option value="">None</option>
+              {questions.map((q) => (
+                <option key={q.id} value={q.id}>
+                  {q.name || q.id}
+                </option>
+              ))}
+            </FormSelect>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <TextField
@@ -270,33 +249,24 @@ export function ScoreFormModal({
             value={answerSubmitted}
             onChange={(e) => setAnswerSubmitted(e.target.value)}
           />
-          <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">
-              Answer validity
-            </span>
-            <select
-              className={INPUT_CLASS}
-              value={
-                answerValidity === "" ? "" : answerValidity ? "true" : "false"
-              }
-              onChange={(e) => {
-                const v = e.target.value;
-                setAnswerValidity(v === "" ? "" : v === "true");
-              }}
-            >
-              <option value="">Unknown</option>
-              <option value="true">Correct</option>
-              <option value="false">Incorrect</option>
-            </select>
-          </label>
-          <label className="flex items-center gap-2 text-sm text-[var(--text)]">
-            <input
-              type="checkbox"
-              checked={isFlag}
-              onChange={(e) => setIsFlag(e.target.checked)}
-            />
-            Flag submission
-          </label>
+          <FormSelect
+            label="Answer validity"
+            value={
+              answerValidity === "" ? "" : answerValidity ? "true" : "false"
+            }
+            onChange={(v) => {
+              setAnswerValidity(v === "" ? "" : v === "true");
+            }}
+          >
+            <option value="">Unknown</option>
+            <option value="true">Correct</option>
+            <option value="false">Incorrect</option>
+          </FormSelect>
+          <FormCheckbox
+            label="Flag submission"
+            checked={isFlag}
+            onChange={setIsFlag}
+          />
           {error ? <Alert variant="error">{error}</Alert> : null}
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--border)] px-5 py-4">

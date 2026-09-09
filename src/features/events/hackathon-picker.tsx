@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { FormSelect } from "@/components/ui/form-fields";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
+import { hackathonLabel } from "@/lib/display-name";
 import type { Hackathon } from "@/types/hackathon";
 
 type HackathonPickerProps = {
@@ -41,9 +43,7 @@ export function HackathonPicker({
         });
         setItems(rows);
       } catch (err) {
-        if (err instanceof ApiRequestError && err.httpStatus === 401) {
-          router.replace("/login");
-        }
+        redirectIfUnauthorized(err, router);
       }
     })();
   }, [router]);
@@ -59,26 +59,22 @@ export function HackathonPicker({
   }
 
   return (
-    <label
-      className={`flex flex-col gap-1.5 text-sm text-[var(--text-muted)] ${className ?? ""}`}
+    <FormSelect
+      label="Hackathon"
+      value={value}
+      onChange={handleChange}
+      className={className}
     >
-      <span className="font-medium text-[var(--text)]">Hackathon</span>
-      <select
-        className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]"
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-      >
-        {!shouldNavigate ? <option value="">{emptyLabel}</option> : null}
-        {items.length === 0 ? (
-          <option value="">No hackathons available</option>
-        ) : (
-          items.map((h) => (
-            <option key={h.id} value={h.id}>
-              {h.display_name || h.name}
-            </option>
-          ))
-        )}
-      </select>
-    </label>
+      {!shouldNavigate ? <option value="">{emptyLabel}</option> : null}
+      {items.length === 0 ? (
+        <option value="">No hackathons available</option>
+      ) : (
+        items.map((h) => (
+          <option key={h.id} value={h.id}>
+            {hackathonLabel(h)}
+          </option>
+        ))
+      )}
+    </FormSelect>
   );
 }

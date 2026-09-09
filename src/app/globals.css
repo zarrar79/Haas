@@ -161,6 +161,30 @@ a {
   background: var(--text-subtle);
 }
 
+/* Frozen row-actions column — stays visible while the table scrolls horizontally */
+.haas-table-sticky-actions {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  width: 3.25rem;
+  min-width: 3.25rem;
+  background: var(--surface);
+  box-shadow: -8px 0 12px -8px color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+thead .haas-table-sticky-actions {
+  z-index: 3;
+  background: var(--surface-raised);
+}
+
+tbody tr:hover > .haas-table-sticky-actions {
+  background: var(--surface-hover);
+}
+
+tbody tr[data-selected="true"] > .haas-table-sticky-actions {
+  background: var(--accent-muted);
+}
+
 /* Sidebar — thin thumb, hidden until scrolling */
 .haas-sidebar-scroll {
   scrollbar-width: thin;

@@ -1,23 +1,10 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  asList,
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
-import type { HackathonAnalytics } from "@/features/hackathons/hackathon-api";
+import { haasGet, haasList, haasSend } from "@/lib/haas-api";
+import type { UserBrief } from "@/types";
 
 export type ScoreRow = {
   id: string;
   user?: string;
-  user_detail?: {
-    id?: string;
-    username?: string;
-    email?: string;
-    name?: string;
-    last_name?: string;
-  };
+  user_detail?: UserBrief;
   team?: string;
   team_name?: string;
   challenge?: string;
@@ -81,12 +68,7 @@ export type MachineRow = {
   blocked_at?: string | null;
   expires_at?: string | null;
   is_for_lms?: boolean;
-  spawned_by?: {
-    id?: string;
-    username?: string;
-    email?: string;
-    name?: string;
-  };
+  spawned_by?: UserBrief;
   created_at?: string;
   updated_at?: string;
 };
@@ -142,13 +124,7 @@ export type ActivityLog = {
   ip_address?: string;
   date_time?: string;
   submitted_by?: string;
-  submitted_by_detail?: {
-    id?: string;
-    username?: string;
-    email?: string;
-    name?: string;
-    last_name?: string;
-  };
+  submitted_by_detail?: UserBrief;
   playing_hackathon?: string;
   duplicated_from?: string | null;
   created_at?: string;
@@ -188,165 +164,107 @@ export type ActivityLogListFilters = {
   limit?: string;
 };
 
-export type AuditLog = {
-  id: string;
-  actor?: string;
-  actor_detail?: {
-    id?: string;
-    username?: string;
-    email?: string;
-    name?: string;
-  };
-  actor_system_role?: string;
-  actor_hackathon_role?: string;
-  action?: string;
-  category?: string;
-  resource_type?: string;
-  resource_id?: string;
-  before?: Record<string, unknown>;
-  after?: Record<string, unknown>;
-  extra?: Record<string, unknown>;
-  success?: boolean;
-  is_break_glass?: boolean;
-  created_at?: string;
-  ip_address?: string;
-  request_path?: string;
-  request_method?: string;
-};
-
-export async function listScores(
-  hackathonId: string,
-  filters?: ScoreListFilters,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/scores`, {
-      ...filters,
-      limit: filters?.limit ?? "100",
-    }),
-  );
-  return asList<ScoreRow>(unwrapHaasResult(result).data);
+export function listScores(hackathonId: string, filters?: ScoreListFilters) {
+  return haasList<ScoreRow>(`hackathons/${hackathonId}/scores`, {
+    ...filters,
+    limit: filters?.limit ?? "100",
+  });
 }
 
-export async function getScore(hackathonId: string, scoreId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ScoreRow>>>(
-    haasApiPath(`hackathons/${hackathonId}/scores/${scoreId}`),
-  );
-  return unwrapHaasResult(result).data;
+export function getScore(hackathonId: string, scoreId: string) {
+  return haasGet<ScoreRow>(`hackathons/${hackathonId}/scores/${scoreId}`);
 }
 
-export async function createScore(
-  hackathonId: string,
-  body: ScoreWriteInput,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ScoreRow>>>(
-    haasApiPath(`hackathons/${hackathonId}/scores`),
-    { method: "POST", body },
-  );
-  return unwrapHaasResult(result).data;
+export function createScore(hackathonId: string, body: ScoreWriteInput) {
+  return haasSend<ScoreRow>(`hackathons/${hackathonId}/scores`, {
+    method: "POST",
+    body,
+  });
 }
 
-export async function updateScore(
+export function updateScore(
   hackathonId: string,
   scoreId: string,
   body: Partial<ScoreWriteInput>,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ScoreRow>>>(
-    haasApiPath(`hackathons/${hackathonId}/scores/${scoreId}`),
-    { method: "PATCH", body },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<ScoreRow>(`hackathons/${hackathonId}/scores/${scoreId}`, {
+    method: "PATCH",
+    body,
+  });
 }
 
-export async function deleteScore(hackathonId: string, scoreId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/scores/${scoreId}`),
-    { method: "DELETE" },
-  );
-  return unwrapHaasResult(result);
+export function deleteScore(hackathonId: string, scoreId: string) {
+  return haasSend<unknown>(`hackathons/${hackathonId}/scores/${scoreId}`, {
+    method: "DELETE",
+  });
 }
 
 /** @deprecated Backend hard-deletes; use deleteScore */
 export const softDeleteScore = deleteScore;
 
-export async function listMachines(
+export function listMachines(
   hackathonId: string,
   filters?: MachineListFilters,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/machines`, {
-      ...filters,
-      limit: filters?.limit ?? "100",
-    }),
-  );
-  return asList<MachineRow>(unwrapHaasResult(result).data);
+  return haasList<MachineRow>(`hackathons/${hackathonId}/machines`, {
+    ...filters,
+    limit: filters?.limit ?? "100",
+  });
 }
 
-export async function getMachine(hackathonId: string, machineId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<MachineRow>>>(
-    haasApiPath(`hackathons/${hackathonId}/machines/${machineId}`),
-  );
-  return unwrapHaasResult(result).data;
+export function getMachine(hackathonId: string, machineId: string) {
+  return haasGet<MachineRow>(`hackathons/${hackathonId}/machines/${machineId}`);
 }
 
-export async function createMachine(
-  hackathonId: string,
-  body: MachineWriteInput,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<MachineRow>>>(
-    haasApiPath(`hackathons/${hackathonId}/machines`),
-    { method: "POST", body },
-  );
-  return unwrapHaasResult(result).data;
+export function createMachine(hackathonId: string, body: MachineWriteInput) {
+  return haasSend<MachineRow>(`hackathons/${hackathonId}/machines`, {
+    method: "POST",
+    body,
+  });
 }
 
-export async function updateMachine(
+export function updateMachine(
   hackathonId: string,
   machineId: string,
   body: Partial<MachineWriteInput>,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<MachineRow>>>(
-    haasApiPath(`hackathons/${hackathonId}/machines/${machineId}`),
-    { method: "PATCH", body },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<MachineRow>(`hackathons/${hackathonId}/machines/${machineId}`, {
+    method: "PATCH",
+    body,
+  });
 }
 
-export async function deleteMachine(hackathonId: string, machineId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/machines/${machineId}`),
-    { method: "DELETE" },
-  );
-  return unwrapHaasResult(result);
+export function deleteMachine(hackathonId: string, machineId: string) {
+  return haasSend<unknown>(`hackathons/${hackathonId}/machines/${machineId}`, {
+    method: "DELETE",
+  });
 }
 
-export async function bulkSpawnMachines(
+export function bulkSpawnMachines(
   hackathonId: string,
   body: { team_ids: string[]; challenge_ids: string[] },
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/machines/bulk-spawn`),
-    { method: "POST", body },
-  );
-  return unwrapHaasResult(result);
+  return haasSend<unknown>(`hackathons/${hackathonId}/machines/bulk-spawn`, {
+    method: "POST",
+    body,
+  });
 }
 
-export async function stopMachine(hackathonId: string, machineId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/machines/${machineId}/stop`),
+export function stopMachine(hackathonId: string, machineId: string) {
+  return haasSend<unknown>(
+    `hackathons/${hackathonId}/machines/${machineId}/stop`,
     { method: "POST", body: {} },
   );
-  return unwrapHaasResult(result);
 }
 
-export async function blockMachine(hackathonId: string, machineId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/machines/${machineId}/block`),
+export function blockMachine(hackathonId: string, machineId: string) {
+  return haasSend<unknown>(
+    `hackathons/${hackathonId}/machines/${machineId}/block`,
     { method: "POST", body: {} },
   );
-  return unwrapHaasResult(result);
 }
 
-export async function bulkStopMachines(
+export function bulkStopMachines(
   hackathonId: string,
   body: {
     machine_ids?: string[];
@@ -355,21 +273,19 @@ export async function bulkStopMachines(
     challenge_id?: string | null;
   },
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/machines/bulk-stop`),
-    { method: "POST", body },
-  );
-  return unwrapHaasResult(result);
+  return haasSend<unknown>(`hackathons/${hackathonId}/machines/bulk-stop`, {
+    method: "POST",
+    body,
+  });
 }
 
-export async function listNotifications(hackathonId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/notifications`, { limit: "100" }),
-  );
-  return asList<NotificationRow>(unwrapHaasResult(result).data);
+export function listNotifications(hackathonId: string) {
+  return haasList<NotificationRow>(`hackathons/${hackathonId}/notifications`, {
+    limit: "100",
+  });
 }
 
-export async function sendNotification(
+export function sendNotification(
   hackathonId: string,
   body: {
     title: string;
@@ -380,138 +296,69 @@ export async function sendNotification(
     users_for?: string[];
   },
 ) {
-  const result = await callAppApi<
-    ApiResult<HaasForwardPayload<NotificationRow>>
-  >(haasApiPath(`hackathons/${hackathonId}/notifications`), {
+  return haasSend<NotificationRow>(`hackathons/${hackathonId}/notifications`, {
     method: "POST",
     body,
   });
-  return unwrapHaasResult(result).data;
 }
 
-export async function updateNotification(
+export function updateNotification(
   hackathonId: string,
   notificationId: string,
   body: { title?: string; message?: string },
 ) {
-  const result = await callAppApi<
-    ApiResult<HaasForwardPayload<NotificationRow>>
-  >(haasApiPath(`hackathons/${hackathonId}/notifications/${notificationId}`), {
-    method: "PATCH",
-    body,
-  });
-  return unwrapHaasResult(result).data;
+  return haasSend<NotificationRow>(
+    `hackathons/${hackathonId}/notifications/${notificationId}`,
+    { method: "PATCH", body },
+  );
 }
 
-export async function deleteNotification(
-  hackathonId: string,
-  notificationId: string,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/notifications/${notificationId}`),
+export function deleteNotification(hackathonId: string, notificationId: string) {
+  return haasSend<unknown>(
+    `hackathons/${hackathonId}/notifications/${notificationId}`,
     { method: "DELETE" },
   );
-  return unwrapHaasResult(result);
 }
 
-export async function listActivityLogs(
+export function listActivityLogs(
   hackathonId: string,
   filters?: ActivityLogListFilters,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/activity-logs`, {
-      ...filters,
-      limit: filters?.limit ?? "100",
-    }),
-  );
-  return asList<ActivityLog>(unwrapHaasResult(result).data);
+  return haasList<ActivityLog>(`hackathons/${hackathonId}/activity-logs`, {
+    ...filters,
+    limit: filters?.limit ?? "100",
+  });
 }
 
-export async function getActivityLog(
-  hackathonId: string,
-  logId: string | number,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ActivityLog>>>(
-    haasApiPath(`hackathons/${hackathonId}/activity-logs/${logId}`),
+export function getActivityLog(hackathonId: string, logId: string | number) {
+  return haasGet<ActivityLog>(
+    `hackathons/${hackathonId}/activity-logs/${logId}`,
   );
-  return unwrapHaasResult(result).data;
 }
 
-export async function createActivityLog(
+export function createActivityLog(
   hackathonId: string,
   body: ActivityLogWriteInput,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ActivityLog>>>(
-    haasApiPath(`hackathons/${hackathonId}/activity-logs`),
-    { method: "POST", body },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<ActivityLog>(`hackathons/${hackathonId}/activity-logs`, {
+    method: "POST",
+    body,
+  });
 }
 
-export async function updateActivityLog(
+export function updateActivityLog(
   hackathonId: string,
   logId: string | number,
   body: Partial<ActivityLogWriteInput>,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ActivityLog>>>(
-    haasApiPath(`hackathons/${hackathonId}/activity-logs/${logId}`),
+  return haasSend<ActivityLog>(
+    `hackathons/${hackathonId}/activity-logs/${logId}`,
     { method: "PATCH", body },
   );
-  return unwrapHaasResult(result).data;
 }
 
-export async function deleteActivityLog(
-  hackathonId: string,
-  logId: string | number,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/activity-logs/${logId}`),
-    { method: "DELETE" },
-  );
-  return unwrapHaasResult(result);
-}
-
-export async function getAuditLog(hackathonId: string, logId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<AuditLog>>>(
-    haasApiPath(`hackathons/${hackathonId}/audit-logs/${logId}`),
-  );
-  return unwrapHaasResult(result).data;
-}
-
-export async function listAuditLogs(
-  hackathonId: string,
-  filters?: { action?: string; category?: string },
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/audit-logs`, {
-      ...filters,
-      limit: "100",
-    }),
-  );
-  return asList<AuditLog>(unwrapHaasResult(result).data);
-}
-
-export async function getEventAnalytics(hackathonId: string) {
-  const result = await callAppApi<
-    ApiResult<HaasForwardPayload<HackathonAnalytics>>
-  >(haasApiPath(`hackathons/${hackathonId}/analytics`));
-  return unwrapHaasResult(result).data;
-}
-
-/** CSV download — response is not JSON envelope. */
-export async function downloadAnalyticsExport(hackathonId: string) {
-  const response = await fetch(
-    haasApiPath(`hackathons/${hackathonId}/analytics/export`),
-    { credentials: "same-origin" },
-  );
-  if (!response.ok) {
-    throw new Error(`Export failed (${response.status})`);
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `hackathon-${hackathonId}-scores.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+export function deleteActivityLog(hackathonId: string, logId: string | number) {
+  return haasSend<unknown>(`hackathons/${hackathonId}/activity-logs/${logId}`, {
+    method: "DELETE",
+  });
 }

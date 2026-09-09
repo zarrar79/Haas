@@ -19,7 +19,7 @@ import {
   ListPageStats,
   ListPageStatsDot,
 } from "@/components/ui/list-page-stats";
-import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
@@ -40,19 +40,13 @@ import {
   type MachineRow,
 } from "@/features/ops/ops-api";
 import { listTeams, type EventTeam } from "@/features/teams/team-api";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
+import { formatDate } from "@/lib/format";
 
 type Props = { hackathonId: string };
 
 type ActiveFilter = "all" | "active" | "inactive";
 type BlockedFilter = "all" | "blocked" | "not_blocked";
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
 
 function spawnedByLabel(row: MachineRow) {
   const d = row.spawned_by;
@@ -120,10 +114,7 @@ export function EventMachinesView({ hackathonId }: Props) {
       setChallenges(challengeList);
       setSelectedKeys(new Set());
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load machines");
     } finally {
       setIsLoading(false);
@@ -309,15 +300,12 @@ export function EventMachinesView({ hackathonId }: Props) {
             onChange={setActiveId}
             section="machines"
           />
-          <label className="flex min-w-[180px] flex-col gap-1 text-xs text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">Search</span>
-            <input
-              className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]/40"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Team, challenge, IP, pod…"
-            />
-          </label>
+          <FilterTextField
+            label="Search"
+            value={search}
+            onChange={setSearch}
+            placeholder="Team, challenge, IP, pod…"
+          />
           {(search.trim() || focusId) && (
             <div className="flex items-end pb-0.5">
               <Button

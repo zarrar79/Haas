@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, type ReactNode } from "react";
 
 import { ApiTesterDrawer } from "@/components/shell/api-tester-drawer";
 import { AppHeader } from "@/components/shell/app-header";
@@ -8,7 +8,7 @@ import { AppSidebar } from "@/components/shell/app-sidebar";
 import { SelectWorkspaceProvider } from "@/features/events/select-workspace-modal";
 import { useLogout } from "@/features/auth/use-logout";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
-import { useIsLgUp } from "@/lib/use-media-query";
+import { useIsXlUp } from "@/lib/use-media-query";
 import { useUiPreferences } from "@/theme/ui-preferences";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -25,15 +25,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [logout]);
 
   const showSidebar = navPlacement === "sidebar";
-  const isLgUp = useIsLgUp();
-  const sidebarVisible = showSidebar && isLgUp;
+  const isXlUp = useIsXlUp();
+  const sidebarVisible = showSidebar && isXlUp;
   const mainMarginLeft = sidebarVisible ? "var(--sidebar-width)" : 0;
+
+  useEffect(() => {
+    if (isXlUp) setMobileNavOpen(false);
+  }, [isXlUp, setMobileNavOpen]);
 
   return (
     <SelectWorkspaceProvider>
     <div className="min-h-dvh bg-[var(--bg)] text-[var(--text)]">
       {sidebarVisible ? (
-        <aside className="fixed inset-y-0 left-0 z-50 hidden w-[var(--sidebar-width)] overflow-hidden border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] lg:flex lg:flex-col">
+        <aside className="fixed inset-y-0 left-0 z-50 hidden w-[var(--sidebar-width)] overflow-hidden border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] xl:flex xl:flex-col">
           <AppSidebar
             isPlatformOperator={isPlatformOperator}
             isEventOnlyAdmin={isEventOnlyAdmin}
@@ -41,15 +45,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
       ) : null}
 
-      {mobileNavOpen && showSidebar ? (
+      {mobileNavOpen && !isXlUp ? (
         <>
           <button
             type="button"
-            className="fixed inset-0 z-40 bg-[var(--overlay)] lg:hidden"
+            className="fixed inset-0 z-40 bg-[var(--overlay)] xl:hidden"
             aria-label="Close menu"
             onClick={() => setMobileNavOpen(false)}
           />
-          <aside className="fixed inset-y-0 left-0 z-50 flex w-[min(100vw,280px)] flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] lg:hidden">
+          <aside className="fixed inset-y-0 left-0 z-50 flex w-[min(100vw,280px)] flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] xl:hidden">
             <AppSidebar
               isPlatformOperator={isPlatformOperator}
               isEventOnlyAdmin={isEventOnlyAdmin}

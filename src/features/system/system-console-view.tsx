@@ -19,7 +19,7 @@ import {
   listSystemAudit,
   type SystemStats,
 } from "@/features/system/system-api";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
 
 type Section = "stats" | "users" | "admins" | "audit" | "activity" | "groups";
 
@@ -49,10 +49,7 @@ export function SystemConsoleView({ section }: Props) {
       if (active === "stats") setStats(await getSystemStats());
       if (active === "audit") setAudit(await listSystemAudit());
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load system data");
     } finally {
       setIsLoading(false);

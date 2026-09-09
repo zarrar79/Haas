@@ -7,6 +7,7 @@ import { useState, type FormEvent } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { FormTextarea } from "@/components/ui/form-fields";
 import { TextField } from "@/components/ui/text-field";
 import { assignHackathonAdmin } from "@/features/hackathon-admins/hackathon-admin-api";
 import {
@@ -22,7 +23,7 @@ import {
   type PendingOrganization,
 } from "@/features/organizations/pending-organization-fields";
 import { SponsorPicker } from "@/features/sponsors/sponsor-picker";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
 import type { SystemUser } from "@/features/system/system-api";
 
 function toIsoLocal(value: string) {
@@ -129,10 +130,7 @@ export function HackathonCreateForm() {
       router.push(`/events/${created.id}/hackathon`);
       router.refresh();
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Create failed");
     } finally {
       setIsSubmitting(false);
@@ -174,15 +172,13 @@ export function HackathonCreateForm() {
             onChange={(e) => setDisplayName(e.target.value)}
             disabled={isSubmitting}
           />
-          <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">Description</span>
-            <textarea
-              className="min-h-24 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)] disabled:opacity-60"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              disabled={isSubmitting}
-            />
-          </label>
+          <FormTextarea
+            label="Description"
+            controlClassName="min-h-24"
+            value={description}
+            onChange={setDescription}
+            disabled={isSubmitting}
+          />
 
           <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-4">
             <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">

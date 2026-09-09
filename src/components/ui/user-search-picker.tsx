@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { TextField } from "@/components/ui/text-field";
+import { SearchPicker } from "@/components/ui/search-picker";
 import { listSystemUsers, type SystemUser } from "@/features/system/system-api";
 import { userLabel } from "@/lib/assigned-events";
 
@@ -67,94 +66,29 @@ export function UserSearchPicker({
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm font-medium text-[var(--text)]">{label}</p>
-      <div className="flex flex-wrap gap-2">
-        <TextField
-          label="Search users"
-          name="user_search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Username, email, name…"
-          disabled={disabled}
-        />
-        <div className="flex items-end">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={disabled || isSearching}
-            onClick={() => void runSearch(search)}
-          >
-            {isSearching ? "Searching…" : "Search"}
-          </Button>
-        </div>
-      </div>
-
-      {selectedUsers.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {selectedUsers.map((user) => (
-            <span
-              key={user.id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1 text-xs text-[var(--text)]"
-            >
-              {userLabel(user)}
-              <button
-                type="button"
-                className="text-[var(--text-muted)] hover:text-[var(--danger)]"
-                disabled={disabled}
-                onClick={() => removeUser(user.id)}
-                aria-label={`Remove ${userLabel(user)}`}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-[var(--text-muted)]">
-          {multiple
-            ? "Search and add one or more users to administer this event."
-            : "Search and select a user."}
-        </p>
-      )}
-
-      <ul className="max-h-48 space-y-1 overflow-y-auto rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-2">
-        {results.length === 0 ? (
-          <li className="px-2 py-3 text-center text-xs text-[var(--text-muted)]">
-            No users found.
-          </li>
-        ) : (
-          results.map((user) => {
-            const picked = selectedIds.includes(user.id);
-            return (
-              <li key={user.id}>
-                <button
-                  type="button"
-                  disabled={disabled || picked}
-                  className={`flex w-full items-center justify-between rounded-[var(--radius-sm)] px-2 py-2 text-left text-sm transition hover:bg-[var(--surface-hover)] ${
-                    picked ? "opacity-50" : ""
-                  }`}
-                  onClick={() => addUser(user)}
-                >
-                  <span>
-                    <span className="font-medium text-[var(--text)]">
-                      {userLabel(user)}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
-                      {user.email || user.id}
-                    </span>
-                  </span>
-                  {picked ? (
-                    <span className="text-xs text-[var(--text-muted)]">Added</span>
-                  ) : (
-                    <span className="text-xs text-[var(--accent)]">Add</span>
-                  )}
-                </button>
-              </li>
-            );
-          })
-        )}
-      </ul>
-    </div>
+    <SearchPicker
+      title={label}
+      searchLabel="Search users"
+      searchName="user_search"
+      searchPlaceholder="Username, email, name…"
+      search={search}
+      onSearchChange={setSearch}
+      onSearch={() => void runSearch(search)}
+      isSearching={isSearching}
+      disabled={disabled}
+      emptyHint={
+        multiple
+          ? "Search and add one or more users to administer this event."
+          : "Search and select a user."
+      }
+      emptyResults="No users found."
+      selected={selectedUsers}
+      results={results}
+      isSelected={(user) => selectedIds.includes(user.id)}
+      onAdd={addUser}
+      onRemove={(user) => removeUser(user.id)}
+      getLabel={userLabel}
+      getSubtitle={(user) => user.email || user.id}
+    />
   );
 }

@@ -12,17 +12,25 @@ import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { getHackathon } from "@/features/hackathons/hackathon-api";
 import { EventOrganizationsView } from "@/features/organizations/event-organizations-view";
+import { EventStaffRolesPanel } from "@/features/roles/event-staff-roles-panel";
 import { EventSponsorsView } from "@/features/sponsors/event-sponsors-view";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
+import { hackathonLabel } from "@/lib/display-name";
 import type { Hackathon } from "@/types/hackathon";
 
-type Tab = "details" | "organizations" | "sponsors";
+type Tab = "details" | "staff" | "organizations" | "sponsors";
 
 const TABS: { id: Tab; label: string; description: string }[] = [
   {
     id: "details",
     label: "Details",
-    description: "Name, schedule, status, admins, and primary attachments.",
+    description: "Name, schedule, status, main admins, and primary attachments.",
+  },
+  {
+    id: "staff",
+    label: "Staff roles",
+    description:
+      "Assign Manager, Moderator, and other limited roles for this event.",
   },
   {
     id: "organizations",
@@ -37,7 +45,12 @@ const TABS: { id: Tab; label: string; description: string }[] = [
 ];
 
 function parseTab(value: string | null): Tab {
-  if (value === "organizations" || value === "sponsors" || value === "details") {
+  if (
+    value === "organizations" ||
+    value === "sponsors" ||
+    value === "staff" ||
+    value === "details"
+  ) {
     return value;
   }
   return "details";
@@ -69,10 +82,7 @@ export function EventHackathonView({ hackathonId }: Props) {
       setHackathon(data);
       setError(null);
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load hackathon");
     }
   }, [activeId, router]);
@@ -111,8 +121,8 @@ export function EventHackathonView({ hackathonId }: Props) {
         title="Hackathon"
         description={
           hackathon
-            ? `Manage ${hackathon.display_name || hackathon.name} — details, organizations, and sponsors.`
-            : "Edit this event and manage its organizations and sponsors."
+            ? `Manage ${hackathonLabel(hackathon)} — details, staff roles, organizations, and sponsors.`
+            : "Edit this event and manage staff, organizations, and sponsors."
         }
       />
 
@@ -149,6 +159,7 @@ export function EventHackathonView({ hackathonId }: Props) {
           onSaved={(h) => setHackathon(h)}
         />
       ) : null}
+      {tab === "staff" ? <EventStaffRolesPanel hackathonId={activeId} /> : null}
       {tab === "organizations" ? (
         <EventOrganizationsView hackathonId={activeId} embedded />
       ) : null}

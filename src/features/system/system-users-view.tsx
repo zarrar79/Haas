@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { ModalShell } from "@/components/ui/modal-shell";
 import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
-import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { StaffUserCreateForm } from "@/components/ui/staff-user-create-form";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
@@ -26,7 +26,7 @@ import {
   type SystemUser,
 } from "@/features/system/system-api";
 import { staffCreatorLabel } from "@/lib/user-creator";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
 import { userLabel } from "@/lib/assigned-events";
 
 type BlockFilter = "all" | "blocked" | "not_blocked";
@@ -66,10 +66,7 @@ export function SystemUsersView() {
         }),
       );
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load users");
     } finally {
       setIsLoading(false);
@@ -154,16 +151,13 @@ export function SystemUsersView() {
           </ListPageStats>
         }
       >
-        <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)]">
-          <span className="font-medium text-[var(--text)]">Search</span>
-          <input
-            name="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name, email, username…"
-            className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--focus-ring)]"
-          />
-        </label>
+        <FilterTextField
+          label="Search"
+          name="search"
+          value={search}
+          onChange={setSearch}
+          placeholder="Name, email, username…"
+        />
 
         <FilterSelect
           label="Blocked"
@@ -175,16 +169,13 @@ export function SystemUsersView() {
           <option value="not_blocked">Not blocked</option>
         </FilterSelect>
 
-        <label className="flex min-w-[140px] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)]">
-          <span className="font-medium text-[var(--text)]">Organization</span>
-          <input
-            name="organization"
-            value={organizationFilter}
-            onChange={(e) => setOrganizationFilter(e.target.value)}
-            placeholder="Filter…"
-            className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--focus-ring)]"
-          />
-        </label>
+        <FilterTextField
+          label="Organization"
+          name="organization"
+          value={organizationFilter}
+          onChange={setOrganizationFilter}
+          placeholder="Filter…"
+        />
 
         <FilterSelect
           label="Staff"

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FormTextarea } from "@/components/ui/form-fields";
 import { FormSkeleton } from "@/components/ui/skeleton";
 import { TextField } from "@/components/ui/text-field";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
@@ -24,7 +25,7 @@ import { HackathonUserAssignmentSection } from "@/features/hackathons/hackathon-
 import { OrganizationPicker } from "@/features/organizations/organization-picker";
 import { SponsorPicker } from "@/features/sponsors/sponsor-picker";
 import type { SystemUser } from "@/features/system/system-api";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
 import type { Hackathon } from "@/types/hackathon";
 
 function toDatetimeLocal(value?: string | null) {
@@ -133,10 +134,7 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
           .filter(Boolean) as SystemUser[],
       );
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load hackathon");
     } finally {
       setIsLoading(false);
@@ -290,15 +288,13 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
             onChange={(e) => setDisplayName(e.target.value)}
             disabled={!canWrite || isSaving}
           />
-          <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">Description</span>
-            <textarea
-              className="min-h-24 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)] disabled:opacity-60"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              disabled={!canWrite || isSaving}
-            />
-          </label>
+          <FormTextarea
+            label="Description"
+            controlClassName="min-h-24"
+            value={description}
+            onChange={setDescription}
+            disabled={!canWrite || isSaving}
+          />
 
           <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-4">
             <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">

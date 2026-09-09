@@ -1,14 +1,7 @@
-import { callAppApi } from "@/lib/client-api";
-import { asList, unwrapHaasResult, type HaasForwardPayload } from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { haasGet, haasList, haasSend } from "@/lib/haas-api";
+import type { UserBrief } from "@/types";
 
-export type ChallengeUserBrief = {
-  id?: string;
-  username?: string;
-  email?: string;
-  name?: string;
-  last_name?: string;
-};
+export type ChallengeUserBrief = UserBrief;
 
 export type ChallengeCreatedInHackathon = {
   id?: string;
@@ -84,94 +77,88 @@ export type ChallengeListFilters = {
   hackathon?: string;
 };
 
-function withQuery(path: string, query?: Record<string, string | undefined>) {
-  const params = new URLSearchParams();
-  if (query) {
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== "") params.set(key, value);
-    }
-  }
-  const qs = params.toString();
-  return qs ? `${path}?${qs}` : path;
+function challengeAdminPath(
+  challengeId: string,
+  hackathonId?: string | null,
+) {
+  return hackathonId
+    ? `hackathons/${hackathonId}/challenge-admin/${challengeId}`
+    : `challenges/${challengeId}`;
+}
+
+function challengeNestedPath(
+  challengeId: string,
+  segment: "questions" | "answers",
+  hackathonId?: string | null,
+) {
+  return `${challengeAdminPath(challengeId, hackathonId)}/${segment}`;
+}
+
+function questionDetailPath(
+  challengeId: string,
+  questionId: string,
+  hackathonId?: string | null,
+) {
+  return `${challengeNestedPath(challengeId, "questions", hackathonId)}/${questionId}`;
 }
 
 /** Platform challenge list (scoped to assigned events for hackathon admins). */
-export async function listAllChallenges(filters?: ChallengeListFilters) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    withQuery("/api/haas/challenge-list", {
-      search: filters?.search,
-      limit: filters?.limit ?? "100",
-      category: filters?.category,
-      difficulty: filters?.difficulty,
-      type: filters?.type,
-      is_dynamic: filters?.is_dynamic,
-      has_vm: filters?.has_vm,
-      mode: filters?.mode,
-      hackathonId: filters?.hackathon,
-      hackathon: filters?.hackathon,
-    }),
-  );
-  const unwrapped = unwrapHaasResult(result);
-  return asList<ChallengeSummary>(unwrapped.data);
+export function listAllChallenges(filters?: ChallengeListFilters) {
+  return haasList<ChallengeSummary>("challenge-list", {
+    search: filters?.search,
+    limit: filters?.limit ?? "100",
+    category: filters?.category,
+    difficulty: filters?.difficulty,
+    type: filters?.type,
+    is_dynamic: filters?.is_dynamic,
+    has_vm: filters?.has_vm,
+    mode: filters?.mode,
+    hackathonId: filters?.hackathon,
+    hackathon: filters?.hackathon,
+  });
 }
 
 /** Challenges linked to this hackathon. */
-export async function listEventChallengeLinks(
+export function listEventChallengeLinks(
   hackathonId: string,
   filters?: { search?: string; status?: string; show_deleted?: string },
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    withQuery(`/api/haas/hackathons/${hackathonId}/challenges/`, {
-      search: filters?.search,
-      status: filters?.status,
-      show_deleted: filters?.show_deleted,
-      limit: "100",
-    }),
-  );
-  const unwrapped = unwrapHaasResult(result);
-  return asList<ChallengeLink>(unwrapped.data);
+  return haasList<ChallengeLink>(`hackathons/${hackathonId}/challenges`, {
+    search: filters?.search,
+    status: filters?.status,
+    show_deleted: filters?.show_deleted,
+    limit: "100",
+  });
 }
 
 /** Attach an existing challenge to the hackathon (creates a draft link). */
-export async function attachChallengeToHackathon(
+export function attachChallengeToHackathon(
   hackathonId: string,
   challengeId: string,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ChallengeLink>>>(
-    `/api/haas/hackathons/${hackathonId}/challenges/`,
-    {
-      method: "POST",
-      body: { challenge: challengeId },
-    },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<ChallengeLink>(`hackathons/${hackathonId}/challenges`, {
+    method: "POST",
+    body: { challenge: challengeId },
+  });
 }
 
-export async function approveChallengeLink(
-  hackathonId: string,
-  linkId: string,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ChallengeLink>>>(
-    `/api/haas/hackathons/${hackathonId}/challenges/${linkId}/approve/`,
+export function approveChallengeLink(hackathonId: string, linkId: string) {
+  return haasSend<ChallengeLink>(
+    `hackathons/${hackathonId}/challenges/${linkId}/approve`,
     { method: "POST" },
   );
-  return unwrapHaasResult(result).data;
 }
 
 /** Soft-remove a challenge link from the hackathon. */
-export async function removeChallengeFromHackathon(
+export function removeChallengeFromHackathon(
   hackathonId: string,
   linkId: string,
   reason = "Removed from event in HAS admin",
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    `/api/haas/hackathons/${hackathonId}/challenges/${linkId}/`,
-    {
-      method: "DELETE",
-      body: { reason },
-    },
-  );
-  return unwrapHaasResult(result);
+  return haasSend<unknown>(`hackathons/${hackathonId}/challenges/${linkId}`, {
+    method: "DELETE",
+    body: { reason },
+  });
 }
 
 export type ChallengeCreateInput = {
@@ -188,26 +175,22 @@ export type ChallengeCreateInput = {
 };
 
 /** Platform create (Root / system.admin). Optional hackathon creates a draft link too. */
-export async function createPlatformChallenge(body: ChallengeCreateInput) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ChallengeSummary>>>(
-    `/api/haas/challenges/`,
-    {
-      method: "POST",
-      body: {
-        challenge_for: "hackathon",
-        is_active: true,
-        ...body,
-      },
+export function createPlatformChallenge(body: ChallengeCreateInput) {
+  return haasSend<ChallengeSummary>("challenges", {
+    method: "POST",
+    body: {
+      challenge_for: "hackathon",
+      is_active: true,
+      ...body,
     },
-  );
-  return unwrapHaasResult(result).data;
+  });
 }
 
 /**
  * Create challenge with optional file upload (multipart).
  * Pass hackathonId for event-scoped challenge-admin; omit for platform.
  */
-export async function createChallengeMultipart(
+export function createChallengeMultipart(
   formData: FormData,
   hackathonId?: string | null,
 ) {
@@ -217,106 +200,68 @@ export async function createChallengeMultipart(
   if (!formData.has("is_active")) {
     formData.set("is_active", "true");
   }
-
   const path = hackathonId
-    ? `/api/haas/hackathons/${hackathonId}/challenge-admin/`
-    : `/api/haas/challenges/`;
-
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ChallengeSummary>>>(
-    path,
-    { method: "POST", body: formData },
-  );
-  return unwrapHaasResult(result).data;
+    ? `hackathons/${hackathonId}/challenge-admin`
+    : "challenges";
+  return haasSend<ChallengeSummary>(path, { method: "POST", body: formData });
 }
 
-export async function getChallenge(
+export function getChallenge(
   challengeId: string,
   hackathonId?: string | null,
 ) {
-  const path = hackathonId
-    ? `/api/haas/hackathons/${hackathonId}/challenge-admin/${challengeId}/`
-    : `/api/haas/challenges/${challengeId}/`;
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ChallengeDetail>>>(
-    path,
-  );
-  return unwrapHaasResult(result).data;
+  return haasGet<ChallengeDetail>(challengeAdminPath(challengeId, hackathonId));
 }
 
-function challengeNestedPath(
-  challengeId: string,
-  segment: "questions" | "answers",
-  hackathonId?: string | null,
-) {
-  return hackathonId
-    ? `/api/haas/hackathons/${hackathonId}/challenge-admin/${challengeId}/${segment}/`
-    : `/api/haas/challenges/${challengeId}/${segment}/`;
-}
-
-export async function listChallengeQuestions(
+export function listChallengeQuestions(
   challengeId: string,
   hackathonId?: string | null,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    withQuery(challengeNestedPath(challengeId, "questions", hackathonId), {
-      limit: "200",
-    }),
+  return haasList<ChallengeQuestionDetail>(
+    challengeNestedPath(challengeId, "questions", hackathonId),
+    { limit: "200" },
   );
-  return asList<ChallengeQuestionDetail>(unwrapHaasResult(result).data);
 }
 
-export async function listChallengeAnswers(
+export function listChallengeAnswers(
   challengeId: string,
   hackathonId?: string | null,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    withQuery(challengeNestedPath(challengeId, "answers", hackathonId), {
-      limit: "500",
-    }),
+  return haasList<ChallengeAnswerDetail>(
+    challengeNestedPath(challengeId, "answers", hackathonId),
+    { limit: "500" },
   );
-  return asList<ChallengeAnswerDetail>(unwrapHaasResult(result).data);
 }
 
-export async function updateChallengeMultipart(
+export function updateChallengeMultipart(
   challengeId: string,
   formData: FormData,
   hackathonId?: string | null,
 ) {
-  const path = hackathonId
-    ? `/api/haas/hackathons/${hackathonId}/challenge-admin/${challengeId}/`
-    : `/api/haas/challenges/${challengeId}/`;
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ChallengeSummary>>>(
-    path,
+  return haasSend<ChallengeSummary>(
+    challengeAdminPath(challengeId, hackathonId),
     { method: "PATCH", body: formData },
   );
-  return unwrapHaasResult(result).data;
 }
 
-export async function setChallengeActive(
+export function setChallengeActive(
   challengeId: string,
   isActive: boolean,
   hackathonId?: string | null,
 ) {
-  const path = hackathonId
-    ? `/api/haas/hackathons/${hackathonId}/challenge-admin/${challengeId}/`
-    : `/api/haas/challenges/${challengeId}/`;
-  const result = await callAppApi<ApiResult<HaasForwardPayload<ChallengeSummary>>>(
-    path,
+  return haasSend<ChallengeSummary>(
+    challengeAdminPath(challengeId, hackathonId),
     { method: "PATCH", body: { is_active: isActive } },
   );
-  return unwrapHaasResult(result).data;
 }
 
-export async function deleteChallenge(
+export function deleteChallenge(
   challengeId: string,
   hackathonId?: string | null,
 ) {
-  const path = hackathonId
-    ? `/api/haas/hackathons/${hackathonId}/challenge-admin/${challengeId}/`
-    : `/api/haas/challenges/${challengeId}/`;
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(path, {
+  return haasSend<unknown>(challengeAdminPath(challengeId, hackathonId), {
     method: "DELETE",
   });
-  return unwrapHaasResult(result);
 }
 
 export type ChallengeQuestionInput = {
@@ -375,71 +320,49 @@ export type ChallengeAnswerInput = {
   docker_ip?: string;
 };
 
-export async function createChallengeQuestion(
+export function createChallengeQuestion(
   challengeId: string,
   body: ChallengeQuestionInput,
   hackathonId?: string | null,
 ) {
-  const path = hackathonId
-    ? `/api/haas/hackathons/${hackathonId}/challenge-admin/${challengeId}/questions/`
-    : `/api/haas/challenges/${challengeId}/questions/`;
-  const result = await callAppApi<
-    ApiResult<HaasForwardPayload<{ id: string; name?: string }>>
-  >(path, { method: "POST", body });
-  return unwrapHaasResult(result).data;
+  return haasSend<{ id: string; name?: string }>(
+    challengeNestedPath(challengeId, "questions", hackathonId),
+    { method: "POST", body },
+  );
 }
 
-function questionDetailPath(
-  challengeId: string,
-  questionId: string,
-  hackathonId?: string | null,
-) {
-  return hackathonId
-    ? `/api/haas/hackathons/${hackathonId}/challenge-admin/${challengeId}/questions/${questionId}/`
-    : `/api/haas/challenges/${challengeId}/questions/${questionId}/`;
-}
-
-export async function updateChallengeQuestion(
+export function updateChallengeQuestion(
   challengeId: string,
   questionId: string,
   body: Partial<ChallengeQuestionInput>,
   hackathonId?: string | null,
 ) {
-  const result = await callAppApi<
-    ApiResult<HaasForwardPayload<ChallengeQuestionDetail>>
-  >(questionDetailPath(challengeId, questionId, hackathonId), {
-    method: "PATCH",
-    body,
-  });
-  return unwrapHaasResult(result).data;
+  return haasSend<ChallengeQuestionDetail>(
+    questionDetailPath(challengeId, questionId, hackathonId),
+    { method: "PATCH", body },
+  );
 }
 
-export async function deleteChallengeQuestion(
+export function deleteChallengeQuestion(
   challengeId: string,
   questionId: string,
   hackathonId?: string | null,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
+  return haasSend<unknown>(
     questionDetailPath(challengeId, questionId, hackathonId),
     { method: "DELETE" },
   );
-  return unwrapHaasResult(result);
 }
 
-export async function createChallengeAnswer(
+export function createChallengeAnswer(
   challengeId: string,
   body: ChallengeAnswerInput,
   hackathonId?: string | null,
 ) {
-  const path = hackathonId
-    ? `/api/haas/hackathons/${hackathonId}/challenge-admin/${challengeId}/answers/`
-    : `/api/haas/challenges/${challengeId}/answers/`;
-  const result = await callAppApi<ApiResult<HaasForwardPayload<{ id: string }>>>(
-    path,
-    {
-      method: "POST",
-      body: { challenge: challengeId, ...body },
-    },
+  return haasSend<{ id: string }>(
+    challengeNestedPath(challengeId, "answers", hackathonId),
+    { method: "POST", body: { challenge: challengeId, ...body } },
   );
-  return unwrapHaasResult(result).data;
 }
+
+

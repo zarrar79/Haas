@@ -1,11 +1,4 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  asList,
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { haasList, haasSend } from "@/lib/haas-api";
 
 export type HaasPermission = {
   id: number;
@@ -24,28 +17,21 @@ export type HaasGroup = {
   users?: Array<{ id: string; username?: string }>;
 };
 
-export async function listPermissions() {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath("permissions", { limit: "200" }),
-  );
-  return asList<HaasPermission>(unwrapHaasResult(result).data);
+export function listPermissions() {
+  return haasList<HaasPermission>("permissions", { limit: "200" });
 }
 
-export async function listPlatformGroups() {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath("groups", { limit: "100" }),
-  );
-  return asList<HaasGroup>(unwrapHaasResult(result).data);
+export function listPlatformGroups() {
+  return haasList<HaasGroup>("groups", { limit: "100" });
 }
 
-export async function listEventGroups(hackathonId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/groups`, { limit: "100" }),
-  );
-  return asList<HaasGroup>(unwrapHaasResult(result).data);
+export function listEventGroups(hackathonId: string) {
+  return haasList<HaasGroup>(`hackathons/${hackathonId}/groups`, {
+    limit: "100",
+  });
 }
 
-export async function createEventGroup(
+export function createEventGroup(
   hackathonId: string,
   body: {
     name: string;
@@ -55,29 +41,21 @@ export async function createEventGroup(
     user_ids?: string[];
   },
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<HaasGroup>>>(
-    haasApiPath(`hackathons/${hackathonId}/groups`),
-    {
-      method: "POST",
-      body: { ...body, hackathon: hackathonId },
-    },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<HaasGroup>(`hackathons/${hackathonId}/groups`, {
+    method: "POST",
+    body: { ...body, hackathon: hackathonId },
+  });
 }
 
-export async function createPlatformGroup(body: {
+export function createPlatformGroup(body: {
   name: string;
   description?: string;
   permission_ids?: number[];
 }) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<HaasGroup>>>(
-    haasApiPath("groups"),
-    { method: "POST", body },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<HaasGroup>("groups", { method: "POST", body });
 }
 
-export async function assignGroupUsers(
+export function assignGroupUsers(
   groupId: string | number,
   body: { user_ids: string[]; remove?: boolean },
   hackathonId?: string,
@@ -85,9 +63,5 @@ export async function assignGroupUsers(
   const path = hackathonId
     ? `hackathons/${hackathonId}/groups/${groupId}/assign-users`
     : `groups/${groupId}/assign-users`;
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(path),
-    { method: "POST", body },
-  );
-  return unwrapHaasResult(result);
+  return haasSend<unknown>(path, { method: "POST", body });
 }

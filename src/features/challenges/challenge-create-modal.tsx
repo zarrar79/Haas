@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FORM_CONTROL_CLASS } from "@/components/ui/form-control";
+import { FormSelect, FormTextarea } from "@/components/ui/form-fields";
 import { TextField } from "@/components/ui/text-field";
 import { FormSkeleton } from "@/components/ui/skeleton";
 import { ModalShell } from "@/components/ui/modal-shell";
@@ -57,39 +59,6 @@ function asId(value: unknown): string {
     return String((value as { id: unknown }).id);
   }
   return String(value);
-}
-
-function SelectField({
-  label,
-  value,
-  onChange,
-  required,
-  disabled,
-  children,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  required?: boolean;
-  disabled?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-      <span className="font-medium text-[var(--text)]">
-        {label}
-        {required ? " *" : ""}
-      </span>
-      <select
-        className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {children}
-      </select>
-    </label>
-  );
 }
 
 function InlineCreate({
@@ -663,7 +632,7 @@ export function ChallengeCreateModal({
           ) : null}
 
           {!isEdit && !isPlatformOperator && !hackathonId && assignedHackathons.length > 1 ? (
-            <SelectField
+            <FormSelect
               label="Assigned hackathon"
               value={targetHackathonId}
               onChange={setTargetHackathonId}
@@ -675,12 +644,12 @@ export function ChallengeCreateModal({
                   {row.hackathon_name}
                 </option>
               ))}
-            </SelectField>
+            </FormSelect>
           ) : null}
 
           {!loadingEdit && step === "basics" ? (
             <div className="grid gap-3 sm:grid-cols-2">
-              <SelectField
+              <FormSelect
                 label="Challenge type"
                 value={challengeType}
                 onChange={setChallengeType}
@@ -691,9 +660,9 @@ export function ChallengeCreateModal({
                     {item.name || item.id}
                   </option>
                 ))}
-              </SelectField>
+              </FormSelect>
               <div>
-                <SelectField
+                <FormSelect
                   label="Category"
                   value={category}
                   onChange={setCategory}
@@ -704,7 +673,7 @@ export function ChallengeCreateModal({
                       {item.name || item.id}
                     </option>
                   ))}
-                </SelectField>
+                </FormSelect>
                 <InlineCreate
                   label="category"
                   placeholder="e.g. Web"
@@ -719,7 +688,7 @@ export function ChallengeCreateModal({
                   }}
                 />
               </div>
-              <SelectField
+              <FormSelect
                 label="Challenge source"
                 value={source}
                 onChange={setSource}
@@ -730,8 +699,8 @@ export function ChallengeCreateModal({
                     {item.source_type || item.name || item.id}
                   </option>
                 ))}
-              </SelectField>
-              <SelectField
+              </FormSelect>
+              <FormSelect
                 label="Difficulty level"
                 value={difficulty}
                 onChange={setDifficulty}
@@ -742,7 +711,7 @@ export function ChallengeCreateModal({
                     {item.name || item.id}
                   </option>
                 ))}
-              </SelectField>
+              </FormSelect>
               <div className="sm:col-span-2">
                 <TextField
                   label="Name *"
@@ -752,16 +721,12 @@ export function ChallengeCreateModal({
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-                  <span className="font-medium text-[var(--text)]">
-                    Description
-                  </span>
-                  <textarea
-                    className="min-h-[100px] rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                </label>
+                <FormTextarea
+                  label="Description"
+                  controlClassName="min-h-[100px]"
+                  value={description}
+                  onChange={setDescription}
+                />
               </div>
             </div>
           ) : null}
@@ -796,18 +761,18 @@ export function ChallengeCreateModal({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <SelectField
+                <FormSelect
                   label="Docker type"
                   value={dockerType}
                   onChange={setDockerType}
                 >
                   <option value="docker">docker</option>
                   <option value="vm">vm</option>
-                </SelectField>
-                <SelectField label="OS" value={dockerOs} onChange={setDockerOs}>
+                </FormSelect>
+                <FormSelect label="OS" value={dockerOs} onChange={setDockerOs}>
                   <option value="Linux">Linux</option>
                   <option value="Window">Window</option>
-                </SelectField>
+                </FormSelect>
                 <TextField
                   label="Image name"
                   name="docker_image_name"
@@ -887,7 +852,7 @@ export function ChallengeCreateModal({
           {!loadingEdit && step === "skills" ? (
             <div className="space-y-3">
               <div>
-                <SelectField
+                <FormSelect
                   label="Skill"
                   value={skillId}
                   onChange={(v) => {
@@ -901,7 +866,7 @@ export function ChallengeCreateModal({
                       {item.name || item.id}
                     </option>
                   ))}
-                </SelectField>
+                </FormSelect>
                 <InlineCreate
                   label="skill"
                   placeholder="e.g. Web Exploitation"
@@ -923,7 +888,7 @@ export function ChallengeCreateModal({
                   </span>
                   <select
                     multiple
-                    className="min-h-[140px] rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]"
+                    className={`min-h-[140px] ${FORM_CONTROL_CLASS}`}
                     value={techniqueIds}
                     disabled={!skillId}
                     onChange={(e) =>

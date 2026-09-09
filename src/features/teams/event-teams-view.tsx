@@ -22,8 +22,9 @@ import {
   ListPageStats,
   ListPageStatsDot,
 } from "@/components/ui/list-page-stats";
+import { FormSelect, FormTextarea } from "@/components/ui/form-fields";
 import { FormSkeleton } from "@/components/ui/skeleton";
-import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { TextField } from "@/components/ui/text-field";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
@@ -53,7 +54,8 @@ import {
 } from "@/features/teams/add-team-member-modal";
 import { TeamEditMembersPanel } from "@/features/teams/team-edit-members-panel";
 import { eventUserDetailPath } from "@/features/users/users-api";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
+import { hackathonLabel } from "@/lib/display-name";
 import type { Hackathon } from "@/types/hackathon";
 
 type MembershipFilter = "all" | "added" | "not_added";
@@ -322,18 +324,15 @@ function TeamFormModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
-              <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-                <span className="font-medium text-[var(--text)]">Register as</span>
-                <select
-                  className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]"
-                  value={registerAs}
-                  onChange={(e) => setRegisterAs(e.target.value)}
-                >
-                  <option value="red">red</option>
-                  <option value="blue">blue</option>
-                  <option value="mix">mix</option>
-                </select>
-              </label>
+              <FormSelect
+                label="Register as"
+                value={registerAs}
+                onChange={setRegisterAs}
+              >
+                <option value="red">red</option>
+                <option value="blue">blue</option>
+                <option value="mix">mix</option>
+              </FormSelect>
               <TextField
                 label="Affiliation"
                 name="affiliation"
@@ -348,14 +347,12 @@ function TeamFormModal({
                   onChange={(e) => setWebsite(e.target.value)}
                 />
               ) : null}
-              <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-                <span className="font-medium text-[var(--text)]">Description</span>
-                <textarea
-                  className="min-h-[80px] rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </label>
+              <FormTextarea
+                label="Description"
+                controlClassName="min-h-[80px]"
+                value={description}
+                onChange={setDescription}
+              />
               {mode === "edit" ? (
                 <label className="flex items-start gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg)] p-3 text-sm text-[var(--text)]">
                   <input
@@ -460,9 +457,7 @@ export function EventTeamsView({
         const { items } = await listHackathons({ show_deleted: "false" });
         setHackathons(items);
       } catch (err) {
-        if (err instanceof ApiRequestError && err.httpStatus === 401) {
-          router.replace("/login");
-        }
+        redirectIfUnauthorized(err, router);
       }
     })();
   }, [router]);
@@ -535,10 +530,7 @@ export function EventTeamsView({
         ),
       );
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load teams");
     } finally {
       setIsLoading(false);
@@ -877,22 +869,19 @@ export function EventTeamsView({
           ) : (
             hackathons.map((h) => (
               <option key={h.id} value={h.id}>
-                {h.display_name || h.name}
+                {hackathonLabel(h)}
               </option>
             ))
           )}
         </FilterSelect>
 
-        <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)]">
-          <span className="font-medium text-[var(--text)]">Search</span>
-          <input
-            name="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name, code…"
-            className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--focus-ring)]"
-          />
-        </label>
+        <FilterTextField
+          label="Search"
+          name="search"
+          value={search}
+          onChange={setSearch}
+          placeholder="Name, code…"
+        />
 
         <FilterSelect
           label="Membership"

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormCheckbox, FormSelect, FormTextarea } from "@/components/ui/form-fields";
 import { ModalShell } from "@/components/ui/modal-shell";
 import { TextField } from "@/components/ui/text-field";
 import {
@@ -25,9 +26,6 @@ type Props = {
   onCreated: () => void;
 };
 
-const INPUT_CLASS =
-  "rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]";
-
 function CatalogField({
   field,
   value,
@@ -43,57 +41,45 @@ function CatalogField({
 }) {
   if (field.kind === "checkbox") {
     return (
-      <label className="flex items-center gap-2 text-sm text-[var(--text)]">
-        <input
-          type="checkbox"
-          checked={Boolean(value)}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-        {field.label}
-      </label>
+      <FormCheckbox
+        label={field.label}
+        checked={Boolean(value)}
+        onChange={(checked) => onChange(checked)}
+      />
     );
   }
 
   if (field.kind === "skill") {
     return (
-      <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-        <span className="font-medium text-[var(--text)]">
-          {field.label}
-          {field.required ? " *" : ""}
-        </span>
-        <select
-          className={`${INPUT_CLASS} disabled:cursor-not-allowed disabled:opacity-60`}
-          value={String(value)}
-          disabled={skillsLoading}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value="">
-            {skillsLoading ? "Loading skills…" : "Select skill…"}
+      <FormSelect
+        label={field.label}
+        required={field.required}
+        value={String(value)}
+        disabled={skillsLoading}
+        onChange={onChange}
+      >
+        <option value="">
+          {skillsLoading ? "Loading skills…" : "Select skill…"}
+        </option>
+        {skills.map((skill) => (
+          <option key={skill.id} value={skill.id}>
+            {skill.name || skill.id}
           </option>
-          {skills.map((skill) => (
-            <option key={skill.id} value={skill.id}>
-              {skill.name || skill.id}
-            </option>
-          ))}
-        </select>
-      </label>
+        ))}
+      </FormSelect>
     );
   }
 
   if (field.kind === "textarea") {
     return (
-      <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-        <span className="font-medium text-[var(--text)]">
-          {field.label}
-          {field.required ? " *" : ""}
-        </span>
-        <textarea
-          className={`${INPUT_CLASS} min-h-[96px] resize-y`}
-          value={String(value)}
-          placeholder={field.placeholder}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      </label>
+      <FormTextarea
+        label={field.label}
+        required={field.required}
+        controlClassName="min-h-[96px] resize-y"
+        value={String(value)}
+        placeholder={field.placeholder}
+        onChange={onChange}
+      />
     );
   }
 

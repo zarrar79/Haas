@@ -1,11 +1,5 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  asList,
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { haasList, haasSend } from "@/lib/haas-api";
+import type { UserBrief } from "@/types";
 
 export type HackathonAdminBinding = {
   id: string;
@@ -15,51 +9,40 @@ export type HackathonAdminBinding = {
   granted_at?: string;
   revoked_at?: string | null;
   notes?: string;
-  user_detail?: {
-    id?: string;
-    username?: string;
-    email?: string;
-    name?: string;
-    last_name?: string;
-  };
+  user_detail?: UserBrief;
   hackathon_detail?: {
     id?: string;
     name?: string;
   };
 };
 
-export async function listHackathonAdmins(filters?: {
+export function listHackathonAdmins(filters?: {
   hackathon?: string;
   user?: string;
   is_active?: string;
   show_inactive?: string;
 }) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath("hackathon-admins", {
-      ...filters,
-      limit: "100",
-    }),
-  );
-  return asList<HackathonAdminBinding>(unwrapHaasResult(result).data);
+  return haasList<HackathonAdminBinding>("hackathon-admins", {
+    ...filters,
+    limit: "100",
+  });
 }
 
-export async function assignHackathonAdmin(body: {
+export function assignHackathonAdmin(body: {
   user: string;
   hackathon: string;
   notes?: string;
 }) {
-  const result = await callAppApi<
-    ApiResult<HaasForwardPayload<HackathonAdminBinding>>
-  >(haasApiPath("hackathon-admins"), { method: "POST", body });
-  return unwrapHaasResult(result).data;
+  return haasSend<HackathonAdminBinding>("hackathon-admins", {
+    method: "POST",
+    body,
+  });
 }
 
-export async function revokeHackathonAdmin(bindingId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathon-admins/${bindingId}`),
-    { method: "DELETE" },
-  );
-  return unwrapHaasResult(result);
+export function revokeHackathonAdmin(bindingId: string) {
+  return haasSend<unknown>(`hackathon-admins/${bindingId}`, {
+    method: "DELETE",
+  });
 }
 
 /** Apply desired admin user ids; assigns new and revokes removed bindings. */
@@ -69,9 +52,7 @@ export async function syncHackathonAdmins(
   existingBindings: HackathonAdminBinding[],
 ) {
   const desired = new Set(desiredUserIds.filter(Boolean));
-  const existingByUser = new Map(
-    existingBindings.map((b) => [b.user, b]),
-  );
+  const existingByUser = new Map(existingBindings.map((b) => [b.user, b]));
 
   const toAssign = [...desired].filter((id) => {
     const existing = existingByUser.get(id);

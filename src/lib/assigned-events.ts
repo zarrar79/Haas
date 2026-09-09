@@ -1,3 +1,4 @@
+import { formatPersonName } from "@/lib/display-name";
 import type { HaasMePayload } from "@/lib/haas-access";
 import { isPlatformOperator } from "@/lib/haas-access";
 
@@ -5,12 +6,31 @@ export type AssignedHackathon = {
   hackathon_id: string;
   hackathon_name: string;
   granted_at?: string;
+  role?: string;
 };
 
 export function getAssignedHackathons(
   me: HaasMePayload | null | undefined,
 ): AssignedHackathon[] {
-  return me?.hackathon_admins ?? [];
+  const byId = new Map<string, AssignedHackathon>();
+  for (const row of me?.hackathon_admins ?? []) {
+    byId.set(row.hackathon_id, {
+      hackathon_id: row.hackathon_id,
+      hackathon_name: row.hackathon_name,
+      granted_at: row.granted_at,
+      role: "hackathon.organizer",
+    });
+  }
+  for (const row of me?.hackathon_roles ?? []) {
+    if (!byId.has(row.hackathon_id)) {
+      byId.set(row.hackathon_id, {
+        hackathon_id: row.hackathon_id,
+        hackathon_name: row.hackathon_name,
+        role: row.role,
+      });
+    }
+  }
+  return [...byId.values()];
 }
 
 export function isAssignedToHackathon(
@@ -21,7 +41,7 @@ export function isAssignedToHackathon(
   return getAssignedHackathons(me).some((row) => row.hackathon_id === hackathonId);
 }
 
-/** Hackathon admin only — not Root / system operator. */
+/** Hackathon admin / scoped staff only — not Root / system operator. */
 export function isEventOnlyAdmin(me: HaasMePayload | null | undefined): boolean {
   if (!me || isPlatformOperator(me)) return false;
   return getAssignedHackathons(me).length > 0;
@@ -46,7 +66,5 @@ export function userLabel(user?: {
   email?: string;
   id?: string;
 }) {
-  if (!user) return "—";
-  const full = [user.name, user.last_name].filter(Boolean).join(" ");
-  return full || user.username || user.email || user.id || "—";
+  return formatPersonName(user, user?.id || "—");
 }

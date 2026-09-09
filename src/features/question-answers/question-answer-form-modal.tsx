@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormCheckbox, FormSelect } from "@/components/ui/form-fields";
 import { ModalShell } from "@/components/ui/modal-shell";
 import { TextField } from "@/components/ui/text-field";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
@@ -135,64 +136,49 @@ export function QuestionAnswerFormModal({
           </h2>
         </div>
         <div className="flex flex-col gap-4 px-5 py-4">
-          <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">Challenge</span>
-            <select
-              className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]"
-              value={challengeId}
-              disabled={mode === "edit"}
-              onChange={(e) => {
-                setChallengeId(e.target.value);
-                setQuestionId("");
-              }}
-            >
-              <option value="">Select challenge</option>
-              {challenges.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">Question</span>
-            <select
-              className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]"
-              value={questionId}
-              disabled={mode === "edit" || !challengeId}
-              onChange={(e) => setQuestionId(e.target.value)}
-            >
-              <option value="">Select question</option>
-              {questions.map((q) => (
-                <option key={q.id} value={q.id}>
-                  {q.name || q.id}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FormSelect
+            label="Challenge"
+            value={challengeId}
+            disabled={mode === "edit"}
+            onChange={(value) => {
+              setChallengeId(value);
+              setQuestionId("");
+            }}
+          >
+            <option value="">Select challenge</option>
+            {challenges.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </FormSelect>
+          <FormSelect
+            label="Question"
+            value={questionId}
+            disabled={mode === "edit" || !challengeId}
+            onChange={setQuestionId}
+          >
+            <option value="">Select question</option>
+            {questions.map((q) => (
+              <option key={q.id} value={q.id}>
+                {q.name || q.id}
+              </option>
+            ))}
+          </FormSelect>
           <TextField
             label="Answer (flag)"
             name="answer"
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
           />
-          <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">
-              Team (dynamic only)
-            </span>
-            <select
-              className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]"
-              value={teamId}
-              onChange={(e) => setTeamId(e.target.value)}
-            >
-              <option value="">Shared / none</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FormSelect label="Team (dynamic only)" value={teamId} onChange={setTeamId}>
+            <option value="">Shared / none</option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </FormSelect>
           <TextField
             label="Machine IP (dynamic only)"
             name="docker_ip"
@@ -200,14 +186,11 @@ export function QuestionAnswerFormModal({
             onChange={(e) => setDockerIp(e.target.value)}
             placeholder="10.42.0.15"
           />
-          <label className="flex items-center gap-2 text-sm text-[var(--text)]">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-            />
-            Active
-          </label>
+          <FormCheckbox
+            label="Active"
+            checked={isActive}
+            onChange={setIsActive}
+          />
           {error ? <Alert variant="error">{error}</Alert> : null}
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--border)] px-5 py-4">

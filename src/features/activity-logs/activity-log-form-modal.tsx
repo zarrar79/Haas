@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-fields";
 import { ModalShell } from "@/components/ui/modal-shell";
 import { TextField } from "@/components/ui/text-field";
 import {
@@ -25,9 +26,6 @@ type Props = {
   onClose: () => void;
   onSaved: () => void;
 };
-
-const INPUT_CLASS =
-  "rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[var(--text)]";
 
 function memberLabel(m: EventUser) {
   return eventUserLabel(m);
@@ -107,20 +105,13 @@ export function ActivityLogFormModal({
           </h2>
         </div>
         <div className="flex flex-col gap-4 overflow-y-auto px-5 py-4">
-          <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">Type *</span>
-            <select
-              className={INPUT_CLASS}
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-            >
-              {ACTIVITY_LOG_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t.replace(/_/g, " ")}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FormSelect label="Type" required value={type} onChange={setType}>
+            {ACTIVITY_LOG_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t.replace(/_/g, " ")}
+              </option>
+            ))}
+          </FormSelect>
           <TextField
             label="Message"
             name="message"
@@ -133,21 +124,18 @@ export function ActivityLogFormModal({
             value={ipAddress}
             onChange={(e) => setIpAddress(e.target.value)}
           />
-          <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">Submitted by</span>
-            <select
-              className={INPUT_CLASS}
-              value={submittedBy}
-              onChange={(e) => setSubmittedBy(e.target.value)}
-            >
-              <option value="">None</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {memberLabel(u)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FormSelect
+            label="Submitted by"
+            value={submittedBy}
+            onChange={setSubmittedBy}
+          >
+            <option value="">None</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {memberLabel(u)}
+              </option>
+            ))}
+          </FormSelect>
           {error ? <Alert variant="error">{error}</Alert> : null}
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--border)] px-5 py-4">

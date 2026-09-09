@@ -11,10 +11,13 @@ export type ApiFailure = {
 
 export type ApiResult<T> = ApiSuccess<T> | ApiFailure;
 
-export type UserProfile = {
-  id: string;
-  email: string;
+/** Nested user payload shared across list/detail APIs. */
+export type UserBrief = {
+  id?: string;
   username?: string;
+  email?: string;
   name?: string;
   last_name?: string;
+  full_name?: string;
+  media_url?: string | null;
 };

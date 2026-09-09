@@ -19,6 +19,7 @@ import {
 } from "@/features/dashboard/lifecycle-analytics-api";
 import { LifecycleAnalyticsView } from "@/features/dashboard/lifecycle-analytics-view";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
+import { hackathonLabel } from "@/lib/display-name";
 import {
   getAssignedHackathons,
   resolveAssignedEventId,
@@ -62,7 +63,7 @@ export function HomeSessionPanel() {
       setEventOptions(
         items.map((h) => ({
           id: h.id,
-          name: h.display_name || h.name || h.id,
+          name: hackathonLabel(h),
         })),
       );
     } catch {

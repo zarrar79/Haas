@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   TABLE_ELEMENT_CLASS,
   TABLE_SHELL_CLASS,
+  TABLE_STICKY_ACTIONS_CLASS,
   SyncedHorizontalScroll,
 } from "@/components/ui/table-scroll";
 import {
@@ -20,8 +21,14 @@ type Column<T> = {
   className?: string;
   /** When true, cell content may wrap (default: nowrap for horizontal scroll). */
   wrap?: boolean;
+  /** Pin the column while the table scrolls horizontally. */
+  sticky?: "left" | "right";
   render: (row: T) => React.ReactNode;
 };
+
+function isStickyActionsColumn<T>(column: Column<T>) {
+  return column.sticky === "right" || column.key === "actions";
+}
 
 type DataTablePaginationInfo = {
   page: number;
@@ -162,7 +169,9 @@ export function DataTable<T>({
                 {columns.map((column) => (
                   <th
                     key={column.key}
-                    className={`whitespace-nowrap px-4 py-3 font-semibold ${column.className ?? ""}`}
+                    className={`whitespace-nowrap px-4 py-3 font-semibold ${column.className ?? ""} ${
+                      isStickyActionsColumn(column) ? TABLE_STICKY_ACTIONS_CLASS : ""
+                    }`}
                   >
                     {column.header}
                   </th>
@@ -176,13 +185,14 @@ export function DataTable<T>({
                 return (
                   <tr
                     key={key}
+                    data-selected={isSelected ? "true" : undefined}
                     onDoubleClick={() => onRowDoubleClick?.(row)}
-                    className={`border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface-hover)] ${
+                    className={`group border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface-hover)] ${
                       isSelected ? "bg-[var(--accent-muted)]" : ""
                     }`}
                   >
                     {selectable ? (
-                      <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface)] px-3 py-3 group-hover:bg-[var(--surface-raised)]">
+                      <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface)] px-3 py-3 group-hover:bg-[var(--surface-hover)] group-data-[selected=true]:bg-[var(--accent-muted)]">
                         <input
                           type="checkbox"
                           aria-label={`Select row ${key}`}
@@ -197,7 +207,9 @@ export function DataTable<T>({
                         key={column.key}
                         className={`px-4 py-3 align-middle text-[var(--text)] ${
                           column.wrap ? "whitespace-normal" : "whitespace-nowrap"
-                        } ${column.className ?? ""}`}
+                        } ${column.className ?? ""} ${
+                          isStickyActionsColumn(column) ? TABLE_STICKY_ACTIONS_CLASS : ""
+                        }`}
                       >
                         {column.render(row)}
                       </td>

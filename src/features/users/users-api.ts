@@ -1,11 +1,5 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  asList,
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { formatPersonName } from "@/lib/display-name";
+import { haasGet, haasList, haasSend, toFormData } from "@/lib/haas-api";
 
 export type EventUserTeam = {
   membership_id?: string;
@@ -106,7 +100,7 @@ export type EventUserUpdateInput = {
   is_active?: boolean;
 };
 
-export async function listEventUsers(
+export function listEventUsers(
   hackathonId: string,
   filters?: {
     search?: string;
@@ -117,122 +111,81 @@ export async function listEventUsers(
     limit?: string;
   },
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/users`, {
-      ...filters,
-      limit: filters?.limit ?? "100",
-    }),
-  );
-  return asList<EventUser>(unwrapHaasResult(result).data);
+  return haasList<EventUser>(`hackathons/${hackathonId}/users`, {
+    ...filters,
+    limit: filters?.limit ?? "100",
+  });
 }
 
-export async function getEventUser(hackathonId: string, userId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventUser>>>(
-    haasApiPath(`hackathons/${hackathonId}/users/${userId}`),
-  );
-  return unwrapHaasResult(result).data;
+export function getEventUser(hackathonId: string, userId: string) {
+  return haasGet<EventUser>(`hackathons/${hackathonId}/users/${userId}`);
 }
 
-export async function updateEventUser(
+export function updateEventUser(
   hackathonId: string,
   userId: string,
   body: EventUserUpdateInput,
   options?: { file?: File | null; clearMedia?: boolean },
 ) {
+  const path = `hackathons/${hackathonId}/users/${userId}`;
   const needsMultipart = Boolean(options?.file || options?.clearMedia);
   if (!needsMultipart) {
-    const result = await callAppApi<ApiResult<HaasForwardPayload<EventUser>>>(
-      haasApiPath(`hackathons/${hackathonId}/users/${userId}`),
-      { method: "PATCH", body },
-    );
-    return unwrapHaasResult(result).data;
+    return haasSend<EventUser>(path, { method: "PATCH", body });
   }
-
-  const form = new FormData();
-  for (const [key, value] of Object.entries(body)) {
-    if (value === undefined) continue;
-    if (value !== null && typeof value === "object") {
-      form.append(key, JSON.stringify(value));
-    } else {
-      form.append(key, String(value));
-    }
-  }
-  if (options?.file) form.append("file", options.file);
-  if (options?.clearMedia) form.append("clear_media", "true");
-
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventUser>>>(
-    haasApiPath(`hackathons/${hackathonId}/users/${userId}`),
-    { method: "PATCH", body: form },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<EventUser>(path, {
+    method: "PATCH",
+    body: toFormData(body as Record<string, unknown>, {
+      file: options?.file,
+      flags: { clear_media: options?.clearMedia },
+    }),
+  });
 }
 
-export async function createEventUser(
+export function createEventUser(
   hackathonId: string,
   body: EventUserCreateInput,
   options?: { file?: File | null },
 ) {
+  const path = `hackathons/${hackathonId}/users`;
   if (!options?.file) {
-    const result = await callAppApi<ApiResult<HaasForwardPayload<EventUser>>>(
-      haasApiPath(`hackathons/${hackathonId}/users`),
-      { method: "POST", body },
-    );
-    return unwrapHaasResult(result).data;
+    return haasSend<EventUser>(path, { method: "POST", body });
   }
-
-  const form = new FormData();
-  for (const [key, value] of Object.entries(body)) {
-    if (value === undefined) continue;
-    if (value !== null && typeof value === "object") {
-      form.append(key, JSON.stringify(value));
-    } else {
-      form.append(key, String(value));
-    }
-  }
-  form.append("file", options.file);
-
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventUser>>>(
-    haasApiPath(`hackathons/${hackathonId}/users`),
-    { method: "POST", body: form },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<EventUser>(path, {
+    method: "POST",
+    body: toFormData(body as Record<string, unknown>, { file: options.file }),
+  });
 }
 
 export async function activateEventUser(hackathonId: string, userId: string) {
   return updateEventUser(hackathonId, userId, { is_active: true });
 }
 
-export async function deleteEventUser(hackathonId: string, userId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/users/${userId}`),
-    { method: "DELETE" },
-  );
-  return unwrapHaasResult(result);
+export function deleteEventUser(hackathonId: string, userId: string) {
+  return haasSend<unknown>(`hackathons/${hackathonId}/users/${userId}`, {
+    method: "DELETE",
+  });
 }
 
-export async function blockEventUser(
+export function blockEventUser(
   hackathonId: string,
   userId: string,
   reason: string,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventUser>>>(
-    haasApiPath(`hackathons/${hackathonId}/users/${userId}/block`),
-    { method: "POST", body: { reason } },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<EventUser>(`hackathons/${hackathonId}/users/${userId}/block`, {
+    method: "POST",
+    body: { reason },
+  });
 }
 
-export async function unblockEventUser(hackathonId: string, userId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventUser>>>(
-    haasApiPath(`hackathons/${hackathonId}/users/${userId}/unblock`),
+export function unblockEventUser(hackathonId: string, userId: string) {
+  return haasSend<EventUser>(
+    `hackathons/${hackathonId}/users/${userId}/unblock`,
     { method: "POST", body: {} },
   );
-  return unwrapHaasResult(result).data;
 }
 
 export function eventUserLabel(user: EventUser): string {
-  const name = user.full_name || [user.name, user.last_name].filter(Boolean).join(" ").trim();
-  return name || user.username || user.email || user.id;
+  return formatPersonName(user, user.id);
 }
 
 export function eventUserDetailPath(hackathonId: string, userId: string) {

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
-import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import {
   listCatalog,
   type CatalogItem,
@@ -19,10 +19,7 @@ import {
   CATALOG_KINDS,
   getCatalogKindConfig,
 } from "@/features/catalog/catalog-kind-config";
-import { ApiRequestError } from "@/lib/client-api";
-
-const SEARCH_INPUT_CLASS =
-  "rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--input-bg)] px-2 py-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] transition-all duration-200 focus:border-[var(--accent)]/40 focus:shadow-[var(--shadow-sm)]";
+import { redirectIfUnauthorized } from "@/lib/client-api";
 
 export function CatalogView() {
   const router = useRouter();
@@ -73,10 +70,7 @@ export function CatalogView() {
         }),
       );
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load catalog");
     } finally {
       setIsLoading(false);
@@ -118,16 +112,14 @@ export function CatalogView() {
       >
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
-            <label className="flex min-w-[11rem] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)] sm:max-w-xs">
-              <span className="font-medium text-[var(--text)]">Search</span>
-              <input
-                name="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={`Search ${config.label.toLowerCase()}…`}
-                className={SEARCH_INPUT_CLASS}
-              />
-            </label>
+            <FilterTextField
+              label="Search"
+              name="search"
+              className="min-w-[11rem] sm:max-w-xs"
+              value={search}
+              onChange={setSearch}
+              placeholder={`Search ${config.label.toLowerCase()}…`}
+            />
 
             {CATALOG_KINDS.map((k) => (
               <div key={k.id} className="flex shrink-0 items-end pb-0.5">

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
-import { StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
@@ -19,7 +19,7 @@ import {
   type Organization,
 } from "@/features/organizations/organization-api";
 import { OrganizationFormModal } from "@/features/organizations/organization-form-modal";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
 
 type Props = {
   hackathonId: string;
@@ -77,10 +77,7 @@ export function EventOrganizationsView({
         }),
       );
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(
         err instanceof Error ? err.message : "Failed to load organizations",
       );
@@ -148,27 +145,22 @@ export function EventOrganizationsView({
             className="min-w-[180px]"
           />
         ) : null}
-        <label className="flex min-w-[11rem] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)] sm:max-w-xs">
-          <span className="font-medium text-[var(--text)]">Search</span>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Organization name…"
-            className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--input-bg)] px-2 py-2 text-sm text-[var(--text)] outline-none"
-          />
-        </label>
-        <label className="flex min-w-[8rem] flex-col gap-1 text-xs text-[var(--text-muted)]">
-          <span className="font-medium text-[var(--text)]">Status</span>
-          <select
-            value={activeFilter}
-            onChange={(e) => setActiveFilter(e.target.value as ActiveFilter)}
-            className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--text)]"
-          >
-            <option value="all">All</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </label>
+        <FilterTextField
+          label="Search"
+          className="min-w-[11rem] sm:max-w-xs"
+          value={search}
+          onChange={setSearch}
+          placeholder="Organization name…"
+        />
+        <FilterSelect
+          label="Status"
+          value={activeFilter}
+          onChange={(v) => setActiveFilter(v as ActiveFilter)}
+        >
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </FilterSelect>
       </StickyToolbar>
 
       {error ? (

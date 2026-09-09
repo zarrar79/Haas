@@ -15,6 +15,7 @@ import {
 import { OverviewAnalyticsView } from "@/features/dashboard/overview-analytics-view";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { getHackathon } from "@/features/hackathons/hackathon-api";
+import { hackathonLabel } from "@/lib/display-name";
 import type { Hackathon } from "@/types/hackathon";
 
 const DEFAULT_PERIOD = "7d";
@@ -66,7 +67,7 @@ export function EventOverview() {
     <div className="w-full">
       <PageHeader
         eyebrow="Event workspace"
-        title={hackathon?.display_name || hackathon?.name || "Event dashboard"}
+        title={hackathonLabel(hackathon, "Event dashboard")}
         actions={
           <>
             <Link href={`/hackathons/${hackathonId}`}>

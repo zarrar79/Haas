@@ -1,19 +1,9 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { haasGet, haasSend } from "@/lib/haas-api";
+import type { HackathonModules } from "@/types/hackathon";
 
 export type EventSettings = Record<string, unknown>;
 
-export type EventModules = {
-  jeopardy_enabled?: boolean;
-  koth_enabled?: boolean;
-  attack_defence_enabled?: boolean;
-  viewer_can_export?: boolean;
-};
+export type EventModules = HackathonModules;
 
 export type UserRules = {
   max_attempts?: number;
@@ -31,94 +21,67 @@ export type PlayingState = {
 
 export type ScoringConfig = Record<string, unknown>;
 
-export async function getSettings(hackathonId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventSettings>>>(
-    haasApiPath(`hackathons/${hackathonId}/settings`),
-  );
-  return unwrapHaasResult(result).data;
+function eventPath(hackathonId: string, segment: string) {
+  return `hackathons/${hackathonId}/${segment}`;
 }
 
-export async function patchSettings(
-  hackathonId: string,
-  body: Partial<EventSettings>,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventSettings>>>(
-    haasApiPath(`hackathons/${hackathonId}/settings`),
-    { method: "PATCH", body },
-  );
-  return unwrapHaasResult(result).data;
+export function getSettings(hackathonId: string) {
+  return haasGet<EventSettings>(eventPath(hackathonId, "settings"));
 }
 
-export async function getModules(hackathonId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventModules>>>(
-    haasApiPath(`hackathons/${hackathonId}/modules`),
-  );
-  return unwrapHaasResult(result).data;
-}
-
-export async function patchModules(
-  hackathonId: string,
-  body: Partial<EventModules>,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventModules>>>(
-    haasApiPath(`hackathons/${hackathonId}/modules`),
-    { method: "PATCH", body },
-  );
-  return unwrapHaasResult(result).data;
-}
-
-export async function getUserRules(hackathonId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<UserRules>>>(
-    haasApiPath(`hackathons/${hackathonId}/user-rules`),
-  );
-  return unwrapHaasResult(result).data;
-}
-
-export async function patchUserRules(
-  hackathonId: string,
-  body: Partial<UserRules>,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<UserRules>>>(
-    haasApiPath(`hackathons/${hackathonId}/user-rules`),
-    { method: "PATCH", body },
-  );
-  return unwrapHaasResult(result).data;
-}
-
-export async function getPlaying(hackathonId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<PlayingState>>>(
-    haasApiPath(`hackathons/${hackathonId}/playing`),
-  );
-  return unwrapHaasResult(result).data;
-}
-
-export async function patchPlaying(
-  hackathonId: string,
-  body: { is_open?: boolean; is_active?: boolean },
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<PlayingState>>>(
-    haasApiPath(`hackathons/${hackathonId}/playing`),
-    { method: "PATCH", body },
-  );
-  return unwrapHaasResult(result).data;
-}
-
-export async function getScoringConfig(hackathonId: string) {
-  const result = await callAppApi<
-    ApiResult<HaasForwardPayload<ScoringConfig>>
-  >(haasApiPath(`hackathons/${hackathonId}/scoring-config`));
-  return unwrapHaasResult(result).data;
-}
-
-export async function patchScoringConfig(
-  hackathonId: string,
-  body: Partial<ScoringConfig>,
-) {
-  const result = await callAppApi<
-    ApiResult<HaasForwardPayload<ScoringConfig>>
-  >(haasApiPath(`hackathons/${hackathonId}/scoring-config`), {
+export function patchSettings(hackathonId: string, body: Partial<EventSettings>) {
+  return haasSend<EventSettings>(eventPath(hackathonId, "settings"), {
     method: "PATCH",
     body,
   });
-  return unwrapHaasResult(result).data;
+}
+
+export function getModules(hackathonId: string) {
+  return haasGet<EventModules>(eventPath(hackathonId, "modules"));
+}
+
+export function patchModules(hackathonId: string, body: Partial<EventModules>) {
+  return haasSend<EventModules>(eventPath(hackathonId, "modules"), {
+    method: "PATCH",
+    body,
+  });
+}
+
+export function getUserRules(hackathonId: string) {
+  return haasGet<UserRules>(eventPath(hackathonId, "user-rules"));
+}
+
+export function patchUserRules(hackathonId: string, body: Partial<UserRules>) {
+  return haasSend<UserRules>(eventPath(hackathonId, "user-rules"), {
+    method: "PATCH",
+    body,
+  });
+}
+
+export function getPlaying(hackathonId: string) {
+  return haasGet<PlayingState>(eventPath(hackathonId, "playing"));
+}
+
+export function patchPlaying(
+  hackathonId: string,
+  body: { is_open?: boolean; is_active?: boolean },
+) {
+  return haasSend<PlayingState>(eventPath(hackathonId, "playing"), {
+    method: "PATCH",
+    body,
+  });
+}
+
+export function getScoringConfig(hackathonId: string) {
+  return haasGet<ScoringConfig>(eventPath(hackathonId, "scoring-config"));
+}
+
+export function patchScoringConfig(
+  hackathonId: string,
+  body: Partial<ScoringConfig>,
+) {
+  return haasSend<ScoringConfig>(eventPath(hackathonId, "scoring-config"), {
+    method: "PATCH",
+    body,
+  });
 }

@@ -19,13 +19,17 @@ import {
   ListPageStats,
   ListPageStatsDot,
 } from "@/components/ui/list-page-stats";
-import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
 import { listAllChallenges } from "@/features/challenges/challenge-api";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
+import {
+  ALL_EVENTS_SCOPE,
+  isAllEventsScope,
+} from "@/features/events/event-scope";
 import {
   applySectionSearch,
   questionAnswerRowSearchParts,
@@ -42,30 +46,22 @@ import {
 } from "@/features/question-answers/question-answers-api";
 import { listAllTeams, listTeams } from "@/features/teams/team-api";
 import type { EventTeam } from "@/features/teams/team-api";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
+import { formatDate } from "@/lib/format";
+import { hackathonLabel } from "@/lib/display-name";
 import type { Hackathon } from "@/types/hackathon";
 
 type Props = { hackathonId: string };
-
-const ALL_HACKATHONS = "__all__";
-
 type ModeFilter = "all" | "static" | "dynamic";
 type ValidityFilter = "all" | "correct" | "incorrect" | "pending";
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
 
 export function EventQuestionAnswersView({ hackathonId }: Props) {
   const { confirm } = usePlatformDialog();
   const router = useRouter();
   const { setSelectedHackathonId } = useSelectedEvent();
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
-  const [activeId, setActiveId] = useState(hackathonId || ALL_HACKATHONS);
-  const isAllScope = activeId === ALL_HACKATHONS || !activeId;
+  const [activeId, setActiveId] = useState(hackathonId || ALL_EVENTS_SCOPE);
+  const isAllScope = isAllEventsScope(activeId);
   const [rows, setRows] = useState<QuestionAnswerRow[]>([]);
   const [challenges, setChallenges] = useState<ChallengeSummary[]>([]);
   const [teams, setTeams] = useState<EventTeam[]>([]);
@@ -137,10 +133,7 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
       setChallenges(challengeList);
       setTeams(teamList);
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(
         err instanceof Error ? err.message : "Failed to load question answers",
       );
@@ -159,10 +152,10 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
   ]);
 
   function onHackathonChange(nextId: string) {
-    const id = nextId || ALL_HACKATHONS;
+    const id = nextId || ALL_EVENTS_SCOPE;
     setActiveId(id);
     setSelectedKeys(new Set());
-    if (id && id !== ALL_HACKATHONS) {
+    if (id && id !== ALL_EVENTS_SCOPE) {
       setSelectedHackathonId(id);
       router.push(`/events/${id}/question-answers`);
     }
@@ -349,27 +342,24 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
       >
         <FilterSelect
           label="Hackathon"
-          value={activeId || ALL_HACKATHONS}
+          value={activeId || ALL_EVENTS_SCOPE}
           onChange={onHackathonChange}
           className="min-w-[200px]"
         >
-          <option value={ALL_HACKATHONS}>All events</option>
+          <option value={ALL_EVENTS_SCOPE}>All events</option>
           {hackathons.map((h) => (
             <option key={h.id} value={h.id}>
-              {h.display_name || h.name}
+              {hackathonLabel(h)}
             </option>
           ))}
         </FilterSelect>
 
-        <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)]">
-          <span className="font-medium text-[var(--text)]">Search</span>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Challenge, question, answer, team…"
-            className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--focus-ring)]"
-          />
-        </label>
+        <FilterTextField
+          label="Search"
+          value={search}
+          onChange={setSearch}
+          placeholder="Challenge, question, answer, team…"
+        />
 
         {(search.trim() || focusId) && (
           <div className="flex items-end pb-0.5">
@@ -393,15 +383,12 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
           ))}
         </FilterSelect>
 
-        <label className="flex min-w-[140px] flex-col gap-1 text-xs text-[var(--text-muted)]">
-          <span className="font-medium text-[var(--text)]">IP / pool</span>
-          <input
-            value={ipFilter}
-            onChange={(e) => setIpFilter(e.target.value)}
-            placeholder="Machine IP or pool"
-            className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--focus-ring)]"
-          />
-        </label>
+        <FilterTextField
+          label="IP / pool"
+          value={ipFilter}
+          onChange={setIpFilter}
+          placeholder="Machine IP or pool"
+        />
 
         <FilterSelect
           label="Type"

@@ -8,15 +8,17 @@ import { resolveEventWorkspaceNavigation } from "@/components/shell/nav-utils";
 import { useEffectiveHackathonId } from "@/features/events/use-effective-hackathon-id";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
+import { hackathonLabel } from "@/lib/display-name";
 
 type HeaderEventPickerProps = {
   className?: string;
-  fullWidth?: boolean;
+  /** Stretch to the parent width (used in the compact header row). */
+  fill?: boolean;
 };
 
 export function HeaderEventPicker({
   className = "",
-  fullWidth = false,
+  fill = false,
 }: HeaderEventPickerProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -34,7 +36,7 @@ export function HeaderEventPicker({
         setOptions(
           items.map((h) => ({
             id: h.id,
-            label: h.display_name || h.name || h.id,
+            label: hackathonLabel(h),
           })),
         );
       } catch {
@@ -56,14 +58,14 @@ export function HeaderEventPicker({
 
   return (
     <label
-      className={`relative block ${fullWidth ? "w-full min-w-0" : "shrink-0"} ${className}`}
+      className={`relative block min-w-0 ${fill ? "w-full" : "shrink-0"} ${className}`}
       title="Select event workspace"
     >
       <span className="sr-only">Active event</span>
       <select
         disabled={isLoading}
-        className={`appearance-none rounded-[var(--radius-sm)] border bg-[var(--surface-raised)] py-0 pl-2.5 pr-7 text-[0.6875rem] font-semibold leading-none text-[var(--text)] shadow-[var(--shadow-sm)] transition focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] xl:pl-3 xl:text-[0.75rem] ${
-          fullWidth
+        className={`appearance-none truncate rounded-[var(--radius-sm)] border bg-[var(--surface-raised)] py-0 pl-2.5 pr-7 text-[0.6875rem] font-semibold leading-none text-[var(--text)] shadow-[var(--shadow-sm)] transition focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] xl:pl-3 xl:text-[0.75rem] ${
+          fill
             ? "h-10 w-full max-w-none"
             : "h-9 max-w-[7.5rem] sm:h-[42px] sm:max-w-[10rem] xl:max-w-[12.5rem]"
         } ${

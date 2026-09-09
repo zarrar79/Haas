@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-fields";
 import { TextField } from "@/components/ui/text-field";
 import {
   createSystemUser,
@@ -105,18 +106,15 @@ export function StaffUserCreateForm({ disabled = false, onCreated }: Props) {
             onChange={(e) => setPassword(e.target.value)}
             disabled={disabled || busy}
           />
-          <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">User type</span>
-            <select
-              className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--text)]"
-              value={userType}
-              onChange={(e) => setUserType(e.target.value)}
-              disabled={disabled || busy}
-            >
-              <option value="Student">Student</option>
-              <option value="Instructor">Instructor</option>
-            </select>
-          </label>
+          <FormSelect
+            label="User type"
+            value={userType}
+            onChange={setUserType}
+            disabled={disabled || busy}
+          >
+            <option value="Student">Student</option>
+            <option value="Instructor">Instructor</option>
+          </FormSelect>
           <TextField
             label="First name"
             name="new_name"

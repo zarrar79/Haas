@@ -103,6 +103,18 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
             icon: "event-home",
           },
           {
+            id: "event-leaderboard",
+            label: "Leaderboard",
+            href: "/events/current/leaderboard",
+            icon: "event-leaderboard",
+          },
+          {
+            id: "event-koth",
+            label: "King of the Hill",
+            href: "/events/current/koth",
+            icon: "event-koth",
+          },
+          {
             id: "event-hackathon",
             label: "Hackathon",
             href: "/events/current/hackathon",

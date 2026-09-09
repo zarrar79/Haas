@@ -17,6 +17,7 @@ import {
   formatBucketLabel,
   formatDuration,
 } from "@/features/dashboard/admin-guidance";
+import { hackathonLabel } from "@/lib/display-name";
 import {
   CHART_COLORS,
   chartTooltipStyle,
@@ -233,7 +234,7 @@ export function HackathonDashboardView({ data }: Props) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-extrabold tracking-tight text-[var(--text)]">
-                {hackathon.display_name || hackathon.name}
+                {hackathonLabel(hackathon)}
               </h2>
               {statusBadge(hackathon.status)}
             </div>

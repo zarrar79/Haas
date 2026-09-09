@@ -1,11 +1,4 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  asList,
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { haasGet, haasList, haasSend, toFormData } from "@/lib/haas-api";
 
 export type Sponsor = {
   id: string;
@@ -29,21 +22,15 @@ export async function listSponsors(filters?: {
   active?: string;
   limit?: string;
 }) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath("sponsors", {
-      search: filters?.search,
-      active: filters?.active,
-      limit: filters?.limit ?? "200",
-    }),
-  );
-  return asList<Sponsor>(unwrapHaasResult(result).data);
+  return haasList<Sponsor>("sponsors", {
+    search: filters?.search,
+    active: filters?.active,
+    limit: filters?.limit ?? "200",
+  });
 }
 
-export async function getSponsor(id: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<Sponsor>>>(
-    haasApiPath(`sponsors/${id}`),
-  );
-  return unwrapHaasResult(result).data;
+export function getSponsor(id: string) {
+  return haasGet<Sponsor>(`sponsors/${id}`);
 }
 
 export async function createSponsor(
@@ -51,23 +38,12 @@ export async function createSponsor(
   options?: { file?: File | null },
 ) {
   if (!options?.file) {
-    const result = await callAppApi<ApiResult<HaasForwardPayload<Sponsor>>>(
-      haasApiPath("sponsors"),
-      { method: "POST", body },
-    );
-    return unwrapHaasResult(result).data;
+    return haasSend<Sponsor>("sponsors", { method: "POST", body });
   }
-  const form = new FormData();
-  for (const [key, value] of Object.entries(body)) {
-    if (value === undefined) continue;
-    form.append(key, String(value));
-  }
-  form.append("image", options.file);
-  const result = await callAppApi<ApiResult<HaasForwardPayload<Sponsor>>>(
-    haasApiPath("sponsors"),
-    { method: "POST", body: form },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<Sponsor>("sponsors", {
+    method: "POST",
+    body: toFormData(body, { file: options.file, fileField: "image" }),
+  });
 }
 
 export async function updateSponsor(
@@ -77,22 +53,14 @@ export async function updateSponsor(
 ) {
   const needsMultipart = Boolean(options?.file || options?.clearImage);
   if (!needsMultipart) {
-    const result = await callAppApi<ApiResult<HaasForwardPayload<Sponsor>>>(
-      haasApiPath(`sponsors/${id}`),
-      { method: "PATCH", body },
-    );
-    return unwrapHaasResult(result).data;
+    return haasSend<Sponsor>(`sponsors/${id}`, { method: "PATCH", body });
   }
-  const form = new FormData();
-  for (const [key, value] of Object.entries(body)) {
-    if (value === undefined) continue;
-    form.append(key, String(value));
-  }
-  if (options?.file) form.append("image", options.file);
-  if (options?.clearImage) form.append("clear_image", "true");
-  const result = await callAppApi<ApiResult<HaasForwardPayload<Sponsor>>>(
-    haasApiPath(`sponsors/${id}`),
-    { method: "PATCH", body: form },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<Sponsor>(`sponsors/${id}`, {
+    method: "PATCH",
+    body: toFormData(body, {
+      file: options?.file,
+      fileField: "image",
+      flags: { clear_image: options?.clearImage },
+    }),
+  });
 }

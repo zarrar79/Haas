@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
-import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
@@ -30,7 +30,8 @@ import { AssignUserToTeamModal } from "@/features/teams/assign-user-to-team-moda
 import { EventUserRowActions } from "@/features/users/event-user-row-actions";
 import { UserFormModal } from "@/features/users/user-form-modal";
 import { useEventUserActions } from "@/features/users/use-event-user-actions";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
+import { hackathonLabel } from "@/lib/display-name";
 import type { Hackathon } from "@/types/hackathon";
 
 type Props = { hackathonId: string };
@@ -72,9 +73,7 @@ export function EventMembersView({ hackathonId }: Props) {
         const { items } = await listHackathons({ show_deleted: "false" });
         setHackathons(items);
       } catch (err) {
-        if (err instanceof ApiRequestError && err.httpStatus === 401) {
-          router.replace("/login");
-        }
+        redirectIfUnauthorized(err, router);
       }
     })();
   }, [router]);
@@ -104,10 +103,7 @@ export function EventMembersView({ hackathonId }: Props) {
         }),
       );
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load members");
     } finally {
       setIsLoading(false);
@@ -227,22 +223,19 @@ export function EventMembersView({ hackathonId }: Props) {
           ) : (
             hackathons.map((h) => (
               <option key={h.id} value={h.id}>
-                {h.display_name || h.name}
+                {hackathonLabel(h)}
               </option>
             ))
           )}
         </FilterSelect>
 
-        <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)]">
-          <span className="font-medium text-[var(--text)]">Search</span>
-          <input
-            name="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name, email, username…"
-            className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--focus-ring)]"
-          />
-        </label>
+        <FilterTextField
+          label="Search"
+          name="search"
+          value={search}
+          onChange={setSearch}
+          placeholder="Name, email, username…"
+        />
 
         <FilterSelect
           label="Blocked"
@@ -254,16 +247,13 @@ export function EventMembersView({ hackathonId }: Props) {
           <option value="not_blocked">Not blocked</option>
         </FilterSelect>
 
-        <label className="flex min-w-[140px] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)]">
-          <span className="font-medium text-[var(--text)]">Organization</span>
-          <input
-            name="organization"
-            value={organizationFilter}
-            onChange={(e) => setOrganizationFilter(e.target.value)}
-            placeholder="Filter…"
-            className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--focus-ring)]"
-          />
-        </label>
+        <FilterTextField
+          label="Organization"
+          name="organization"
+          value={organizationFilter}
+          onChange={setOrganizationFilter}
+          placeholder="Filter…"
+        />
 
         <FilterSelect
           label="Staff"

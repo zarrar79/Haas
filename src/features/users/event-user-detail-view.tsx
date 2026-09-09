@@ -15,7 +15,7 @@ import { UserFormModal } from "@/features/users/user-form-modal";
 import { UserProfileSummary } from "@/features/users/user-profile-summary";
 import { useEventUserActions } from "@/features/users/use-event-user-actions";
 import { getEventUser, type EventUser } from "@/features/users/users-api";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
 
 type Props = {
   hackathonId: string;
@@ -39,10 +39,7 @@ export function EventUserDetailView({ hackathonId, userId }: Props) {
     try {
       setUser(await getEventUser(hackathonId, userId));
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load user");
       setUser(null);
     } finally {

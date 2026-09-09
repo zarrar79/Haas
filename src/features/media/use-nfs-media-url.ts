@@ -44,9 +44,16 @@ export function useNfsMediaUrl(pathOrUrl: string | null | undefined): {
 
     void fetch(proxyUrl, { credentials: "same-origin", cache: "no-store" })
       .then(async (response) => {
-        if (!response.ok) throw new Error(`Media fetch failed (${response.status})`);
-        const blob = await response.blob();
         if (cancelled) return;
+        if (response.status !== 200) {
+          setUrl(null);
+          return;
+        }
+        const blob = await response.blob();
+        if (cancelled || !blob.size) {
+          setUrl(null);
+          return;
+        }
         createdObjectUrl = URL.createObjectURL(blob);
         setUrl(createdObjectUrl);
       })

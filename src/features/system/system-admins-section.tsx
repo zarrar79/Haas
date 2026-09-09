@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { TextField } from "@/components/ui/text-field";
-import { UserSearchPicker } from "@/components/ui/user-search-picker";
+import { UserSearchAddPicker } from "@/components/ui/user-search-add-picker";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
 import {
@@ -18,7 +18,7 @@ import {
   revokeSystemAdmin,
   type SystemAdmin,
 } from "@/features/system/system-api";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
 
 export function SystemAdminsSection() {
   const router = useRouter();
@@ -37,10 +37,7 @@ export function SystemAdminsSection() {
     try {
       setAdmins(await listSystemAdmins());
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load event admins");
     } finally {
       setIsLoading(false);
@@ -107,11 +104,13 @@ export function SystemAdminsSection() {
           onChange={setAdminHackathonId}
           navigateOnChange={false}
         />
-        <UserSearchPicker
+        <UserSearchAddPicker
           label="Event admin user"
           multiple={false}
+          allowCreate={false}
           selectedIds={adminUserId ? [adminUserId] : []}
           onChange={(ids) => setAdminUserId(ids[0] || "")}
+          emptyHint="Only users created or updated by staff are listed."
         />
         <TextField
           label="Notes"

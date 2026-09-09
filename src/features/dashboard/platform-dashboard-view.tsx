@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { GuidanceHint } from "@/components/ui/tooltip";
 import { formatBucketLabel } from "@/features/dashboard/admin-guidance";
+import { hackathonLabel } from "@/lib/display-name";
 import {
   CHART_COLORS,
   chartTooltipStyle,
@@ -43,7 +44,7 @@ export function PlatformDashboardView({ data }: Props) {
   const eventComparison = useMemo(
     () =>
       (data.events ?? []).map((event) => ({
-        name: (event.hackathon.display_name || event.hackathon.name).slice(
+        name: hackathonLabel(event.hackathon).slice(
           0,
           14,
         ),
@@ -267,7 +268,7 @@ export function PlatformDashboardView({ data }: Props) {
               <div className="border-b border-[var(--border)] px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-sm font-semibold text-[var(--text)]">
-                    {event.hackathon.display_name || event.hackathon.name}
+                    {hackathonLabel(event.hackathon)}
                   </p>
                   <Badge
                     tone={

@@ -1,11 +1,4 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  asList,
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { haasList, haasListPage, haasSend } from "@/lib/haas-api";
 
 export type QuestionAnswerRow = {
   id: string;
@@ -63,81 +56,62 @@ function answersBasePath(hackathonId: string | null) {
     : "challenge-answers";
 }
 
-async function fetchReport(path: string, filters?: ReportFilters) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(path, {
-      ...filters,
-      limit: filters?.limit ?? "100",
-    }),
-  );
-  const unwrapped = unwrapHaasResult(result);
-  return {
-    items: asList<QuestionAnswerRow>(unwrapped.data),
-    pagination: unwrapped.pagination,
-    message: unwrapped.message,
-  };
-}
-
-export async function listQuestionAnswerRows(
+export function listQuestionAnswerRows(
   hackathonId: string,
   filters?: ReportFilters,
 ) {
-  return fetchReport(`hackathons/${hackathonId}/question-answer-rows`, filters);
+  return haasListPage<QuestionAnswerRow>(
+    `hackathons/${hackathonId}/question-answer-rows`,
+    { ...filters, limit: filters?.limit ?? "100" },
+  );
 }
 
-export async function listAllQuestionAnswerRows(filters?: ReportFilters) {
-  return fetchReport("question-answer-rows", filters);
+export function listAllQuestionAnswerRows(filters?: ReportFilters) {
+  return haasListPage<QuestionAnswerRow>("question-answer-rows", {
+    ...filters,
+    limit: filters?.limit ?? "100",
+  });
 }
 
-export async function listChallengeQuestions(
+export function listChallengeQuestions(
   hackathonId: string | null,
   filters?: { challenge?: string; search?: string },
 ) {
   const path = hackathonId
     ? `hackathons/${hackathonId}/challenge-questions`
     : "challenge-questions";
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(path, {
-      challenge: filters?.challenge,
-      search: filters?.search,
-      limit: "200",
-    }),
-  );
-  return asList<ChallengeQuestionBrief>(unwrapHaasResult(result).data);
+  return haasList<ChallengeQuestionBrief>(path, {
+    challenge: filters?.challenge,
+    search: filters?.search,
+    limit: "200",
+  });
 }
 
-export async function createAnswerKey(
+export function createAnswerKey(
   hackathonId: string | null,
   body: AnswerKeyWriteInput,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(answersBasePath(hackathonId)),
-    { method: "POST", body },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<unknown>(answersBasePath(hackathonId), {
+    method: "POST",
+    body,
+  });
 }
 
-export async function updateAnswerKey(
+export function updateAnswerKey(
   hackathonId: string | null,
   answerId: string,
   body: Partial<AnswerKeyWriteInput>,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`${answersBasePath(hackathonId)}/${answerId}`),
-    { method: "PATCH", body },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<unknown>(`${answersBasePath(hackathonId)}/${answerId}`, {
+    method: "PATCH",
+    body,
+  });
 }
 
-export async function deleteAnswerKey(
-  hackathonId: string | null,
-  answerId: string,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`${answersBasePath(hackathonId)}/${answerId}`),
-    { method: "DELETE" },
-  );
-  return unwrapHaasResult(result);
+export function deleteAnswerKey(hackathonId: string | null, answerId: string) {
+  return haasSend<unknown>(`${answersBasePath(hackathonId)}/${answerId}`, {
+    method: "DELETE",
+  });
 }
 
 /** Resolve hackathon scope for CRUD from row + page scope. */

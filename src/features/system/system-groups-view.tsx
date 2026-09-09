@@ -16,7 +16,7 @@ import {
   type HaasGroup,
   type HaasPermission,
 } from "@/features/groups/group-api";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
 
 export function SystemGroupsView() {
   const router = useRouter();
@@ -37,10 +37,7 @@ export function SystemGroupsView() {
     try {
       setGroups(await listPlatformGroups());
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load groups");
     } finally {
       setIsLoading(false);

@@ -1,59 +1,84 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  asList,
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { haasGet, haasList, haasSend } from "@/lib/haas-api";
+import type { UserBrief } from "@/types";
 
-export type RoleBinding = {
+export type HackathonRoleCode =
+  | "hackathon.manager"
+  | "hackathon.moderator"
+  | "hackathon.challenge_admin"
+  | "hackathon.viewer"
+  | "hackathon.organizer"
+  | string;
+
+export type HackathonRoleBinding = {
   id: string;
   user: string;
-  role: string;
+  hackathon?: string;
+  hackathon_name?: string;
+  role: HackathonRoleCode;
+  role_label?: string;
   is_active?: boolean;
+  granted_at?: string;
+  revoked_at?: string | null;
   expires_at?: string | null;
-  user_detail?: {
-    username?: string;
-    email?: string;
-    name?: string;
-  };
+  notes?: string;
+  user_detail?: UserBrief;
 };
 
-export async function listRoles(hackathonId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/roles`, { limit: "100" }),
-  );
-  return asList<RoleBinding>(unwrapHaasResult(result).data);
-}
+export type HackathonRoleCatalogItem = {
+  role: HackathonRoleCode;
+  label: string;
+  capabilities: string[];
+  capability_labels?: { code: string; label: string }[];
+};
 
-export async function grantRole(
+export function listHackathonRoles(
   hackathonId: string,
-  body: { user: string; role: string; expires_at?: string | null },
+  filters?: { role?: string; show_inactive?: string },
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<RoleBinding>>>(
-    haasApiPath(`hackathons/${hackathonId}/roles`),
-    { method: "POST", body },
-  );
-  return unwrapHaasResult(result).data;
+  return haasList<HackathonRoleBinding>(`hackathons/${hackathonId}/roles`, {
+    ...filters,
+    limit: "100",
+  });
 }
 
-export async function updateRole(
+export function getHackathonRoleCatalog(hackathonId: string) {
+  return haasGet<HackathonRoleCatalogItem[]>(
+    `hackathons/${hackathonId}/roles/catalog`,
+  );
+}
+
+export function assignHackathonRole(
+  hackathonId: string,
+  body: {
+    user: string;
+    role: HackathonRoleCode;
+    notes?: string;
+    expires_at?: string | null;
+  },
+) {
+  return haasSend<HackathonRoleBinding>(`hackathons/${hackathonId}/roles`, {
+    method: "POST",
+    body,
+  });
+}
+
+export function updateHackathonRole(
   hackathonId: string,
   bindingId: string,
-  body: { is_active?: boolean; expires_at?: string | null; role?: string },
+  body: Partial<{
+    role: HackathonRoleCode;
+    notes: string;
+    expires_at: string | null;
+  }>,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<RoleBinding>>>(
-    haasApiPath(`hackathons/${hackathonId}/roles/${bindingId}`),
+  return haasSend<HackathonRoleBinding>(
+    `hackathons/${hackathonId}/roles/${bindingId}`,
     { method: "PATCH", body },
   );
-  return unwrapHaasResult(result).data;
 }
 
-export async function revokeRole(hackathonId: string, bindingId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/roles/${bindingId}`),
-    { method: "DELETE" },
-  );
-  return unwrapHaasResult(result);
+export function revokeHackathonRole(hackathonId: string, bindingId: string) {
+  return haasSend<unknown>(`hackathons/${hackathonId}/roles/${bindingId}`, {
+    method: "DELETE",
+  });
 }

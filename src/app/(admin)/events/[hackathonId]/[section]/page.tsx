@@ -5,6 +5,8 @@ import { PlaceholderPage } from "@/components/shell/placeholder-page";
 import { EventActivityLogsView } from "@/features/activity-logs/event-activity-logs-view";
 import { EventChallengesView } from "@/features/challenges/event-challenges-view";
 import { EventHackathonView } from "@/features/events/event-hackathon-view";
+import { EventLeaderboardView } from "@/features/leaderboard/event-leaderboard-view";
+import { EventKothListView } from "@/features/koth/event-koth-list-view";
 import { EventMachinesView } from "@/features/machines/event-machines-view";
 import { EventMembersView } from "@/features/members/event-members-view";
 import { EventQuestionAnswersView } from "@/features/question-answers/event-question-answers-view";
@@ -56,6 +58,12 @@ export default async function EventSectionPage({ params }: PageProps) {
   }
   if (section === "scores") {
     return <EventTeamScoresView hackathonId={hackathonId} />;
+  }
+  if (section === "leaderboard") {
+    return <EventLeaderboardView hackathonId={hackathonId} />;
+  }
+  if (section === "koth") {
+    return <EventKothListView hackathonId={hackathonId} />;
   }
   if (section === "machines") {
     return <EventMachinesView hackathonId={hackathonId} />;

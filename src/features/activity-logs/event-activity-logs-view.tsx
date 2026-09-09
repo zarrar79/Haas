@@ -11,7 +11,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
-import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { ActivityLogFormModal } from "@/features/activity-logs/activity-log-form-modal";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
@@ -23,22 +23,14 @@ import {
   listActivityLogs,
   type ActivityLog,
 } from "@/features/ops/ops-api";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
+import { formatDate } from "@/lib/format";
+import { formatPersonName } from "@/lib/display-name";
 
 type Props = { hackathonId: string };
 
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
 function userLabel(row: ActivityLog) {
-  const d = row.submitted_by_detail;
-  if (!d) return row.submitted_by || "—";
-  const name = [d.name, d.last_name].filter(Boolean).join(" ").trim();
-  return name || d.username || d.email || row.submitted_by || "—";
+  return formatPersonName(row.submitted_by_detail, row.submitted_by || "—");
 }
 
 function typeBadge(type?: string) {
@@ -128,10 +120,7 @@ export function EventActivityLogsView({ hackathonId }: Props) {
       setRows(logList);
       setUsers(userList);
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load activity logs");
     } finally {
       setIsLoading(false);
@@ -203,15 +192,12 @@ export function EventActivityLogsView({ hackathonId }: Props) {
             onChange={setActiveId}
             section="activity-logs"
           />
-          <label className="flex min-w-[180px] flex-col gap-1 text-xs text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">Search</span>
-            <input
-              className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Message, user…"
-            />
-          </label>
+          <FilterTextField
+            label="Search"
+            value={search}
+            onChange={setSearch}
+            placeholder="Message, user…"
+          />
           <FilterSelect
             label="Type"
             value={typeFilter}
@@ -236,33 +222,24 @@ export function EventActivityLogsView({ hackathonId }: Props) {
               </option>
             ))}
           </FilterSelect>
-          <label className="flex min-w-[140px] flex-col gap-1 text-xs text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">IP</span>
-            <input
-              className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
-              value={ipFilter}
-              onChange={(e) => setIpFilter(e.target.value)}
-              placeholder="Filter by IP"
-            />
-          </label>
-          <label className="flex min-w-[160px] flex-col gap-1 text-xs text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">After</span>
-            <input
-              type="datetime-local"
-              className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
-              value={dateAfter}
-              onChange={(e) => setDateAfter(e.target.value)}
-            />
-          </label>
-          <label className="flex min-w-[160px] flex-col gap-1 text-xs text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">Before</span>
-            <input
-              type="datetime-local"
-              className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
-              value={dateBefore}
-              onChange={(e) => setDateBefore(e.target.value)}
-            />
-          </label>
+          <FilterTextField
+            label="IP"
+            value={ipFilter}
+            onChange={setIpFilter}
+            placeholder="Filter by IP"
+          />
+          <FilterTextField
+            label="After"
+            type="datetime-local"
+            value={dateAfter}
+            onChange={setDateAfter}
+          />
+          <FilterTextField
+            label="Before"
+            type="datetime-local"
+            value={dateBefore}
+            onChange={setDateBefore}
+          />
         </div>
       </StickyToolbar>
 

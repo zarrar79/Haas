@@ -1,11 +1,4 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  asList,
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { haasList, haasSend } from "@/lib/haas-api";
 
 export type CatalogItem = {
   id: string;
@@ -30,39 +23,28 @@ export type CatalogKind =
   | "skills"
   | "techniques";
 
-export async function listCatalog(
+export function listCatalog(
   kind: CatalogKind,
   filters?: { search?: string; skill?: string },
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`catalog/${kind}`, {
-      limit: "100",
-      search: filters?.search,
-      skill: filters?.skill,
-    }),
-  );
-  return asList<CatalogItem>(unwrapHaasResult(result).data);
+  return haasList<CatalogItem>(`catalog/${kind}`, {
+    limit: "100",
+    search: filters?.search,
+    skill: filters?.skill,
+  });
 }
 
-export async function createCatalogItem(
-  kind: CatalogKind,
-  body: Record<string, unknown>,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<CatalogItem>>>(
-    haasApiPath(`catalog/${kind}`),
-    { method: "POST", body },
-  );
-  return unwrapHaasResult(result).data;
+export function createCatalogItem(kind: CatalogKind, body: Record<string, unknown>) {
+  return haasSend<CatalogItem>(`catalog/${kind}`, { method: "POST", body });
 }
 
-export async function updateCatalogItem(
+export function updateCatalogItem(
   kind: CatalogKind,
   id: string,
   body: Record<string, unknown>,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<CatalogItem>>>(
-    haasApiPath(`catalog/${kind}/${id}`),
-    { method: "PATCH", body },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<CatalogItem>(`catalog/${kind}/${id}`, {
+    method: "PATCH",
+    body,
+  });
 }

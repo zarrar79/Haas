@@ -61,5 +61,5 @@ export async function GET(_request: Request, context: RouteContext) {
     /* soft miss */
   }
 
-  return new NextResponse("Image not found", { status: 404 });
+  return new NextResponse(null, { status: 204 });
 }

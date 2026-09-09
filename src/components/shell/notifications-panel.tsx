@@ -11,6 +11,7 @@ import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { useEffectiveHackathonId } from "@/features/events/use-effective-hackathon-id";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
+import { hackathonLabel } from "@/lib/display-name";
 import {
   deleteNotification,
   listNotifications,
@@ -30,14 +31,22 @@ function formatWhen(value?: string) {
 
 export function NotificationsPanel({
   iconButtonClassName = "relative inline-flex size-[42px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--input-bg)] text-[var(--text)] shadow-[var(--shadow-sm)] transition hover:bg-[var(--surface-hover)]",
+  hideTrigger = false,
+  open: openProp,
+  onOpenChange,
 }: {
   iconButtonClassName?: string;
+  hideTrigger?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const { confirm } = usePlatformDialog();
   const effectiveHackathonId = useEffectiveHackathonId();
   const { selectedHackathonId, setSelectedHackathonId } = useSelectedEvent();
   const { hasCapability } = useHaasAccess();
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = openProp ?? uncontrolledOpen;
+  const setOpen = onOpenChange ?? setUncontrolledOpen;
   const [hackathonId, setHackathonId] = useState(
     effectiveHackathonId ?? selectedHackathonId ?? "",
   );
@@ -68,7 +77,7 @@ export function NotificationsPanel({
         setHackathons(
           items.map((h) => ({
             id: h.id,
-            label: h.display_name || h.name || h.id,
+            label: hackathonLabel(h),
           })),
         );
       } catch {
@@ -198,19 +207,21 @@ export function NotificationsPanel({
   }
 
   return (
-    <div className="relative" ref={panelRef}>
+    <div className={hideTrigger ? "" : "relative"} ref={panelRef}>
+      {hideTrigger ? null : (
       <button
         type="button"
         className={iconButtonClassName}
         aria-label="Notifications"
         aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setOpen(!open)}
       >
         <BiBell className="text-lg" />
         {rows.length > 0 ? (
           <span className="absolute right-2 top-2 size-2.5 rounded-full border-2 border-[var(--surface)] bg-[var(--success)]" />
         ) : null}
       </button>
+      )}
 
       {open ? (
         <div className="dropdown-panel dropdown-panel-open absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(100vw-2rem,420px)] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--surface)] shadow-[var(--shadow-lg)]">

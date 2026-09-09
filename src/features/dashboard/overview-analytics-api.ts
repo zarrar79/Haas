@@ -1,10 +1,4 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { haasGet } from "@/lib/haas-api";
 
 export type OverviewPeriod = "24h" | "7d" | "30d";
 
@@ -40,19 +34,36 @@ export type OverviewActivityTimeline = {
   generated_at: string;
 };
 
+export type OverviewLeaderboardItem = {
+  rank: number;
+  team_id: string;
+  name: string;
+  team_code?: string | null;
+  register_as?: string | null;
+  is_blocked?: boolean;
+  is_active?: boolean;
+  challenge_score?: number;
+  first_blood_score?: number;
+  bonus_score?: number;
+  negative_score?: number;
+  total_score?: number;
+  final_score?: number;
+  /** Alias of final_score for older overview charts. */
+  score: number;
+  solves: number;
+  submissions: number;
+  difficulty_counts?: {
+    easy?: number;
+    medium?: number;
+    hard?: number;
+    other?: number;
+  };
+  image_url?: string | null;
+};
+
 export type OverviewLeaderboard = {
   limit: number;
-  items: {
-    rank: number;
-    team_id: string;
-    name: string;
-    team_code?: string | null;
-    register_as?: string | null;
-    score: number;
-    solves: number;
-    submissions: number;
-    image_url?: string | null;
-  }[];
+  items: OverviewLeaderboardItem[];
 };
 
 export type OverviewTopChallenges = {
@@ -117,14 +128,11 @@ async function getOverviewSection<T>(
   section: string,
   filters?: OverviewFilters,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<T>>>(
-    haasApiPath(`hackathons/${hackathonId}/overview/${section}`, {
-      period: filters?.period,
-      limit: filters?.limit,
-      intervals: filters?.intervals,
-    }),
-  );
-  return unwrapHaasResult(result).data;
+  return haasGet<T>(`hackathons/${hackathonId}/overview/${section}`, {
+    period: filters?.period,
+    limit: filters?.limit,
+    intervals: filters?.intervals,
+  });
 }
 
 export function getOverviewKpis(
@@ -218,15 +226,12 @@ async function getDashboardSection<T>(
   section: string,
   filters?: OverviewFilters,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<T>>>(
-    haasApiPath(`dashboard/${section}`, {
-      period: filters?.period,
-      limit: filters?.limit,
-      intervals: filters?.intervals,
-      event_id: filters?.event_id,
-    }),
-  );
-  return unwrapHaasResult(result).data;
+  return haasGet<T>(`dashboard/${section}`, {
+    period: filters?.period,
+    limit: filters?.limit,
+    intervals: filters?.intervals,
+    event_id: filters?.event_id,
+  });
 }
 
 /** Parallel fetch of consolidated analytics across all visible hackathons. */

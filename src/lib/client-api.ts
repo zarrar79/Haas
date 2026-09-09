@@ -18,6 +18,26 @@ type CallAppApiOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
 };
 
+export function isUnauthorizedError(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.httpStatus === 401;
+}
+
+export function redirectIfUnauthorized(
+  error: unknown,
+  router: { replace: (href: string) => void },
+): boolean {
+  if (!isUnauthorizedError(error)) return false;
+  router.replace("/login");
+  return true;
+}
+
+export function toErrorMessage(
+  error: unknown,
+  fallback = "Request failed",
+): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export async function callAppApi<T>(
   path: string,
   options: CallAppApiOptions = {},
@@ -41,13 +61,20 @@ export async function callAppApi<T>(
   } else {
     const base = url.slice(0, qIndex);
     const query = url.slice(qIndex);
-    url = (base.length > 1 && base.endsWith("/") ? base.slice(0, -1) : base) + query;
+    url =
+      (base.length > 1 && base.endsWith("/") ? base.slice(0, -1) : base) +
+      query;
   }
 
   const response = await fetch(url, {
     ...requestInit,
     headers,
-    body: body === undefined ? undefined : isFormData ? (body as FormData) : JSON.stringify(body),
+    body:
+      body === undefined
+        ? undefined
+        : isFormData
+          ? (body as FormData)
+          : JSON.stringify(body),
     credentials: "same-origin",
   });
 

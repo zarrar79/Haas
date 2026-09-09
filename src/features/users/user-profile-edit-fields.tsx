@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { FormSelect } from "@/components/ui/form-fields";
 import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { TextField } from "@/components/ui/text-field";
 import type {
@@ -17,9 +18,6 @@ import {
   TEAM_TYPE_OPTIONS,
   type UserProfileEditState,
 } from "@/features/users/user-profile-edit-state";
-
-const INPUT_CLASS =
-  "rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]";
 
 type Props = {
   state: UserProfileEditState;
@@ -188,36 +186,31 @@ export function UserProfileEditFields({
             onChange={(e) => patch({ phone_number: e.target.value })}
             placeholder="+92XXXXXXXXXX"
           />
-          <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">Gender</span>
-            <select
-              className={INPUT_CLASS}
-              value={state.gender}
-              onChange={(e) => patch({ gender: e.target.value })}
-            >
-              <option value="">Select gender</option>
-              {GENDER_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)] sm:col-span-2">
-            <span className="font-medium text-[var(--text)]">Team type</span>
-            <select
-              className={INPUT_CLASS}
-              value={state.teamType}
-              onChange={(e) => patch({ teamType: e.target.value })}
-            >
-              <option value="">Not set</option>
-              {TEAM_TYPE_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FormSelect
+            label="Gender"
+            value={state.gender}
+            onChange={(value) => patch({ gender: value })}
+          >
+            <option value="">Select gender</option>
+            {GENDER_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </FormSelect>
+          <FormSelect
+            label="Team type"
+            className="sm:col-span-2"
+            value={state.teamType}
+            onChange={(value) => patch({ teamType: value })}
+          >
+            <option value="">Not set</option>
+            {TEAM_TYPE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </FormSelect>
         </div>
       </section>
 
@@ -240,40 +233,30 @@ export function UserProfileEditFields({
                 className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg)] p-3"
               >
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-                    <span className="font-medium text-[var(--text)]">Level</span>
-                    <select
-                      className={INPUT_CLASS}
-                      value={entry.level || ""}
-                      onChange={(e) =>
-                        updateEducation(index, "level", e.target.value)
-                      }
-                    >
-                      <option value="">Select level</option>
-                      {EDUCATION_LEVELS.map((level) => (
-                        <option key={level} value={level}>
-                          {level}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-                    <span className="font-medium text-[var(--text)]">Degree</span>
-                    <select
-                      className={INPUT_CLASS}
-                      value={entry.degree || ""}
-                      onChange={(e) =>
-                        updateEducation(index, "degree", e.target.value)
-                      }
-                    >
-                      <option value="">Select degree</option>
-                      {DEGREE_OPTIONS.map((degree) => (
-                        <option key={degree} value={degree}>
-                          {degree}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <FormSelect
+                    label="Level"
+                    value={entry.level || ""}
+                    onChange={(value) => updateEducation(index, "level", value)}
+                  >
+                    <option value="">Select level</option>
+                    {EDUCATION_LEVELS.map((level) => (
+                      <option key={level} value={level}>
+                        {level}
+                      </option>
+                    ))}
+                  </FormSelect>
+                  <FormSelect
+                    label="Degree"
+                    value={entry.degree || ""}
+                    onChange={(value) => updateEducation(index, "degree", value)}
+                  >
+                    <option value="">Select degree</option>
+                    {DEGREE_OPTIONS.map((degree) => (
+                      <option key={degree} value={degree}>
+                        {degree}
+                      </option>
+                    ))}
+                  </FormSelect>
                   <TextField
                     label="School / college"
                     name={`school_${index}`}
@@ -378,23 +361,20 @@ export function UserProfileEditFields({
                 className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg)] p-3"
               >
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-                    <span className="font-medium text-[var(--text)]">Category</span>
-                    <select
-                      className={INPUT_CLASS}
-                      value={entry.category || ""}
-                      onChange={(e) =>
-                        updateExpertise(index, "category", e.target.value)
-                      }
-                    >
-                      <option value="">Select category</option>
-                      {EXPERTISE_CATEGORIES.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <FormSelect
+                    label="Category"
+                    value={entry.category || ""}
+                    onChange={(value) =>
+                      updateExpertise(index, "category", value)
+                    }
+                  >
+                    <option value="">Select category</option>
+                    {EXPERTISE_CATEGORIES.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </FormSelect>
                   <TextField
                     label="Level"
                     name={`expertise_level_${index}`}

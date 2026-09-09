@@ -11,24 +11,18 @@ import { DataTable } from "@/components/ui/data-table";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
-import { StickyToolbar } from "@/components/ui/sticky-toolbar";
-import { TextField } from "@/components/ui/text-field";
+import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import {
   getHackathonAnalytics,
   listHackathons,
   type HackathonAnalytics,
 } from "@/features/hackathons/hackathon-api";
-import { ApiRequestError } from "@/lib/client-api";
-import { isPlatformChallengeOperator } from "@/lib/is-platform-operator";
+import { redirectIfUnauthorized } from "@/lib/client-api";
+import { formatDate } from "@/lib/format";
+import { hackathonLabel } from "@/lib/display-name";
 import type { Hackathon } from "@/types/hackathon";
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
 
 type Row = Hackathon & {
   teamCount?: number | null;
@@ -37,6 +31,7 @@ type Row = Hackathon & {
 
 export function HackathonListView() {
   const router = useRouter();
+  const { isPlatformOperator } = useHaasAccess();
   const { setSelectedHackathonId } = useSelectedEvent();
   const [items, setItems] = useState<Row[]>([]);
   const [search, setSearch] = useState("");
@@ -44,7 +39,6 @@ export function HackathonListView() {
   const [showDeleted, setShowDeleted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPlatform, setIsPlatform] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -75,10 +69,7 @@ export function HackathonListView() {
 
       setItems(withCounts);
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load hackathons");
     } finally {
       setIsLoading(false);
@@ -88,26 +79,6 @@ export function HackathonListView() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const { callAppApi } = await import("@/lib/client-api");
-        type MePayload = {
-          data: { is_root?: boolean; system_role?: string };
-        };
-        const result = await callAppApi<{
-          ok: boolean;
-          data: MePayload;
-        }>("/api/haas/me");
-        if (result.ok) {
-          setIsPlatform(isPlatformChallengeOperator(result.data.data));
-        }
-      } catch {
-        setIsPlatform(false);
-      }
-    })();
-  }, []);
 
   function goChallenges(id: string) {
     setSelectedHackathonId(id);
@@ -134,7 +105,7 @@ export function HackathonListView() {
             <Link href="/challenges">
               <Button variant="secondary">All challenges</Button>
             </Link>
-            {isPlatform ? (
+            {isPlatformOperator ? (
               <Link href="/hackathons/new">
                 <Button>Create event</Button>
               </Link>
@@ -151,25 +122,18 @@ export function HackathonListView() {
           </ListPageStats>
         }
       >
-        <TextField
+        <FilterTextField
           label="Search"
           name="search"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={setSearch}
           placeholder="Name…"
         />
-        <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-          <span className="font-medium text-[var(--text)]">Active</span>
-          <select
-            className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--text)]"
-            value={isActive}
-            onChange={(e) => setIsActive(e.target.value)}
-          >
-            <option value="">Any</option>
-            <option value="true">Active</option>
-            <option value="false">Inactive</option>
-          </select>
-        </label>
+        <FilterSelect label="Active" value={isActive} onChange={setIsActive}>
+          <option value="">Any</option>
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </FilterSelect>
         <label className="flex items-end gap-2 pb-2 text-sm text-[var(--text)]">
           <input
             type="checkbox"
@@ -198,7 +162,7 @@ export function HackathonListView() {
             render: (row) => (
               <div>
                 <div className="font-medium">
-                  {row.display_name || row.name}
+                  {hackathonLabel(row)}
                 </div>
                 <div className="font-mono text-xs text-[var(--text-muted)]">
                   {row.id}
@@ -242,7 +206,7 @@ export function HackathonListView() {
             className: "text-right w-12",
             render: (row) => (
               <RowActionsMenu
-                label={`Actions for ${row.display_name || row.name || "event"}`}
+                label={`Actions for ${hackathonLabel(row, "event")}`}
                 items={[
                   {
                     id: "teams",

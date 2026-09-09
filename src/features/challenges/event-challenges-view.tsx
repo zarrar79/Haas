@@ -17,7 +17,7 @@ import {
   ListPageStatsDot,
 } from "@/components/ui/list-page-stats";
 import { TableSkeleton } from "@/components/ui/skeleton";
-import { FilterSelect, StickyToolbar } from "@/components/ui/sticky-toolbar";
+import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import {
   DEFAULT_TABLE_PAGE_SIZE,
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table-pagination";
 import {
   TABLE_ELEMENT_CLASS,
+  TABLE_STICKY_ACTIONS_CLASS,
   TableScroll,
 } from "@/components/ui/table-scroll";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
@@ -54,12 +55,15 @@ import {
 } from "@/features/search/section-search";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
 import {
+  ALL_EVENTS_SCOPE,
+  isAllEventsScope,
+} from "@/features/events/event-scope";
+import {
   getAssignedHackathons,
 } from "@/lib/assigned-events";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
+import { hackathonLabel } from "@/lib/display-name";
 import type { Hackathon } from "@/types/hackathon";
-
-const ALL_HACKATHONS = "__all__";
 
 type MembershipFilter = "all" | "added" | "not_added";
 type VmFilter = "all" | "vm" | "non_vm";
@@ -158,9 +162,9 @@ export function EventChallengesView({
 
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
   const [activeId, setActiveId] = useState<string>(
-    hackathonIdProp || ALL_HACKATHONS,
+    hackathonIdProp || ALL_EVENTS_SCOPE,
   );
-  const isAllScope = activeId === ALL_HACKATHONS || !activeId;
+  const isAllScope = isAllEventsScope(activeId);
 
   const [rows, setRows] = useState<Row[]>([]);
   const { search, setSearch, debouncedSearch, focusId, clearDeepSearch } =
@@ -205,9 +209,7 @@ export function EventChallengesView({
         const { items } = await listHackathons({ show_deleted: "false" });
         setHackathons(items);
       } catch (err) {
-        if (err instanceof ApiRequestError && err.httpStatus === 401) {
-          router.replace("/login");
-        }
+        redirectIfUnauthorized(err, router);
       }
     })();
   }, [router]);
@@ -319,10 +321,7 @@ export function EventChallengesView({
         Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name)),
       );
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load challenges");
     } finally {
       setIsLoading(false);
@@ -405,8 +404,8 @@ export function EventChallengesView({
   }
 
   function onHackathonChange(nextId: string) {
-    setActiveId(nextId || ALL_HACKATHONS);
-    if (nextId && nextId !== ALL_HACKATHONS) {
+    setActiveId(nextId || ALL_EVENTS_SCOPE);
+    if (nextId && nextId !== ALL_EVENTS_SCOPE) {
       setSelectedHackathonId(nextId);
       if (syncUrl) router.push(`/events/${nextId}/challenges`);
     } else {
@@ -766,30 +765,27 @@ export function EventChallengesView({
       >
         <FilterSelect
           label="Hackathon"
-          value={activeId || ALL_HACKATHONS}
+          value={activeId || ALL_EVENTS_SCOPE}
           onChange={onHackathonChange}
           className="min-w-[180px]"
         >
           {!hackathonIdProp ? (
-            <option value={ALL_HACKATHONS}>All challenges</option>
+            <option value={ALL_EVENTS_SCOPE}>All challenges</option>
           ) : null}
           {hackathons.map((h) => (
             <option key={h.id} value={h.id}>
-              {h.display_name || h.name}
+              {hackathonLabel(h)}
             </option>
           ))}
         </FilterSelect>
 
-        <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-xs text-[var(--text-muted)]">
-          <span className="font-medium text-[var(--text)]">Search</span>
-          <input
-            name="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name, category, type…"
-            className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--focus-ring)]"
-          />
-        </label>
+        <FilterTextField
+          label="Search"
+          name="search"
+          value={search}
+          onChange={setSearch}
+          placeholder="Name, category, type…"
+        />
 
         {!isAllScope ? (
           <FilterSelect
@@ -996,7 +992,7 @@ export function EventChallengesView({
                 {!isAllScope ? (
                   <th className="px-4 py-3">In this hackathon</th>
                 ) : null}
-                <th className="px-4 py-3 text-right w-12" />
+                <th className={`px-4 py-3 text-right w-12 ${TABLE_STICKY_ACTIONS_CLASS}`} />
               </tr>
             </thead>
             <tbody>
@@ -1004,6 +1000,7 @@ export function EventChallengesView({
                 <tr
                   key={row.challengeId}
                   onDoubleClick={() => onRowDoubleClick(row)}
+                  data-selected={selectedKeys.has(row.challengeId) ? "true" : undefined}
                   className={`border-b border-[var(--border)] last:border-b-0 ${
                     selectedKeys.has(row.challengeId)
                       ? "bg-[var(--accent-muted)]/30"
@@ -1090,7 +1087,7 @@ export function EventChallengesView({
                       )}
                     </td>
                   ) : null}
-                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                  <td className={`px-4 py-3 text-right ${TABLE_STICKY_ACTIONS_CLASS}`} onClick={(e) => e.stopPropagation()}>
                     <RowActionsMenu
                       label={`Actions for ${row.name}`}
                       items={[

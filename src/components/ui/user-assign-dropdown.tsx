@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { FORM_CONTROL_CLASS } from "@/components/ui/form-control";
 import { userLabel } from "@/lib/assigned-events";
 import { staffCreatorLabel } from "@/lib/user-creator";
 import type { SystemUser } from "@/features/system/system-api";
@@ -63,7 +64,7 @@ export function UserSearchCombobox({
         </span>
         <input
           type="text"
-          className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
+          className={FORM_CONTROL_CLASS}
           placeholder={selected ? userLabel(selected) : placeholder}
           value={query}
           disabled={disabled}

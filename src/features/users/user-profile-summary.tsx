@@ -12,13 +12,8 @@ import {
 import { TeamTypeDisplay } from "@/features/users/team-type-display";
 import type { EventUser } from "@/features/users/users-api";
 import { eventUserLabel } from "@/features/users/users-api";
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
+import { formatDate } from "@/lib/format";
+import { hackathonLabel } from "@/lib/display-name";
 
 function DetailItem({
   label,
@@ -118,7 +113,7 @@ export function UserProfileSummary({ user, compact }: Props) {
             <DetailItem label="Block reason" value={user.block_reason} />
             <DetailItem
               label="Created in event"
-              value={user.created_in_hackathon?.display_name || user.created_in_hackathon?.name}
+              value={hackathonLabel(user.created_in_hackathon)}
             />
           </>
         ) : null}

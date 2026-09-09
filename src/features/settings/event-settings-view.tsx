@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
+import { FormCheckbox } from "@/components/ui/form-fields";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/loader";
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
@@ -40,7 +41,7 @@ import {
   removePlayingChallenge,
   removePlayingTeam,
 } from "@/features/challenges/challenge-admin-api";
-import { ApiRequestError } from "@/lib/client-api";
+import { redirectIfUnauthorized } from "@/lib/client-api";
 
 type Tab = "settings" | "modules" | "rules" | "playing" | "admins";
 
@@ -107,10 +108,7 @@ export function EventSettingsView({ hackathonId }: Props) {
       setPlaying(p || {});
       setAdmins(adminRows);
     } catch (err) {
-      if (err instanceof ApiRequestError && err.httpStatus === 401) {
-        router.replace("/login");
-        return;
-      }
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load settings");
     } finally {
       setIsLoading(false);
@@ -334,29 +332,23 @@ export function EventSettingsView({ hackathonId }: Props) {
               }))
             }
           />
-          <label className="flex items-center gap-2 text-sm text-[var(--text)]">
-            <input
-              type="checkbox"
-              checked={Boolean(rules.vpn_allowed)}
-              onChange={(e) =>
-                setRules((prev) => ({ ...prev, vpn_allowed: e.target.checked }))
-              }
-            />
-            VPN allowed
-          </label>
-          <label className="flex items-center gap-2 text-sm text-[var(--text)]">
-            <input
-              type="checkbox"
-              checked={Boolean(rules.force_password_policy)}
-              onChange={(e) =>
-                setRules((prev) => ({
-                  ...prev,
-                  force_password_policy: e.target.checked,
-                }))
-              }
-            />
-            Force password policy
-          </label>
+          <FormCheckbox
+            label="VPN allowed"
+            checked={Boolean(rules.vpn_allowed)}
+            onChange={(checked) =>
+              setRules((prev) => ({ ...prev, vpn_allowed: checked }))
+            }
+          />
+          <FormCheckbox
+            label="Force password policy"
+            checked={Boolean(rules.force_password_policy)}
+            onChange={(checked) =>
+              setRules((prev) => ({
+                ...prev,
+                force_password_policy: checked,
+              }))
+            }
+          />
           <div className="sm:col-span-2">
             <Button onClick={() => void saveRules()} disabled={!canWrite}>
               Save user rules
@@ -367,26 +359,20 @@ export function EventSettingsView({ hackathonId }: Props) {
 
       {!isLoading && tab === "playing" ? (
         <div className="space-y-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4">
-          <label className="flex items-center gap-2 text-sm text-[var(--text)]">
-            <input
-              type="checkbox"
-              checked={Boolean(playing.is_open)}
-              onChange={(e) =>
-                setPlaying((prev) => ({ ...prev, is_open: e.target.checked }))
-              }
-            />
-            Event open (`is_open`)
-          </label>
-          <label className="flex items-center gap-2 text-sm text-[var(--text)]">
-            <input
-              type="checkbox"
-              checked={Boolean(playing.is_active)}
-              onChange={(e) =>
-                setPlaying((prev) => ({ ...prev, is_active: e.target.checked }))
-              }
-            />
-            Playing active (`is_active`)
-          </label>
+          <FormCheckbox
+            label="Event open (`is_open`)"
+            checked={Boolean(playing.is_open)}
+            onChange={(checked) =>
+              setPlaying((prev) => ({ ...prev, is_open: checked }))
+            }
+          />
+          <FormCheckbox
+            label="Playing active (`is_active`)"
+            checked={Boolean(playing.is_active)}
+            onChange={(checked) =>
+              setPlaying((prev) => ({ ...prev, is_active: checked }))
+            }
+          />
           <Button onClick={() => void savePlaying()} disabled={!canWrite}>
             Save playing
           </Button>

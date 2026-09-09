@@ -1,3 +1,4 @@
+import { formatPersonName } from "@/lib/display-name";
 import type { HaasCapabilityName } from "@/lib/haas-capabilities";
 
 export const HIGHER_STAFF_GROUP_NAME = "HigherStaff";
@@ -80,6 +81,7 @@ export function isEventAdmin(
   );
 }
 
+/** True when the user may mutate event resources they have write caps for. */
 export function canMutateEvent(
   me: HaasMePayload | null | undefined,
   hackathonId: string | null | undefined,
@@ -95,19 +97,20 @@ export function hasCapability(
   if (!me) return false;
   if (me.is_root || me.permissions?.includes("*")) return true;
   if (isHigherStaffUser(me)) return true;
-  if (me.permissions?.includes(capability)) return true;
-  if (hackathonId && isEventAdmin(me, hackathonId)) return true;
+  // Platform /me permissions are the union across events; prefer exact match.
+  if (me.permissions?.includes(capability)) {
+    // If scoped to an event, also require membership on that event.
+    if (!hackathonId) return true;
+    return isEventAdmin(me, hackathonId) || Boolean(
+      me.hackathon_admins?.some((r) => r.hackathon_id === hackathonId) ||
+        me.hackathon_roles?.some((r) => r.hackathon_id === hackathonId),
+    );
+  }
   return false;
 }
 
 export { isEventOnlyAdmin } from "@/lib/assigned-events";
 
 export function userDisplayName(user?: HaasMeUser | null): string {
-  if (!user) return "";
-  return (
-    [user.name, user.last_name].filter(Boolean).join(" ") ||
-    user.username ||
-    user.email ||
-    ""
-  );
+  return formatPersonName(user);
 }

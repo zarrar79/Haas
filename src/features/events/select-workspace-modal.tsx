@@ -21,6 +21,7 @@ import { InlineLoader } from "@/components/ui/loader";
 import { ModalShell } from "@/components/ui/modal-shell";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
+import { hackathonLabel, personInitial } from "@/lib/display-name";
 import type { Hackathon } from "@/types/hackathon";
 
 type SelectWorkspaceRequest = {
@@ -74,8 +75,7 @@ function sortHackathons(items: Hackathon[]) {
 }
 
 function eventInitial(hackathon: Hackathon) {
-  const label = hackathon.display_name || hackathon.name || "?";
-  return label.charAt(0).toUpperCase();
+  return personInitial(hackathonLabel(hackathon, "?"));
 }
 
 function WorkspaceEventCard({
@@ -87,7 +87,7 @@ function WorkspaceEventCard({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const title = hackathon.display_name || hackathon.name;
+  const title = hackathonLabel(hackathon);
   const schedule = formatSchedule(hackathon);
   const infinite = isInfiniteEvent(hackathon);
 
@@ -293,7 +293,7 @@ export function useHackathonDisplayName(hackathonId: string | null) {
         const { items } = await listHackathons({ show_deleted: "false" });
         if (cancelled) return;
         const match = items.find((h) => h.id === hackathonId);
-        setLabel(match?.display_name || match?.name || null);
+        setLabel(match ? hackathonLabel(match) : null);
       } catch {
         if (!cancelled) setLabel(null);
       }

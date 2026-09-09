@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ImageUploadField } from "@/components/ui/image-upload-field";
+import { FormCheckbox, FormSelect } from "@/components/ui/form-fields";
 import { ModalShell } from "@/components/ui/modal-shell";
 import { TextField } from "@/components/ui/text-field";
 import {
@@ -26,9 +27,6 @@ const ORG_OPTIONS = [
   { value: "country", label: "Country" },
   { value: "organization", label: "Organization" },
 ];
-
-const INPUT_CLASS =
-  "rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]";
 
 type Props = {
   open: boolean;
@@ -161,42 +159,25 @@ export function SponsorFormModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-              <span className="font-medium text-[var(--text)]">Tier</span>
-              <select
-                className={INPUT_CLASS}
-                value={tag}
-                onChange={(e) => setTag(e.target.value)}
-              >
-                {TAG_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-              <span className="font-medium text-[var(--text)]">Organization type</span>
-              <select
-                className={INPUT_CLASS}
-                value={orgType}
-                onChange={(e) => setOrgType(e.target.value)}
-              >
-                {ORG_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-2 text-sm text-[var(--text)]">
-              <input
-                type="checkbox"
-                checked={active}
-                onChange={(e) => setActive(e.target.checked)}
-              />
-              Active
-            </label>
+            <FormSelect label="Tier" value={tag} onChange={setTag}>
+              {TAG_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </FormSelect>
+            <FormSelect
+              label="Organization type"
+              value={orgType}
+              onChange={setOrgType}
+            >
+              {ORG_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </FormSelect>
+            <FormCheckbox label="Active" checked={active} onChange={setActive} />
           </>
         )}
         {error ? <Alert variant="error">{error}</Alert> : null}

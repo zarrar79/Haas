@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import type { InputHTMLAttributes, ReactNode } from "react";
+
+import { FILTER_CONTROL_CLASS } from "@/components/ui/form-control";
 
 /** Full-bleed sticky shell — opaque, no table bleed-through while scrolling. */
 export const STICKY_TOOLBAR_OUTER_CLASS =
@@ -50,6 +52,26 @@ export function StickyToolbar({
 /** @deprecated Use StickyToolbar — kept as semantic alias for filter rows. */
 export const FilterToolbar = StickyToolbar;
 
+const FILTER_FIELD_CLASS =
+  "flex min-w-0 w-full flex-1 flex-col gap-1 text-xs text-[var(--text-muted)] sm:min-w-[8.75rem]";
+
+function FilterField({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className={`${FILTER_FIELD_CLASS} ${className ?? ""}`.trim()}>
+      <span className="font-medium text-[var(--text)]">{label}</span>
+      {children}
+    </label>
+  );
+}
+
 export function FilterSelect({
   label,
   value,
@@ -64,17 +86,43 @@ export function FilterSelect({
   children: ReactNode;
 }) {
   return (
-    <label
-      className={`flex min-w-0 w-full flex-1 flex-col gap-1 text-xs text-[var(--text-muted)] sm:min-w-[8.75rem] ${className ?? ""}`}
-    >
-      <span className="font-medium text-[var(--text)]">{label}</span>
+    <FilterField label={label} className={className}>
       <select
-        className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--input-bg)] px-2 py-2 text-sm text-[var(--text)] outline-none transition-all duration-200 focus:border-[var(--accent)]/40 focus:shadow-[var(--shadow-sm)]"
+        className={FILTER_CONTROL_CLASS}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
         {children}
       </select>
-    </label>
+    </FilterField>
+  );
+}
+
+type FilterTextFieldProps = Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "className" | "onChange" | "value"
+> & {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+};
+
+export function FilterTextField({
+  label,
+  value,
+  onChange,
+  className,
+  ...props
+}: FilterTextFieldProps) {
+  return (
+    <FilterField label={label} className={className}>
+      <input
+        className={FILTER_CONTROL_CLASS}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        {...props}
+      />
+    </FilterField>
   );
 }

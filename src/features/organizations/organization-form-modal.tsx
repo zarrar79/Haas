@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormCheckbox, FormTextarea } from "@/components/ui/form-fields";
 import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { ModalShell } from "@/components/ui/modal-shell";
 import { TextField } from "@/components/ui/text-field";
@@ -150,22 +151,17 @@ export function OrganizationFormModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-              <span className="font-medium text-[var(--text)]">Description</span>
-              <textarea
-                className="min-h-[96px] rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </label>
-            <label className="flex items-center gap-2 text-sm text-[var(--text)]">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-              />
-              Active
-            </label>
+            <FormTextarea
+              label="Description"
+              controlClassName="min-h-[96px]"
+              value={description}
+              onChange={setDescription}
+            />
+            <FormCheckbox
+              label="Active"
+              checked={isActive}
+              onChange={setIsActive}
+            />
           </>
         )}
         {error ? <Alert variant="error">{error}</Alert> : null}

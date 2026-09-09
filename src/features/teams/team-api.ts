@@ -1,11 +1,5 @@
-import { callAppApi } from "@/lib/client-api";
-import {
-  asList,
-  haasApiPath,
-  unwrapHaasResult,
-  type HaasForwardPayload,
-} from "@/lib/haas-api";
-import type { ApiResult } from "@/types";
+import { haasGet, haasList, haasSend, toFormData } from "@/lib/haas-api";
+import type { UserBrief } from "@/types";
 
 export type TeamMember = {
   id: string;
@@ -17,14 +11,7 @@ export type TeamMember = {
   is_active?: boolean;
   joined_at?: string;
   approved_at?: string | null;
-  user_detail?: {
-    id?: string;
-    username?: string;
-    email?: string;
-    name?: string;
-    last_name?: string;
-    media_url?: string | null;
-  };
+  user_detail?: UserBrief;
 };
 
 export type EventTeam = {
@@ -77,47 +64,45 @@ export type TeamWriteInput = {
   is_active?: boolean;
 };
 
-export async function listAllTeams(filters?: TeamListFilters) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath("teams", {
-      search: filters?.search,
-      status: filters?.status,
-      register_as: filters?.register_as,
-      is_active: filters?.is_active,
-      is_blocked: filters?.is_blocked,
-      hackathon: filters?.hackathon,
-      limit: filters?.limit ?? "100",
-    }),
-  );
-  return asList<EventTeam>(unwrapHaasResult(result).data);
+function teamCollectionPath(hackathonId: string | null | undefined) {
+  return hackathonId ? `hackathons/${hackathonId}/teams` : "teams";
 }
 
-export async function listTeams(
-  hackathonId: string,
-  filters?: TeamListFilters,
+function teamItemPath(hackathonId: string | null | undefined, teamId: string) {
+  return `${teamCollectionPath(hackathonId)}/${teamId}`;
+}
+
+export function listAllTeams(filters?: TeamListFilters) {
+  return haasList<EventTeam>("teams", {
+    search: filters?.search,
+    status: filters?.status,
+    register_as: filters?.register_as,
+    is_active: filters?.is_active,
+    is_blocked: filters?.is_blocked,
+    hackathon: filters?.hackathon,
+    limit: filters?.limit ?? "100",
+  });
+}
+
+export function listTeams(hackathonId: string, filters?: TeamListFilters) {
+  return haasList<EventTeam>(`hackathons/${hackathonId}/teams`, {
+    search: filters?.search,
+    status: filters?.status,
+    register_as: filters?.register_as,
+    is_active: filters?.is_active,
+    is_blocked: filters?.is_blocked,
+    limit: filters?.limit ?? "100",
+  });
+}
+
+export function getTeam(
+  hackathonId: string | null | undefined,
+  teamId: string,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/teams`, {
-      search: filters?.search,
-      status: filters?.status,
-      register_as: filters?.register_as,
-      is_active: filters?.is_active,
-      is_blocked: filters?.is_blocked,
-      limit: filters?.limit ?? "100",
-    }),
-  );
-  return asList<EventTeam>(unwrapHaasResult(result).data);
+  return haasGet<EventTeam>(teamItemPath(hackathonId, teamId));
 }
 
-export async function getTeam(hackathonId: string | null | undefined, teamId: string) {
-  const path = hackathonId
-    ? haasApiPath(`hackathons/${hackathonId}/teams/${teamId}`)
-    : haasApiPath(`teams/${teamId}`);
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventTeam>>>(path);
-  return unwrapHaasResult(result).data;
-}
-
-export async function createTeam(
+export function createTeam(
   hackathonId: string | null | undefined,
   body: {
     name: string;
@@ -127,64 +112,34 @@ export async function createTeam(
   },
   options?: { file?: File | null },
 ) {
-  const path = hackathonId
-    ? haasApiPath(`hackathons/${hackathonId}/teams`)
-    : haasApiPath("teams");
-
+  const path = teamCollectionPath(hackathonId);
   if (!options?.file) {
-    const result = await callAppApi<ApiResult<HaasForwardPayload<EventTeam>>>(
-      path,
-      { method: "POST", body },
-    );
-    return unwrapHaasResult(result).data;
+    return haasSend<EventTeam>(path, { method: "POST", body });
   }
-
-  const form = new FormData();
-  for (const [key, value] of Object.entries(body)) {
-    if (value === undefined) continue;
-    form.append(key, String(value));
-  }
-  form.append("file", options.file);
-
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventTeam>>>(
-    path,
-    { method: "POST", body: form },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<EventTeam>(path, {
+    method: "POST",
+    body: toFormData(body, { file: options.file }),
+  });
 }
 
-export async function updateTeam(
+export function updateTeam(
   hackathonId: string | null | undefined,
   teamId: string,
   body: TeamWriteInput,
   options?: { file?: File | null; clearPicture?: boolean },
 ) {
-  const path = hackathonId
-    ? haasApiPath(`hackathons/${hackathonId}/teams/${teamId}`)
-    : haasApiPath(`teams/${teamId}`);
-
+  const path = teamItemPath(hackathonId, teamId);
   const needsMultipart = Boolean(options?.file || options?.clearPicture);
   if (!needsMultipart) {
-    const result = await callAppApi<ApiResult<HaasForwardPayload<EventTeam>>>(
-      path,
-      { method: "PATCH", body },
-    );
-    return unwrapHaasResult(result).data;
+    return haasSend<EventTeam>(path, { method: "PATCH", body });
   }
-
-  const form = new FormData();
-  for (const [key, value] of Object.entries(body)) {
-    if (value === undefined) continue;
-    form.append(key, String(value));
-  }
-  if (options?.file) form.append("file", options.file);
-  if (options?.clearPicture) form.append("clear_team_picture", "true");
-
-  const result = await callAppApi<ApiResult<HaasForwardPayload<EventTeam>>>(
-    path,
-    { method: "PATCH", body: form },
-  );
-  return unwrapHaasResult(result).data;
+  return haasSend<EventTeam>(path, {
+    method: "PATCH",
+    body: toFormData(body, {
+      file: options?.file,
+      flags: { clear_team_picture: options?.clearPicture },
+    }),
+  });
 }
 
 export async function setTeamActive(
@@ -208,126 +163,100 @@ export function teamHasIpPool(team: Pick<EventTeam, "ip_pool" | "pool_ip" | "sub
   return Boolean(team.ip_pool?.trim() || team.pool_ip?.trim() || team.subnet?.trim());
 }
 
-export async function attachTeam(hackathonId: string, teamId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/teams/attach`),
-    { method: "POST", body: { team_id: teamId } },
-  );
-  return unwrapHaasResult(result);
+export function attachTeam(hackathonId: string, teamId: string) {
+  return haasSend<unknown>(`hackathons/${hackathonId}/teams/attach`, {
+    method: "POST",
+    body: { team_id: teamId },
+  });
 }
 
 /** Teams currently on the live playing roster for this event (= "Added"). */
-export async function listPlayingTeams(
+export function listPlayingTeams(
   hackathonId: string,
   filters?: { search?: string; limit?: string },
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/playing/teams`, {
-      search: filters?.search,
-      limit: filters?.limit ?? "100",
-    }),
-  );
-  return asList<EventTeam>(unwrapHaasResult(result).data);
+  return haasList<EventTeam>(`hackathons/${hackathonId}/playing/teams`, {
+    search: filters?.search,
+    limit: filters?.limit ?? "100",
+  });
 }
 
 /** Detach team from this hackathon roster (keeps the team in the catalog). */
-export async function detachTeamFromHackathon(
-  hackathonId: string,
-  teamId: string,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/teams/${teamId}`),
-    { method: "DELETE" },
-  );
-  return unwrapHaasResult(result);
+export function detachTeamFromHackathon(hackathonId: string, teamId: string) {
+  return haasSend<unknown>(`hackathons/${hackathonId}/teams/${teamId}`, {
+    method: "DELETE",
+  });
 }
 
 /** Soft-delete / deactivate a team (platform or event-scoped path). */
-export async function removeTeam(
+export function removeTeam(
   hackathonId: string | null | undefined,
   teamId: string,
 ) {
-  const path = hackathonId
-    ? haasApiPath(`hackathons/${hackathonId}/teams/${teamId}`)
-    : haasApiPath(`teams/${teamId}`);
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(path, {
+  return haasSend<unknown>(teamItemPath(hackathonId, teamId), {
     method: "DELETE",
   });
-  return unwrapHaasResult(result);
 }
 
-export async function blockTeam(
-  hackathonId: string,
-  teamId: string,
-  reason: string,
-) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/teams/${teamId}/block`),
-    { method: "POST", body: { reason } },
-  );
-  return unwrapHaasResult(result);
+export function blockTeam(hackathonId: string, teamId: string, reason: string) {
+  return haasSend<unknown>(`hackathons/${hackathonId}/teams/${teamId}/block`, {
+    method: "POST",
+    body: { reason },
+  });
 }
 
-export async function unblockTeam(hackathonId: string, teamId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/teams/${teamId}/unblock`),
-    { method: "POST", body: {} },
-  );
-  return unwrapHaasResult(result);
+export function unblockTeam(hackathonId: string, teamId: string) {
+  return haasSend<unknown>(`hackathons/${hackathonId}/teams/${teamId}/unblock`, {
+    method: "POST",
+    body: {},
+  });
 }
 
-export async function approveTeamMember(
+export function approveTeamMember(
   hackathonId: string,
   teamId: string,
   membershipId: string,
   approved: boolean,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/teams/${teamId}/approve-members`),
+  return haasSend<unknown>(
+    `hackathons/${hackathonId}/teams/${teamId}/approve-members`,
     {
       method: "POST",
       body: { membership_id: membershipId, approved },
     },
   );
-  return unwrapHaasResult(result);
 }
 
-export async function listTeamMembers(hackathonId: string, teamId: string) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(`hackathons/${hackathonId}/teams/${teamId}/members`, {
-      limit: "100",
-    }),
+export function listTeamMembers(hackathonId: string, teamId: string) {
+  return haasList<TeamMember>(
+    `hackathons/${hackathonId}/teams/${teamId}/members`,
+    { limit: "100" },
   );
-  return asList<TeamMember>(unwrapHaasResult(result).data);
 }
 
-export async function addTeamMember(
+export function addTeamMember(
   hackathonId: string,
   teamId: string,
   body: { user: string; is_captain?: boolean; is_approved?: boolean },
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<TeamMember>>>(
-    haasApiPath(`hackathons/${hackathonId}/teams/${teamId}/members`),
+  return haasSend<TeamMember>(
+    `hackathons/${hackathonId}/teams/${teamId}/members`,
     { method: "POST", body },
   );
-  return unwrapHaasResult(result).data;
 }
 
-export async function removeTeamMember(
+export function removeTeamMember(
   hackathonId: string,
   teamId: string,
   membershipId: string,
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<unknown>>>(
-    haasApiPath(
-      `hackathons/${hackathonId}/teams/${teamId}/members/${membershipId}`,
-    ),
+  return haasSend<unknown>(
+    `hackathons/${hackathonId}/teams/${teamId}/members/${membershipId}`,
     { method: "DELETE" },
   );
-  return unwrapHaasResult(result);
 }
 
-export async function updateTeamMember(
+export function updateTeamMember(
   hackathonId: string,
   teamId: string,
   membershipId: string,
@@ -337,11 +266,8 @@ export async function updateTeamMember(
     is_active?: boolean;
   },
 ) {
-  const result = await callAppApi<ApiResult<HaasForwardPayload<TeamMember>>>(
-    haasApiPath(
-      `hackathons/${hackathonId}/teams/${teamId}/members/${membershipId}`,
-    ),
+  return haasSend<TeamMember>(
+    `hackathons/${hackathonId}/teams/${teamId}/members/${membershipId}`,
     { method: "PATCH", body },
   );
-  return unwrapHaasResult(result).data;
 }

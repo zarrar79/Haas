@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { TextField } from "@/components/ui/text-field";
+import { SearchPicker } from "@/components/ui/search-picker";
 import { listSponsors, type Sponsor } from "@/features/sponsors/sponsor-api";
 import { SponsorFormModal } from "@/features/sponsors/sponsor-form-modal";
 
@@ -91,10 +91,10 @@ export function SponsorPicker({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium text-[var(--text)]">Sponsors</p>
-        <div className="flex flex-wrap gap-2">
+    <SearchPicker
+      title="Sponsors"
+      headerActions={
+        <>
           {hackathonId ? (
             <Link
               href={`/events/${hackathonId}/hackathon?tab=sponsors`}
@@ -112,97 +112,29 @@ export function SponsorPicker({
           >
             New sponsor
           </Button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <TextField
-          label="Search sponsors"
-          name="sponsor_search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Name…"
-          disabled={disabled}
-        />
-        <div className="flex items-end">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={disabled || isSearching}
-            onClick={() => void runSearch(search)}
-          >
-            {isSearching ? "Searching…" : "Search"}
-          </Button>
-        </div>
-      </div>
-
-      {selected.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {selected.map((sponsor) => (
-            <span
-              key={sponsor.id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1 text-xs text-[var(--text)]"
-            >
-              {sponsor.name}
-              <button
-                type="button"
-                className="text-[var(--text-muted)] hover:text-[var(--danger)]"
-                disabled={disabled}
-                onClick={() => removeSponsor(sponsor.id)}
-                aria-label={`Remove ${sponsor.name}`}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-[var(--text-muted)]">
-          Search and add sponsors for this event (optional). Create new ones here or
-          on the Sponsors page.
-        </p>
-      )}
-
-      <ul className="max-h-48 space-y-1 overflow-y-auto rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-2">
-        {results.length === 0 ? (
-          <li className="px-2 py-3 text-center text-xs text-[var(--text-muted)]">
-            No sponsors found.
-          </li>
-        ) : (
-          results.map((sponsor) => {
-            const picked = selectedIds.includes(sponsor.id);
-            return (
-              <li key={sponsor.id}>
-                <button
-                  type="button"
-                  disabled={disabled || picked}
-                  className={`flex w-full items-center justify-between rounded-[var(--radius-sm)] px-2 py-2 text-left text-sm transition hover:bg-[var(--surface-hover)] ${
-                    picked ? "opacity-50" : ""
-                  }`}
-                  onClick={() => addSponsor(sponsor)}
-                >
-                  <span>
-                    <span className="font-medium text-[var(--text)]">
-                      {sponsor.name}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
-                      {[sponsor.tag, sponsor.organization_type]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </span>
-                  </span>
-                  {picked ? (
-                    <span className="text-xs text-[var(--text-muted)]">Added</span>
-                  ) : (
-                    <span className="text-xs text-[var(--accent)]">Add</span>
-                  )}
-                </button>
-              </li>
-            );
-          })
-        )}
-      </ul>
-
+        </>
+      }
+      searchLabel="Search sponsors"
+      searchName="sponsor_search"
+      searchPlaceholder="Name…"
+      search={search}
+      onSearchChange={setSearch}
+      onSearch={() => void runSearch(search)}
+      isSearching={isSearching}
+      disabled={disabled}
+      emptyHint="Search and add sponsors for this event (optional). Create new ones here or on the Sponsors page."
+      emptyResults="No sponsors found."
+      selected={selected}
+      results={results}
+      isSelected={(sponsor) => selectedIds.includes(sponsor.id)}
+      onAdd={addSponsor}
+      onRemove={(sponsor) => removeSponsor(sponsor.id)}
+      getLabel={(sponsor) => sponsor.name}
+      getSubtitle={(sponsor) =>
+        [sponsor.tag, sponsor.organization_type].filter(Boolean).join(" · ") ||
+        undefined
+      }
+    >
       <SponsorFormModal
         open={createOpen}
         mode="create"
@@ -212,6 +144,6 @@ export function SponsorPicker({
           void runSearch(search);
         }}
       />
-    </div>
+    </SearchPicker>
   );
 }

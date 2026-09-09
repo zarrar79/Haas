@@ -10,6 +10,7 @@ import {
   listEventUsers,
   type EventUser,
 } from "@/features/users/users-api";
+import { formatPersonName } from "@/lib/display-name";
 
 export type GlobalSearchResultType =
   | "challenge"
@@ -179,15 +180,10 @@ export async function runGlobalSearch(
   }
 
   for (const row of systemUsers.slice(0, 6)) {
-    const label =
-      [row.name, row.last_name].filter(Boolean).join(" ").trim() ||
-      row.username ||
-      row.email ||
-      row.id;
     results.push({
       id: `user-${row.id}`,
       type: "user",
-      title: label,
+      title: formatPersonName(row, row.id),
       subtitle: [row.email, row.username, row.user_type]
         .filter(Boolean)
         .join(" · "),

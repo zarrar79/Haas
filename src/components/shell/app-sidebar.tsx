@@ -88,8 +88,13 @@ export function AppSidebar({
         aria-label="Cyber Range Digiinn360 home"
       >
         <AppBrandMark size={40} />
-        <span className="text-[1rem] font-extrabold leading-none tracking-[0.01em] text-[var(--sidebar-accent)] sm:text-[1.0625rem]">
-          Cyber Range
+        <span className="flex min-w-0 flex-col leading-tight">
+          <span className="text-[1rem] font-extrabold tracking-[0.01em] text-[var(--sidebar-accent)] sm:text-[1.0625rem]">
+            Cyber Range
+          </span>
+          <span className="mt-0.5 text-[0.7rem] font-bold tracking-[0.04em] text-[var(--sidebar-section)] sm:text-[0.75rem]">
+            Digiinn360
+          </span>
         </span>
       </Link>
 

@@ -7,12 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyableText } from "@/components/ui/copyable-text";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
+import { FormTextarea, FormSelect, FormCheckbox } from "@/components/ui/form-fields";
 import { FormSkeleton } from "@/components/ui/skeleton";
 import { ModalShell } from "@/components/ui/modal-shell";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { TextField } from "@/components/ui/text-field";
 import {
   TABLE_ELEMENT_CLASS,
+  TABLE_STICKY_ACTIONS_CLASS,
   TableScroll,
 } from "@/components/ui/table-scroll";
 import {
@@ -60,9 +62,6 @@ type AnswerDraft = {
   dockerIp: string;
   isActive: boolean;
 };
-
-const INPUT_CLASS =
-  "rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]";
 
 function emptyQuestionDraft(): QuestionDraft {
   return {
@@ -179,14 +178,12 @@ function QuestionForm({
         value={draft.name}
         onChange={(e) => onChange({ ...draft, name: e.target.value })}
       />
-      <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-        <span className="font-medium text-[var(--text)]">Description</span>
-        <textarea
-          className={`${INPUT_CLASS} min-h-[72px]`}
-          value={draft.description}
-          onChange={(e) => onChange({ ...draft, description: e.target.value })}
-        />
-      </label>
+      <FormTextarea
+        label="Description"
+        controlClassName="min-h-[72px]"
+        value={draft.description}
+        onChange={(value) => onChange({ ...draft, description: value })}
+      />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <TextField
           label="Score"
@@ -219,34 +216,25 @@ function QuestionForm({
             onChange({ ...draft, formatAnswer: e.target.value })
           }
         />
-        <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)] sm:col-span-2">
-          <span className="font-medium text-[var(--text)]">Hints</span>
-          <textarea
-            className={`${INPUT_CLASS} min-h-[56px]`}
-            value={draft.hints}
-            onChange={(e) => onChange({ ...draft, hints: e.target.value })}
-          />
-        </label>
+        <FormTextarea
+          label="Hints"
+          className="sm:col-span-2"
+          controlClassName="min-h-[56px]"
+          value={draft.hints}
+          onChange={(value) => onChange({ ...draft, hints: value })}
+        />
       </div>
-      <div className="flex flex-wrap gap-4 text-sm text-[var(--text)]">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={draft.isMultiple}
-            onChange={(e) =>
-              onChange({ ...draft, isMultiple: e.target.checked })
-            }
-          />
-          Multiple answers
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={draft.isActive}
-            onChange={(e) => onChange({ ...draft, isActive: e.target.checked })}
-          />
-          Active
-        </label>
+      <div className="flex flex-wrap gap-4">
+        <FormCheckbox
+          label="Multiple answers"
+          checked={draft.isMultiple}
+          onChange={(checked) => onChange({ ...draft, isMultiple: checked })}
+        />
+        <FormCheckbox
+          label="Active"
+          checked={draft.isActive}
+          onChange={(checked) => onChange({ ...draft, isActive: checked })}
+        />
       </div>
       <div className="flex justify-end gap-2">
         <Button size="sm" variant="secondary" onClick={onCancel} disabled={busy}>
@@ -290,21 +278,18 @@ function AnswerForm({
         />
         {isDynamic ? (
           <>
-            <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-              <span className="font-medium text-[var(--text)]">Team</span>
-              <select
-                className={INPUT_CLASS}
-                value={draft.teamId}
-                onChange={(e) => onChange({ ...draft, teamId: e.target.value })}
-              >
-                <option value="">Shared / none</option>
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <FormSelect
+              label="Team"
+              value={draft.teamId}
+              onChange={(value) => onChange({ ...draft, teamId: value })}
+            >
+              <option value="">Shared / none</option>
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </FormSelect>
             <TextField
               label="Docker IP"
               name="docker_ip"
@@ -317,14 +302,12 @@ function AnswerForm({
           </>
         ) : null}
       </div>
-      <label className="mt-3 flex items-center gap-2 text-sm text-[var(--text)]">
-        <input
-          type="checkbox"
-          checked={draft.isActive}
-          onChange={(e) => onChange({ ...draft, isActive: e.target.checked })}
-        />
-        Active
-      </label>
+      <FormCheckbox
+        className="mt-3"
+        label="Active"
+        checked={draft.isActive}
+        onChange={(checked) => onChange({ ...draft, isActive: checked })}
+      />
       <div className="mt-3 flex justify-end gap-2">
         <Button size="sm" variant="secondary" onClick={onCancel} disabled={busy}>
           Cancel
@@ -540,7 +523,7 @@ function QuestionRow({
                       <th className="px-3 py-2">Team</th>
                       <th className="px-3 py-2">Docker IP</th>
                       <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2 text-right w-12" />
+                      <th className={`px-3 py-2 text-right w-12 ${TABLE_STICKY_ACTIONS_CLASS}`} />
                     </tr>
                   </thead>
                   <tbody>
@@ -591,7 +574,7 @@ function QuestionRow({
                               <Badge tone="success">Active</Badge>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-right">
+                          <td className={`px-3 py-2 text-right ${TABLE_STICKY_ACTIONS_CLASS}`}>
                             <RowActionsMenu
                               label={`Actions for answer ${answer.id}`}
                               items={[

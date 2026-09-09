@@ -19,3 +19,7 @@ export function useMediaQuery(query: string) {
 export function useIsLgUp() {
   return useMediaQuery("(min-width: 1024px)");
 }
+
+export function useIsXlUp() {
+  return useMediaQuery("(min-width: 1280px)");
+}

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ModalShell } from "@/components/ui/modal-shell";
+import { FormInput } from "@/components/ui/form-fields";
 import { InlineLoader } from "@/components/ui/loader";
 import {
   MAX_TEAM_MEMBERS,
@@ -169,16 +170,13 @@ export function AssignUserToTeamModal({
             </div>
           ) : null}
 
-          <label className="flex flex-col gap-1.5 text-sm text-[var(--text-muted)]">
-            <span className="font-medium text-[var(--text)]">Search teams</span>
-            <input
-              className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)]"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Team name or code…"
-              disabled={Boolean(userError)}
-            />
-          </label>
+          <FormInput
+            label="Search teams"
+            value={search}
+            onChange={setSearch}
+            placeholder="Team name or code…"
+            disabled={Boolean(userError)}
+          />
 
           <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)]">
             {isLoading ? (

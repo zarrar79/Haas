@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { FORM_CONTROL_CLASS } from "@/components/ui/form-control";
+import { RemovableChip } from "@/components/ui/removable-chip";
 import { StaffUserCreateForm } from "@/components/ui/staff-user-create-form";
 import { userLabel } from "@/lib/assigned-events";
 import {
@@ -18,6 +20,11 @@ type Props = {
   onChange: (ids: string[], users: SystemUser[]) => void;
   disabled?: boolean;
   label?: string;
+  /** When false, picking a user replaces the current selection. */
+  multiple?: boolean;
+  /** Show inline create-user form in the dropdown. */
+  allowCreate?: boolean;
+  emptyHint?: string;
 };
 
 function userHaystack(user: SystemUser): string {
@@ -33,6 +40,9 @@ export function UserSearchAddPicker({
   onChange,
   disabled = false,
   label = "Event administrators",
+  multiple = true,
+  allowCreate = true,
+  emptyHint,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -51,6 +61,7 @@ export function UserSearchAddPicker({
     try {
       const rows = await listSystemUsers({
         search: search?.trim() || undefined,
+        staff_provisioned: "true",
         has_created_by: "true",
       });
       setUsers(filterStaffProvisionedUsers(rows));
@@ -117,7 +128,13 @@ export function UserSearchAddPicker({
       byId.set(user.id, user);
       return [...byId.values()];
     });
-    onChange([...selectedIds, user.id], [...selectedUsers, user]);
+    if (multiple) {
+      onChange([...selectedIds, user.id], [...selectedUsers, user]);
+    } else {
+      onChange([user.id], [user]);
+      setOpen(false);
+      setQuery("");
+    }
     setQuery("");
   }
 
@@ -167,7 +184,7 @@ export function UserSearchAddPicker({
           className="flex w-full items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-left text-sm text-[var(--text-muted)] transition hover:border-[var(--border-strong)] disabled:opacity-50"
           onClick={toggleOpen}
         >
-          <span>Select user to add…</span>
+          <span>{multiple ? "Select user to add…" : "Select a user…"}</span>
           <svg
             className={`h-4 w-4 shrink-0 transition ${open ? "rotate-180" : ""}`}
             viewBox="0 0 20 20"
@@ -190,23 +207,25 @@ export function UserSearchAddPicker({
                 type="text"
                 value={query}
                 placeholder="Search name, email, username…"
-                className="w-full rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                className={`w-full ${FORM_CONTROL_CLASS} focus:border-[var(--accent)]`}
                 onChange={(e) => setQuery(e.target.value)}
               />
-              <div className="mt-2 flex justify-end">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  disabled={disabled}
-                  onClick={() => setShowCreateForm((v) => !v)}
-                >
-                  {showCreateForm ? "Hide create form" : "Create user"}
-                </Button>
-              </div>
+              {allowCreate ? (
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={disabled}
+                    onClick={() => setShowCreateForm((v) => !v)}
+                  >
+                    {showCreateForm ? "Hide create form" : "Create user"}
+                  </Button>
+                </div>
+              ) : null}
             </div>
 
-            {showCreateForm ? (
+            {allowCreate && showCreateForm ? (
               <div className="border-b border-[var(--border)] p-2">
                 <StaffUserCreateForm
                   disabled={disabled}
@@ -230,17 +249,19 @@ export function UserSearchAddPicker({
                 </li>
               ) : filtered.length === 0 ? (
                 <li className="px-3 py-3 text-center text-xs text-[var(--text-muted)]">
-                  <p>No users found.</p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    className="mt-2"
-                    disabled={disabled}
-                    onClick={() => setShowCreateForm(true)}
-                  >
-                    Create user
-                  </Button>
+                  <p>No staff-provisioned users found.</p>
+                  {allowCreate ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="mt-2"
+                      disabled={disabled}
+                      onClick={() => setShowCreateForm(true)}
+                    >
+                      Create user
+                    </Button>
+                  ) : null}
                 </li>
               ) : (
                 filtered.map((user) => (
@@ -259,7 +280,7 @@ export function UserSearchAddPicker({
                       </span>
                       {staffCreatorLabel(user) ? (
                         <span className="text-[0.65rem] text-[var(--text-subtle)]">
-                          Created by: {staffCreatorLabel(user)}
+                          {staffCreatorLabel(user)}
                         </span>
                       ) : null}
                     </button>
@@ -274,26 +295,18 @@ export function UserSearchAddPicker({
       {selectedUsers.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {selectedUsers.map((user) => (
-            <span
+            <RemovableChip
               key={user.id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-1 text-xs text-[var(--text)]"
-            >
-              {userLabel(user)}
-              <button
-                type="button"
-                className="text-[var(--text-muted)] hover:text-[var(--danger)]"
-                disabled={disabled}
-                onClick={() => removeUser(user.id)}
-                aria-label={`Remove ${userLabel(user)}`}
-              >
-                ×
-              </button>
-            </span>
+              label={userLabel(user)}
+              disabled={disabled}
+              onRemove={() => removeUser(user.id)}
+            />
           ))}
         </div>
       ) : (
         <p className="text-xs text-[var(--text-muted)]">
-          Only users created by an admin are listed. Open the dropdown, search if needed, click to add. Save the form to apply.
+          {emptyHint ||
+            "Only users created or updated by staff are listed. Open the dropdown, search, then click to select."}
         </p>
       )}
     </div>
