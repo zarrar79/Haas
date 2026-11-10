@@ -23,7 +23,6 @@ import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/st
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
-import { HackathonPicker } from "@/features/events/hackathon-picker";
 import {
   applySectionSearch,
   machineRowSearchParts,
@@ -295,11 +294,6 @@ export function EventMachinesView({ hackathonId }: Props) {
         }
       >
         <div className="flex flex-wrap items-end gap-3">
-          <HackathonPicker
-            value={activeId}
-            onChange={setActiveId}
-            section="machines"
-          />
           <FilterTextField
             label="Search"
             value={search}

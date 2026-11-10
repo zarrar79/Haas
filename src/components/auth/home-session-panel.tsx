@@ -13,11 +13,6 @@ import {
   type OverviewAnalyticsBundle,
 } from "@/features/dashboard/overview-analytics-api";
 import { OverviewAnalyticsView } from "@/features/dashboard/overview-analytics-view";
-import {
-  getLifecycleAnalyticsBundle,
-  type LifecycleAnalyticsBundle,
-} from "@/features/dashboard/lifecycle-analytics-api";
-import { LifecycleAnalyticsView } from "@/features/dashboard/lifecycle-analytics-view";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
 import { hackathonLabel } from "@/lib/display-name";
 import {
@@ -33,9 +28,6 @@ type EventOption = { id: string; name: string };
 export function HomeSessionPanel() {
   const { me, isLoading, isEventOnlyAdmin } = useHaasAccess();
   const { selectedHackathonId, setSelectedHackathonId } = useSelectedEvent();
-  const [lifecycle, setLifecycle] = useState<LifecycleAnalyticsBundle | null>(
-    null,
-  );
   const [analytics, setAnalytics] = useState<OverviewAnalyticsBundle | null>(
     null,
   );
@@ -83,23 +75,14 @@ export function HomeSessionPanel() {
     const eventId =
       filterEventId !== ALL_EVENTS ? filterEventId : undefined;
     try {
-      const [life, competition] = await Promise.all([
-        getLifecycleAnalyticsBundle({
-          period: DEFAULT_PERIOD,
-          limit: "20",
-          event_id: eventId,
-        }),
-        getConsolidatedOverviewBundle({
-          period: DEFAULT_PERIOD,
-          limit: "15",
-          event_id: eventId,
-        }),
-      ]);
-      setLifecycle(life);
+      const competition = await getConsolidatedOverviewBundle({
+        period: DEFAULT_PERIOD,
+        limit: "15",
+        event_id: eventId,
+      });
       setAnalytics(competition);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard");
-      setLifecycle(null);
       setAnalytics(null);
     } finally {
       setDashboardLoading(false);
@@ -175,23 +158,16 @@ export function HomeSessionPanel() {
 
       {error ? <Alert variant="error">{error}</Alert> : null}
 
-      {!isLoading && !dashboardLoading && lifecycle ? (
-        <LifecycleAnalyticsView data={lifecycle} />
-      ) : null}
-
       {!isLoading && !dashboardLoading && analytics ? (
-        <div className="space-y-3 border-t border-[var(--border)] pt-6">
-          <OverviewAnalyticsView
-            data={analytics}
-            periodLabel={DEFAULT_PERIOD}
-          />
-        </div>
+        <OverviewAnalyticsView
+          data={analytics}
+          periodLabel={DEFAULT_PERIOD}
+        />
       ) : null}
 
       {!isLoading &&
       !dashboardLoading &&
       !error &&
-      !lifecycle &&
       !analytics &&
       isEventOnlyAdmin &&
       assigned.length === 0 ? (

@@ -24,6 +24,8 @@ import {
   BiTrendingUp,
   BiTrophy,
   BiUser,
+  BiLockAlt,
+  BiNews,
 } from "react-icons/bi";
 
 export const NAV_ICONS = {
@@ -59,6 +61,9 @@ export const NAV_ICONS = {
   "system-audit": BiClipboard,
   "system-activity": BiPulse,
   "system-groups": BiCollection,
+  "system-platform-settings": BiSlider,
+  "system-change-log": BiNews,
+  "system-referer-gate": BiLockAlt,
 } as const satisfies Record<string, IconType>;
 
 export type NavIconName = keyof typeof NAV_ICONS;

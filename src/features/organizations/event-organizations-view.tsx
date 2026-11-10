@@ -12,7 +12,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
 import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
-import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import {
   listOrganizations,
@@ -52,7 +51,8 @@ export function EventOrganizationsView({
 
   useEffect(() => {
     setActiveId(hackathonId);
-  }, [hackathonId]);
+    if (hackathonId) setSelectedHackathonId(hackathonId);
+  }, [hackathonId, setSelectedHackathonId]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -89,12 +89,6 @@ export function EventOrganizationsView({
   useEffect(() => {
     void load();
   }, [load]);
-
-  function onHackathonChange(nextId: string) {
-    setActiveId(nextId);
-    setSelectedHackathonId(nextId || null);
-    if (nextId) router.push(`/events/${nextId}/hackathon?tab=organizations`);
-  }
 
   const filtered = useMemo(() => rows, [rows]);
 
@@ -137,14 +131,6 @@ export function EventOrganizationsView({
           </ListPageStats>
         }
       >
-        {!embedded ? (
-          <HackathonPicker
-            value={activeId}
-            onChange={onHackathonChange}
-            section="hackathon"
-            className="min-w-[180px]"
-          />
-        ) : null}
         <FilterTextField
           label="Search"
           className="min-w-[11rem] sm:max-w-xs"

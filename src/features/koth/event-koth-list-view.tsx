@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/list-page-stats";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
-import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import {
   createKothSession,
@@ -24,8 +23,10 @@ import {
   listKothSessions,
   updateKothSession,
   type KothSession,
+  type KothSessionConfigPatch,
 } from "@/features/koth/koth-api";
 import { redirectIfUnauthorized } from "@/lib/client-api";
+import { KothScheduleModal } from "@/features/koth/koth-schedule-modal";
 import { formatDate } from "@/lib/format";
 
 type Props = { hackathonId: string };
@@ -59,7 +60,8 @@ export function EventKothListView({ hackathonId }: Props) {
 
   useEffect(() => {
     setActiveId(hackathonId);
-  }, [hackathonId]);
+    if (hackathonId) setSelectedHackathonId(hackathonId);
+  }, [hackathonId, setSelectedHackathonId]);
 
   const load = useCallback(async () => {
     if (!activeId) return;
@@ -68,7 +70,7 @@ export function EventKothListView({ hackathonId }: Props) {
     try {
       setRows(await listKothSessions(activeId));
     } catch (err) {
-      if (redirectIfUnauthorized(err)) return;
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to load KOTH instances");
     } finally {
       setIsLoading(false);
@@ -87,7 +89,7 @@ export function EventKothListView({ hackathonId }: Props) {
     const name = await prompt({
       title: "Create KOTH instance",
       message:
-        "Each instance has its own scores, ingest token, and scorer settings.",
+        "Each instance has its own scores and deploy settings.",
       label: "Name",
       defaultValue: `KOTH ${rows.length + 1}`,
       confirmLabel: "Create",
@@ -101,11 +103,24 @@ export function EventKothListView({ hackathonId }: Props) {
       await load();
       openSession(created.id);
     } catch (err) {
-      if (redirectIfUnauthorized(err)) return;
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to create KOTH");
     } finally {
       setBusyId(null);
     }
+  };
+
+  const [scheduleRow, setScheduleRow] = useState<KothSession | null>(null);
+
+  const onSaveSchedule = async (patch: KothSessionConfigPatch) => {
+    if (!scheduleRow) return;
+    try {
+      await updateKothSession(activeId, scheduleRow.id, patch);
+    } catch (err) {
+      if (redirectIfUnauthorized(err, router)) return;
+      throw err;
+    }
+    await load();
   };
 
   const onRename = async (row: KothSession) => {
@@ -124,8 +139,32 @@ export function EventKothListView({ hackathonId }: Props) {
       await updateKothSession(activeId, row.id, { name: trimmed });
       await load();
     } catch (err) {
-      if (redirectIfUnauthorized(err)) return;
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to rename");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const onToggleSound = async (row: KothSession) => {
+    const next = row.sound_enabled === false;
+    const ok = await confirm({
+      title: next ? "Turn KOTH sounds on?" : "Turn KOTH sounds off?",
+      message: next
+        ? `Players and the live dashboard can use the sound button again for “${row.name}”.`
+        : `The sound button on the blue-team board and live dashboard will be locked off for “${row.name}”.`,
+      confirmLabel: next ? "Turn on" : "Turn off",
+      cancelLabel: "Cancel",
+    });
+    if (!ok) return;
+    setBusyId(row.id);
+    setError(null);
+    try {
+      await updateKothSession(activeId, row.id, { sound_enabled: next });
+      await load();
+    } catch (err) {
+      if (redirectIfUnauthorized(err, router)) return;
+      setError(err instanceof Error ? err.message : "Failed to update sound");
     } finally {
       setBusyId(null);
     }
@@ -150,7 +189,7 @@ export function EventKothListView({ hackathonId }: Props) {
       await deleteKothSession(activeId, row.id);
       await load();
     } catch (err) {
-      if (redirectIfUnauthorized(err)) return;
+      if (redirectIfUnauthorized(err, router)) return;
       setError(err instanceof Error ? err.message : "Failed to delete");
     } finally {
       setBusyId(null);
@@ -163,23 +202,12 @@ export function EventKothListView({ hackathonId }: Props) {
         title="King of the Hill"
         description="Create, open, rename, or delete KOTH instances for this hackathon. Each instance is scored separately."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <HackathonPicker
-              value={activeId}
-              onChange={(nextId) => {
-                setActiveId(nextId);
-                setSelectedHackathonId(nextId);
-                router.push(`/events/${nextId}/koth`);
-              }}
-              section="koth"
-            />
-            {canWrite ? (
-              <Button size="sm" disabled={busy} onClick={() => void onCreate()}>
-                <BiPlus className="mr-1" />
-                {busyId === "create" ? "Creating…" : "New KOTH"}
-              </Button>
-            ) : null}
-          </div>
+          canWrite ? (
+            <Button size="sm" disabled={busy} onClick={() => void onCreate()}>
+              <BiPlus className="mr-1" />
+              {busyId === "create" ? "Creating…" : "New KOTH"}
+            </Button>
+          ) : undefined
         }
       />
 
@@ -230,7 +258,7 @@ export function EventKothListView({ hackathonId }: Props) {
             render: (row) =>
               row.current_team_name
                 ? `${row.current_team_name}${
-                    row.current_team_code ? ` (${row.current_team_code})` : ""
+                    row.current_koth_code ? ` (${row.current_koth_code})` : ""
                   }`
                 : "—",
           },
@@ -238,7 +266,51 @@ export function EventKothListView({ hackathonId }: Props) {
             key: "scoring",
             header: "Scoring",
             render: (row) =>
-              `+${row.initial_score} / +${row.hold_score} each ${row.hold_interval_seconds}s`,
+              `first +${row.initial_score} / king +${row.king_score ?? 0} / blood +${row.first_blood_score ?? 0} / hold +${row.hold_score} each ${row.hold_interval_seconds}s`,
+          },
+          {
+            key: "window",
+            header: "Round window",
+            className: "whitespace-nowrap",
+            render: (row) => (
+              <div className="text-xs leading-5">
+                <div>
+                  {formatDate(row.schedule_start)}
+                  {row.start_time ? null : (
+                    <span className="text-[var(--text-muted)]"> (hackathon)</span>
+                  )}
+                </div>
+                <div>
+                  → {row.schedule_end ? formatDate(row.schedule_end) : "no end"}
+                  {row.end_time ? null : (
+                    <span className="text-[var(--text-muted)]"> (hackathon)</span>
+                  )}
+                </div>
+              </div>
+            ),
+          },
+          {
+            key: "sound",
+            header: "Sound",
+            className: "whitespace-nowrap",
+            render: (row) => {
+              const on = row.sound_enabled !== false;
+              return (
+                <div className="inline-flex flex-nowrap items-center gap-2">
+                  <Badge tone={on ? "success" : "neutral"}>{on ? "On" : "Off"}</Badge>
+                  {canWrite ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => void onToggleSound(row)}
+                    >
+                      {on ? "Turn off" : "Turn on"}
+                    </Button>
+                  ) : null}
+                </div>
+              );
+            },
           },
           {
             key: "teams",
@@ -265,6 +337,14 @@ export function EventKothListView({ hackathonId }: Props) {
                       size="sm"
                       variant="ghost"
                       disabled={busy}
+                      onClick={() => setScheduleRow(row)}
+                    >
+                      Edit times
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
                       onClick={() => void onRename(row)}
                     >
                       Rename
@@ -283,6 +363,11 @@ export function EventKothListView({ hackathonId }: Props) {
             ),
           },
         ]}
+      />
+      <KothScheduleModal
+        session={scheduleRow}
+        onClose={() => setScheduleRow(null)}
+        onSave={onSaveSchedule}
       />
     </div>
   );

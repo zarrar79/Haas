@@ -25,7 +25,6 @@ import {
   getOverviewLeaderboard,
   type OverviewLeaderboardItem,
 } from "@/features/dashboard/overview-analytics-api";
-import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { redirectIfUnauthorized } from "@/lib/client-api";
 
@@ -37,6 +36,15 @@ type BlockFilter = "all" | "blocked" | "active";
 
 function formatNum(n: number) {
   return new Intl.NumberFormat().format(n || 0);
+}
+
+/** Live board treats first blood as "bonus"; Haas also has a separate bonus_score field. */
+function displayBonus(row: OverviewLeaderboardItem) {
+  return (row.first_blood_score ?? 0) + (row.bonus_score ?? 0);
+}
+
+function displayChallengeScore(row: OverviewLeaderboardItem) {
+  return row.challenge_score ?? 0;
 }
 
 function DifficultyBar({
@@ -88,6 +96,8 @@ function TopTeamCard({
   const hard = team.difficulty_counts?.hard ?? 0;
   const solved = easy + medium + hard + (team.difficulty_counts?.other ?? 0);
   const finalScore = team.final_score ?? team.score ?? 0;
+  const challengeScore = displayChallengeScore(team);
+  const bonus = displayBonus(team);
 
   return (
     <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)]">
@@ -109,6 +119,13 @@ function TopTeamCard({
               {formatNum(finalScore)}
               <span className="ml-1 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                 total
+              </span>
+            </p>
+            <p className="mt-0.5 text-xs tabular-nums text-[var(--text-muted)]">
+              {formatNum(challengeScore)} score
+              <span className="mx-1 text-[var(--border-strong,#94a3b8)]">·</span>
+              <span className="text-[var(--success,#16a34a)]">
+                +{formatNum(bonus)} bonus
               </span>
             </p>
             <p className="text-xs text-[var(--text-muted)]">
@@ -153,7 +170,6 @@ function TopTeamCard({
 export function EventLeaderboardView({ hackathonId }: Props) {
   const router = useRouter();
   const { setSelectedHackathonId } = useSelectedEvent();
-  const [activeId, setActiveId] = useState(hackathonId);
   const [limit, setLimit] = useState<LimitOption>("100");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -163,9 +179,10 @@ export function EventLeaderboardView({ hackathonId }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Event Workspace pages follow the header / URL hackathon only.
   useEffect(() => {
-    setActiveId(hackathonId);
-  }, [hackathonId]);
+    if (hackathonId) setSelectedHackathonId(hackathonId);
+  }, [hackathonId, setSelectedHackathonId]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
@@ -173,11 +190,11 @@ export function EventLeaderboardView({ hackathonId }: Props) {
   }, [search]);
 
   const load = useCallback(async () => {
-    if (!activeId) return;
+    if (!hackathonId) return;
     setIsLoading(true);
     setError(null);
     try {
-      const payload = await getOverviewLeaderboard(activeId, { limit });
+      const payload = await getOverviewLeaderboard(hackathonId, { limit });
       setItems(payload.items ?? []);
     } catch (err) {
       if (redirectIfUnauthorized(err, router)) return;
@@ -186,17 +203,11 @@ export function EventLeaderboardView({ hackathonId }: Props) {
     } finally {
       setIsLoading(false);
     }
-  }, [activeId, limit, router]);
+  }, [hackathonId, limit, router]);
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  function onHackathonChange(nextId: string) {
-    setActiveId(nextId);
-    setSelectedHackathonId(nextId || null);
-    if (nextId) router.push(`/events/${nextId}/leaderboard`);
-  }
 
   const sideOptions = useMemo(() => {
     const set = new Set<string>();
@@ -269,51 +280,40 @@ export function EventLeaderboardView({ hackathonId }: Props) {
         }
       />
 
-      <StickyToolbar layout="stack">
-        <HackathonPicker
-          value={activeId}
-          onChange={onHackathonChange}
-          navigateOnChange={false}
+      <StickyToolbar>
+        <FilterTextField
+          label="Search"
+          value={search}
+          onChange={setSearch}
+          placeholder="Team name, code, side…"
         />
-        <div className="flex flex-wrap items-end gap-3">
-          <FilterTextField
-            label="Search"
-            value={search}
-            onChange={setSearch}
-            placeholder="Team name, code, side…"
-          />
-          <FilterSelect
-            label="Side"
-            value={sideFilter}
-            onChange={setSideFilter}
-          >
-            <option value="all">All sides</option>
-            {sideOptions.map((side) => (
-              <option key={side} value={side}>
-                {side}
-              </option>
-            ))}
-          </FilterSelect>
-          <FilterSelect
-            label="Status"
-            value={blockFilter}
-            onChange={(v) => setBlockFilter(v as BlockFilter)}
-          >
-            <option value="all">All teams</option>
-            <option value="active">Active only</option>
-            <option value="blocked">Blocked only</option>
-          </FilterSelect>
-          <FilterSelect
-            label="Show top"
-            value={limit}
-            onChange={(v) => setLimit(v as LimitOption)}
-          >
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-            <option value="200">200</option>
-          </FilterSelect>
-        </div>
+        <FilterSelect label="Side" value={sideFilter} onChange={setSideFilter}>
+          <option value="all">All sides</option>
+          {sideOptions.map((side) => (
+            <option key={side} value={side}>
+              {side}
+            </option>
+          ))}
+        </FilterSelect>
+        <FilterSelect
+          label="Status"
+          value={blockFilter}
+          onChange={(v) => setBlockFilter(v as BlockFilter)}
+        >
+          <option value="all">All teams</option>
+          <option value="active">Active only</option>
+          <option value="blocked">Blocked only</option>
+        </FilterSelect>
+        <FilterSelect
+          label="Show top"
+          value={limit}
+          onChange={(v) => setLimit(v as LimitOption)}
+        >
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+        </FilterSelect>
       </StickyToolbar>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
@@ -425,10 +425,10 @@ export function EventLeaderboardView({ hackathonId }: Props) {
               },
               {
                 key: "challenge",
-                header: "Challenge",
+                header: "Score",
                 render: (row) => (
                   <span className="tabular-nums font-medium text-[var(--text)]">
-                    {formatNum(row.challenge_score ?? 0)}
+                    {formatNum(displayChallengeScore(row))}
                   </span>
                 ),
               },
@@ -437,7 +437,7 @@ export function EventLeaderboardView({ hackathonId }: Props) {
                 header: "Bonus",
                 render: (row) => (
                   <span className="tabular-nums font-medium text-[var(--success,#16a34a)]">
-                    +{formatNum(row.bonus_score ?? 0)}
+                    +{formatNum(displayBonus(row))}
                   </span>
                 ),
               },

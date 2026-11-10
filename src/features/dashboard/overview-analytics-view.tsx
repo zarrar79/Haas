@@ -322,8 +322,7 @@ type Props = {
 };
 
 export function OverviewAnalyticsView({ data, periodLabel }: Props) {
-  const { kpis, activity, leaderboard, topChallenges, difficultyMix, submissions } =
-    data;
+  const { kpis, activity, topChallenges, difficultyMix, submissions } = data;
 
   const period = periodLabel || activity.period || kpis.period || "7d";
   const windowHours = activity.window_hours || kpis.window_hours || 168;
@@ -343,11 +342,25 @@ export function OverviewAnalyticsView({ data, periodLabel }: Props) {
     (r) => r.valid + r.invalid + r.logins > 0,
   );
 
-  const lbItems = useMemo(
-    () => (leaderboard.items ?? []).slice(0, 8),
-    [leaderboard.items],
+  const topSolvedChallenges = useMemo(
+    () => {
+      const seen = new Set<string>();
+      return (topChallenges.items ?? [])
+        .filter((row) => {
+          // Only challenges with real solves — do not pad the limit with zeros.
+          if ((row.solves ?? 0) <= 0) return false;
+          if (seen.has(row.challenge_id)) return false;
+          seen.add(row.challenge_id);
+          return true;
+        })
+        .slice(0, 8);
+    },
+    [topChallenges.items],
   );
-  const maxScore = Math.max(...lbItems.map((t) => t.score || 0), 1);
+  const maxSolves = Math.max(
+    ...topSolvedChallenges.map((row) => row.solves || 0),
+    1,
+  );
 
   const windowSolveRate =
     (submissions.window?.total || 0) > 0
@@ -375,19 +388,6 @@ export function OverviewAnalyticsView({ data, periodLabel }: Props) {
         solves: solveMap.get(b.key) || 0,
       }));
   }, [difficultyMix]);
-
-  const challengeBars = useMemo(
-    () =>
-      (topChallenges.items ?? []).slice(0, 6).map((row) => ({
-        name: row.name.length > 14 ? `${row.name.slice(0, 13)}…` : row.name,
-        fullName: row.name,
-        solves: row.solves ?? 0,
-        submissions: row.submissions ?? 0,
-        difficulty: row.difficulty,
-        total_score: row.total_score ?? 0,
-      })),
-    [topChallenges.items],
-  );
 
   const qualityPie = useMemo(
     () =>
@@ -507,46 +507,47 @@ export function OverviewAnalyticsView({ data, periodLabel }: Props) {
         </Card>
       </div>
 
-      {/* Row 2 — Leaderboard + Window snapshot */}
+      {/* Row 2 — Top solved challenges + Window snapshot */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card
           className="xl:col-span-2"
-          title="Team leaderboard"
-          subtitle={`Top ${lbItems.length || 0} teams by total score across all challenges`}
+          title="Top solved challenges"
+          subtitle={`Most solved challenges${topSolvedChallenges.length ? ` · showing ${topSolvedChallenges.length}` : ""}`}
         >
-          {lbItems.length === 0 ? (
+          {topSolvedChallenges.length === 0 ? (
             <p className="py-10 text-center text-sm text-[var(--text-muted)]">
-              No scored teams yet.
+              No challenge solves yet.
             </p>
           ) : (
             <ul className="space-y-4">
-              {lbItems.map((team) => (
-                <li key={team.team_id}>
+              {topSolvedChallenges.map((challenge, index) => (
+                <li key={challenge.challenge_id}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate text-base font-semibold text-[var(--text)]">
-                          {team.rank}. {team.name}
+                          {index + 1}. {challenge.name}
                         </p>
-                        {team.rank === 1 ? (
-                          <BiTrophy className="size-4 shrink-0 text-[var(--accent)]" />
+                        {index === 0 ? (
+                          <BiFlag className="size-4 shrink-0 text-[var(--accent)]" />
+                        ) : null}
+                        {challenge.difficulty ? (
+                          <Pill tone="neutral">{challenge.difficulty}</Pill>
                         ) : null}
                       </div>
                       <p className="mt-0.5 text-xs text-[var(--text-subtle)]">
-                        {team.team_code || team.team_id.slice(0, 8)}
+                        {formatNum(challenge.submissions)} submissions ·{" "}
+                        {formatNum(challenge.total_score)} pts awarded
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="text-xl font-bold tabular-nums text-[var(--text)]">
-                        {formatNum(team.score)}
+                        {formatNum(challenge.solves)}
                       </p>
-                      <p className="text-xs text-[var(--text-subtle)]">
-                        {formatNum(team.solves)} solves / {formatNum(team.submissions)}{" "}
-                        subs
-                      </p>
+                      <p className="text-xs text-[var(--text-subtle)]">solves</p>
                     </div>
                   </div>
-                  <ProgressBar value={team.score} max={maxScore} />
+                  <ProgressBar value={challenge.solves} max={maxSolves} />
                 </li>
               ))}
             </ul>
@@ -555,7 +556,7 @@ export function OverviewAnalyticsView({ data, periodLabel }: Props) {
 
         <Card
           title="Window snapshot"
-          subtitle={`Activity in the last ${windowHours} hours (${period}).`}
+          subtitle={`Activity in the last ${windowHours} hours (${period}), plus overall challenge progress.`}
         >
           <p className="text-sm leading-relaxed text-[var(--text-muted)]">
             <span className="font-semibold text-[var(--text)]">
@@ -605,6 +606,32 @@ export function OverviewAnalyticsView({ data, periodLabel }: Props) {
                 {formatNum(submissions.window.invalid)}
               </p>
             </div>
+          </div>
+
+          <div className="mt-4 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-raised)] p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-subtle)]">
+                  Challenges solved
+                </p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-[var(--text)]">
+                  {formatNum(kpis.challenges_solved)}
+                  <span className="text-sm font-semibold text-[var(--text-muted)]">
+                    /{formatNum(kpis.challenges_total)}
+                  </span>
+                </p>
+              </div>
+              <Pill tone="lime">{challengeSolvePct}% cracked</Pill>
+            </div>
+            <ProgressBar
+              compact
+              value={kpis.challenges_solved}
+              max={Math.max(kpis.challenges_total, 1)}
+            />
+            <p className="mt-2 text-[11px] text-[var(--text-muted)]">
+              Overall challenge set · {formatNum(submissions.first_bloods)} first
+              bloods
+            </p>
           </div>
         </Card>
       </div>
@@ -723,8 +750,8 @@ export function OverviewAnalyticsView({ data, periodLabel }: Props) {
         </Card>
       </div>
 
-      {/* Row 4 — Quality / Difficulty / Top challenges */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      {/* Row 4 — Quality / Difficulty */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card
           title="Submission quality"
           subtitle={`${pct(submissions.solve_rate || kpis.solve_rate)}% of all flags submitted were valid.`}
@@ -821,53 +848,6 @@ export function OverviewAnalyticsView({ data, periodLabel }: Props) {
                     fill={LIME}
                     radius={[4, 4, 0, 0]}
                     barSize={18}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </Card>
-
-        <Card
-          title="Top challenges"
-          subtitle="Solves against total submissions."
-        >
-          <div className="h-[220px]">
-            {challengeBars.length === 0 ? (
-              <p className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">
-                No challenge solves yet.
-              </p>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={challengeBars}
-                  layout="vertical"
-                  margin={{ top: 4, right: 12, left: 4, bottom: 4 }}
-                  barGap={2}
-                >
-                  <XAxis type="number" hide />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={92}
-                    tick={{ fill: MUTED, fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <RechartsTooltip content={<FullTextTooltip />} />
-                  <Bar
-                    dataKey="submissions"
-                    name="submissions"
-                    fill={TEAL}
-                    radius={[0, 999, 999, 0]}
-                    barSize={8}
-                  />
-                  <Bar
-                    dataKey="solves"
-                    name="solves"
-                    fill={LIME}
-                    radius={[0, 999, 999, 0]}
-                    barSize={8}
                   />
                 </BarChart>
               </ResponsiveContainer>

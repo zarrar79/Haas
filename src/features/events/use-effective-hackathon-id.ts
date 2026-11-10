@@ -7,7 +7,9 @@ import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { resolveAssignedEventId } from "@/lib/assigned-events";
 
 /**
- * Hackathon id for event-scoped routes: persisted selection, or first assigned event.
+ * Hackathon id for event-scoped routes.
+ * Platform operators: persisted navbar selection (any event).
+ * Event admins: selection clamped to /me assignments.
  */
 export function useEffectiveHackathonId(): string | null {
   const { me } = useHaasAccess();

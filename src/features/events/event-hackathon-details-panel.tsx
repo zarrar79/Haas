@@ -20,6 +20,8 @@ import {
   getHackathonAnalytics,
   updateHackathon,
 } from "@/features/hackathons/hackathon-api";
+import { getPlaying } from "@/features/settings/settings-api";
+import { EventLiveDashboardSettingsPanel } from "@/features/events/event-live-dashboard-settings-panel";
 import { HackathonQuickActions } from "@/features/hackathons/hackathon-quick-actions";
 import { HackathonUserAssignmentSection } from "@/features/hackathons/hackathon-user-assignment-section";
 import { OrganizationPicker } from "@/features/organizations/organization-picker";
@@ -79,7 +81,6 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
   const [discordLink, setDiscordLink] = useState("");
   const [isInfinite, setIsInfinite] = useState(false);
   const [isActive, setIsActive] = useState(true);
-  const [viewOnDashboard, setViewOnDashboard] = useState(false);
   const [adminBindings, setAdminBindings] = useState<HackathonAdminBinding[]>(
     [],
   );
@@ -97,7 +98,6 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
     setDiscordLink(data.discord_link || "");
     setIsInfinite(coerceBool(data.is_infinite));
     setIsActive(coerceBool(data.is_active));
-    setViewOnDashboard(coerceBool(data.view_on_dashboard));
     setSponsorIds((data.sponsors || []).map((s) => s.id));
     setOrganizationId(data.city || data.organization?.id || null);
   }
@@ -107,7 +107,7 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
     setError(null);
     setSuccess(null);
     try {
-      const [data, bindings, analytics] = await Promise.all([
+      const [data, bindings, analytics, playing] = await Promise.all([
         getHackathon(hackathonId),
         isRoot || isPlatformOperator
           ? listHackathonAdmins({
@@ -116,11 +116,17 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
             })
           : Promise.resolve([] as HackathonAdminBinding[]),
         getHackathonAnalytics(hackathonId).catch(() => null),
+        getPlaying(hackathonId).catch(() => null),
       ]);
       setHackathon(data);
       applyLoadedHackathon(data);
-      setTeamCount(analytics?.teams ?? null);
-      setChallengeCount(analytics?.challenges ?? null);
+      // Prefer live playing-roster counts over catalog/created-for analytics.
+      setTeamCount(
+        playing?.team_count ?? analytics?.teams ?? null,
+      );
+      setChallengeCount(
+        playing?.challenge_count ?? analytics?.challenges ?? null,
+      );
       setAdminBindings(bindings);
       const activeBindings = bindings.filter((b) => b.is_active !== false);
       setAssigneeIds(activeBindings.map((b) => b.user));
@@ -187,7 +193,6 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
         discord_link: discordLink,
         is_infinite: isInfinite,
         is_active: isActive,
-        view_on_dashboard: viewOnDashboard,
         city: organizationId,
         sponsor_ids: sponsorIds,
         ...(isInfinite
@@ -356,16 +361,6 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
               />
               Active
             </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="h-4 w-4"
-                checked={viewOnDashboard}
-                onChange={(e) => setViewOnDashboard(e.target.checked)}
-                disabled={!canWrite || isSaving}
-              />
-              View on dashboard
-            </label>
           </div>
 
           {canWrite ? (
@@ -419,6 +414,11 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
           ) : null}
         </div>
       </form>
+
+      <EventLiveDashboardSettingsPanel
+        hackathonId={hackathonId}
+        disabled={isSaving}
+      />
     </div>
   );
 }

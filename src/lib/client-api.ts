@@ -3,6 +3,8 @@
  * Talks only to same-origin /api/* — never to the Django host.
  */
 
+import { hardReloadApplication } from "@/lib/client-session";
+
 export class ApiRequestError extends Error {
   constructor(
     message: string,
@@ -16,18 +18,87 @@ export class ApiRequestError extends Error {
 
 type CallAppApiOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
+  /** Skip the global expired-session redirect (e.g. login/logout). */
+  skipAuthRedirect?: boolean;
 };
 
+const AUTH_FAILURE_MESSAGE_RE =
+  /token_not_valid|token is expired|invalid or expired token|given token not valid|not authenticated|authentication credentials|authentication required|session has expired|session superseded|signed in on another device|unauthorized/i;
+
+let redirectingToLogin = false;
+
+function bodyCode(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null || !("code" in body)) {
+    return undefined;
+  }
+  const code = (body as { code: unknown }).code;
+  if (typeof code === "string" || typeof code === "number") {
+    return String(code);
+  }
+  return undefined;
+}
+
+function bodyMessage(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+  if (
+    "message" in body &&
+    typeof (body as { message: unknown }).message === "string"
+  ) {
+    return (body as { message: string }).message;
+  }
+  return undefined;
+}
+
+/** True when status/body/message indicate an expired or invalid session. */
+export function isAuthFailure(
+  status: number,
+  message?: string,
+  body?: unknown,
+): boolean {
+  if (status === 401) return true;
+  const code = bodyCode(body);
+  if (code === "401" || code === "unauthorized" || code === "token_not_valid") {
+    return true;
+  }
+  if (message && AUTH_FAILURE_MESSAGE_RE.test(message)) return true;
+  const nested = bodyMessage(body);
+  if (nested && AUTH_FAILURE_MESSAGE_RE.test(nested)) return true;
+  return false;
+}
+
 export function isUnauthorizedError(error: unknown): boolean {
-  return error instanceof ApiRequestError && error.httpStatus === 401;
+  if (!(error instanceof ApiRequestError)) return false;
+  return isAuthFailure(error.httpStatus, error.message, error.body);
+}
+
+/**
+ * Clear the HttpOnly session cookie and hard-reload to /login.
+ * Safe to call multiple times; no-ops on the login page.
+ */
+export function handleClientUnauthorized(): void {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname.startsWith("/login")) return;
+  if (redirectingToLogin) return;
+  redirectingToLogin = true;
+
+  // keepalive so the cookie clear can finish during navigation/unload.
+  void fetch("/api/auth/logout", {
+    method: "POST",
+    credentials: "same-origin",
+    keepalive: true,
+  }).catch(() => {
+    /* cookie clear is best-effort */
+  });
+
+  hardReloadApplication("/login");
 }
 
 export function redirectIfUnauthorized(
   error: unknown,
-  router: { replace: (href: string) => void },
+  _router?: { replace: (href: string) => void },
 ): boolean {
   if (!isUnauthorizedError(error)) return false;
-  router.replace("/login");
+  handleClientUnauthorized();
   return true;
 }
 
@@ -42,7 +113,12 @@ export async function callAppApi<T>(
   path: string,
   options: CallAppApiOptions = {},
 ): Promise<T> {
-  const { body, headers: optionHeaders, ...requestInit } = options;
+  const {
+    body,
+    headers: optionHeaders,
+    skipAuthRedirect = false,
+    ...requestInit
+  } = options;
   const headers = new Headers(optionHeaders);
 
   const isFormData =
@@ -88,16 +164,33 @@ export async function callAppApi<T>(
     }
   }
 
-  if (!response.ok) {
-    const message =
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "message" in parsed &&
-      typeof (parsed as { message: unknown }).message === "string"
-        ? (parsed as { message: string }).message
-        : `Request failed (${response.status})`;
+  const message =
+    bodyMessage(parsed) ??
+    (typeof parsed === "string" && parsed ? parsed : null) ??
+    `Request failed (${response.status})`;
 
-    throw new ApiRequestError(message, response.status, parsed);
+  const authFailed = isAuthFailure(response.status, message, parsed);
+
+  // BFF may return HTTP 200 with { ok: false } for some backend envelopes —
+  // treat those as failures too when the payload says so.
+  const payloadOkFalse =
+    typeof parsed === "object" &&
+    parsed !== null &&
+    "ok" in parsed &&
+    (parsed as { ok: unknown }).ok === false;
+
+  if (!response.ok || payloadOkFalse || authFailed) {
+    const httpStatus = authFailed
+      ? 401
+      : !response.ok
+        ? response.status
+        : 400;
+
+    if (authFailed && !skipAuthRedirect) {
+      handleClientUnauthorized();
+    }
+
+    throw new ApiRequestError(message, httpStatus, parsed);
   }
 
   return parsed as T;

@@ -29,19 +29,20 @@ import {
   TableScroll,
 } from "@/components/ui/table-scroll";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
+import { AttachChallengeModal } from "@/features/challenges/attach-challenge-modal";
 import { ChallengeCreateModal } from "@/features/challenges/challenge-create-modal";
 import { ChallengeDetailModal } from "@/features/challenges/challenge-detail-modal";
 import {
-  attachChallengeToHackathon,
-  approveChallengeLink,
+  addPlayingChallenges,
   deleteChallenge,
   listAllChallenges,
-  listEventChallengeLinks,
-  removeChallengeFromHackathon,
+  listPlayingChallenges,
+  removePlayingChallenge,
   setChallengeActive,
-  type ChallengeLink,
+  type ChallengeLinkedHackathon,
   type ChallengeSummary,
 } from "@/features/challenges/challenge-api";
+import { PlayingInChips } from "@/components/ui/playing-in-chips";
 import {
   listCatalog,
   type CatalogItem,
@@ -86,8 +87,12 @@ type Row = {
   createdById?: string | null;
   createdByLabel?: string | null;
   createdAt?: string | null;
+  /** On the live playing roster for the scoped event. */
   isAdded: boolean;
-  link?: ChallengeLink;
+  /** Catalog hackathon ids where this challenge is on the playing roster. */
+  playingHackathonIds: string[];
+  /** Live playing-roster events (for chips / remove). */
+  playingIn: ChallengeLinkedHackathon[];
 };
 
 type EventChallengesViewProps = {
@@ -117,11 +122,24 @@ function createdByLabel(detail?: ChallengeSummary["created_by_detail"], id?: str
   return name || detail?.username || detail?.email || id || null;
 }
 
-function toRow(challenge: ChallengeSummary, link?: ChallengeLink): Row {
+function toRow(
+  challenge: ChallengeSummary,
+  opts?: {
+    isAdded?: boolean;
+    playingHackathonIds?: string[];
+    playingIn?: ChallengeLinkedHackathon[];
+  },
+): Row {
   const createdIn =
     challenge.created_in_hackathon?.display_name ||
     challenge.created_in_hackathon?.name ||
     null;
+
+  const playingIn =
+    opts?.playingIn ??
+    (challenge.playing_in || []).filter((h) => Boolean(h?.id));
+  const playingIds =
+    opts?.playingHackathonIds ?? playingIn.map((h) => h.id).filter(Boolean);
 
   return {
     challengeId: challenge.id,
@@ -145,8 +163,9 @@ function toRow(challenge: ChallengeSummary, link?: ChallengeLink): Row {
       challenge.created_by,
     ),
     createdAt: challenge.created_at || null,
-    isAdded: Boolean(link),
-    link,
+    isAdded: opts?.isAdded ?? false,
+    playingHackathonIds: playingIds,
+    playingIn,
   };
 }
 
@@ -191,6 +210,11 @@ export function EventChallengesView({
   const [detailChallengeId, setDetailChallengeId] = useState<string | null>(
     null,
   );
+  const [attachTarget, setAttachTarget] = useState<{
+    challengeIds: string[];
+    label?: string;
+    playingByChallengeId: Record<string, string[]>;
+  } | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [page, setPage] = useState(1);
@@ -264,57 +288,73 @@ export function EventChallengesView({
 
     try {
       let allChallenges: ChallengeSummary[] = [];
-      const links: ChallengeLink[] = [];
+      let playing: ChallengeSummary[] = [];
 
       if (isAllScope) {
         allChallenges = await listAllChallenges(apiFilters);
         setInfo(
-          "Showing all challenges in the platform catalog. Select a hackathon to attach challenges to an event.",
+          "Showing all challenges in the platform catalog. Select a hackathon to add challenges to its playing roster.",
         );
       } else {
-        allChallenges = await listAllChallenges({
-          ...apiFilters,
-          hackathon: activeId,
-        });
-
-        const eventLinks = await listEventChallengeLinks(activeId, {
-          search: debouncedSearch || undefined,
-          show_deleted: "false",
-        });
-        links.push(...eventLinks);
+        [allChallenges, playing] = await Promise.all([
+          listAllChallenges({
+            ...apiFilters,
+            hackathon: activeId,
+          }),
+          listPlayingChallenges(activeId, {
+            search: debouncedSearch || undefined,
+            limit: "200",
+          }),
+        ]);
       }
 
       setCatalogLimited(false);
 
-      const linkByChallengeId = new Map<string, ChallengeLink>();
-      for (const link of links) {
-        const cid =
-          typeof link.challenge === "string"
-            ? link.challenge
-            : String(link.challenge);
-        linkByChallengeId.set(cid, link);
-      }
-
+      const playingIds = new Set(playing.map((c) => c.id));
+      const activeHackathon = !isAllScope
+        ? hackathons.find((h) => h.id === activeId)
+        : null;
       const merged = new Map<string, Row>();
 
-      for (const challenge of allChallenges) {
-        const link = linkByChallengeId.get(challenge.id);
-        merged.set(challenge.id, toRow(challenge, link));
-      }
-
-      for (const link of links) {
-        const cid =
-          typeof link.challenge === "string"
-            ? link.challenge
-            : String(link.challenge);
-        if (!merged.has(cid)) {
-          merged.set(cid, {
-            challengeId: cid,
-            name: link.challenge_name || cid,
-            isAdded: true,
-            link,
+      function withScopedPlaying(
+        challenge: ChallengeSummary,
+        onPlayingRoster: boolean,
+      ) {
+        const byId = new Map<string, ChallengeLinkedHackathon>();
+        for (const h of challenge.playing_in || []) {
+          if (h?.id) byId.set(h.id, h);
+        }
+        if (
+          !isAllScope &&
+          activeId &&
+          onPlayingRoster &&
+          !byId.has(activeId)
+        ) {
+          byId.set(activeId, {
+            id: activeId,
+            name: activeHackathon?.name,
+            display_name: activeHackathon?.display_name,
           });
         }
+        const playingIn = [...byId.values()];
+        return toRow(challenge, {
+          isAdded: !isAllScope && onPlayingRoster,
+          playingHackathonIds: playingIn.map((h) => h.id),
+          playingIn,
+        });
+      }
+
+      for (const challenge of allChallenges) {
+        merged.set(
+          challenge.id,
+          withScopedPlaying(challenge, playingIds.has(challenge.id)),
+        );
+      }
+
+      // Ensure every playing-roster challenge appears even if catalog page missed it.
+      for (const challenge of playing) {
+        if (merged.has(challenge.id)) continue;
+        merged.set(challenge.id, withScopedPlaying(challenge, true));
       }
 
       setRows(
@@ -326,7 +366,7 @@ export function EventChallengesView({
     } finally {
       setIsLoading(false);
     }
-  }, [activeId, apiFilters, debouncedSearch, isAllScope, router]);
+  }, [activeId, apiFilters, debouncedSearch, hackathons, isAllScope, router]);
 
   useEffect(() => {
     void load();
@@ -415,13 +455,33 @@ export function EventChallengesView({
 
   async function addChallenge(challengeId: string) {
     if (isAllScope) {
-      setError("Select a hackathon first to add a challenge to an event.");
+      setError("Select a hackathon first to add a challenge to playing.");
       return;
     }
     setBusyId(challengeId);
     setError(null);
     try {
-      await attachChallengeToHackathon(activeId, challengeId);
+      await addPlayingChallenges(activeId, [challengeId]);
+      const scoped = hackathons.find((h) => h.id === activeId);
+      setRows((prev) =>
+        prev.map((r) => {
+          if (r.challengeId !== challengeId) return r;
+          if (r.playingHackathonIds.includes(activeId)) {
+            return { ...r, isAdded: true };
+          }
+          const nextPlaying: ChallengeLinkedHackathon = {
+            id: activeId,
+            name: scoped?.name,
+            display_name: scoped?.display_name,
+          };
+          return {
+            ...r,
+            isAdded: true,
+            playingHackathonIds: [...r.playingHackathonIds, activeId],
+            playingIn: [...r.playingIn, nextPlaying],
+          };
+        }),
+      );
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add challenge");
@@ -430,42 +490,55 @@ export function EventChallengesView({
     }
   }
 
-  async function approveLink(linkId: string) {
-    if (isAllScope) return;
-    setBusyId(linkId);
+  async function removePlayingAssociation(
+    challengeId: string,
+    hackathonId: string,
+    challengeName?: string,
+  ) {
+    const event =
+      hackathons.find((h) => h.id === hackathonId) ||
+      rows
+        .find((r) => r.challengeId === challengeId)
+        ?.playingIn.find((h) => h.id === hackathonId);
+    const ok = await confirm({
+      title: "Remove from playing",
+      message: `Remove${challengeName ? ` “${challengeName}”` : " this challenge"} from the playing roster of ${hackathonLabel(event || { id: hackathonId })}?`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusyId(challengeId);
     setError(null);
     try {
-      await approveChallengeLink(activeId, linkId);
+      await removePlayingChallenge(hackathonId, challengeId);
+      setRows((prev) =>
+        prev.map((r) =>
+          r.challengeId === challengeId
+            ? {
+                ...r,
+                isAdded:
+                  !isAllScope && activeId === hackathonId ? false : r.isAdded,
+                playingHackathonIds: r.playingHackathonIds.filter(
+                  (id) => id !== hackathonId,
+                ),
+                playingIn: r.playingIn.filter((h) => h.id !== hackathonId),
+              }
+            : r,
+        ),
+      );
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve");
+      setError(
+        err instanceof Error ? err.message : "Failed to remove from playing",
+      );
     } finally {
       setBusyId(null);
     }
   }
 
-  async function removeLink(linkId: string, challengeId: string) {
+  async function removeFromPlaying(challengeId: string, name?: string) {
     if (isAllScope) return;
-    const ok = await confirm({
-      title: "Remove from event",
-      message:
-        "Remove this challenge from the hackathon? It stays in the platform catalog.",
-      confirmLabel: "Remove",
-      destructive: true,
-    });
-    if (!ok) {
-      return;
-    }
-    setBusyId(linkId || challengeId);
-    setError(null);
-    try {
-      await removeChallengeFromHackathon(activeId, linkId);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove challenge");
-    } finally {
-      setBusyId(null);
-    }
+    await removePlayingAssociation(challengeId, activeId, name);
   }
 
   function scopeHackathonId() {
@@ -580,44 +653,74 @@ export function EventChallengesView({
     );
   }
 
+  function buildPlayingMap(ids: string[]) {
+    const map: Record<string, string[]> = {};
+    for (const id of ids) {
+      const row = rows.find((r) => r.challengeId === id);
+      const playing = [...(row?.playingHackathonIds || [])];
+      if (
+        !isAllScope &&
+        row?.isAdded &&
+        activeId &&
+        !playing.includes(activeId)
+      ) {
+        playing.push(activeId);
+      }
+      map[id] = playing;
+    }
+    return map;
+  }
+
   function bulkAdd() {
-    if (isAllScope) return;
-    const ids = selectedRows
-      .filter((r) => !r.isAdded)
-      .map((r) => r.challengeId);
-    if (ids.length === 0) {
-      setError("No selected challenges are available to add.");
+    if (!isAllScope) {
+      const ids = selectedRows.filter((r) => !r.isAdded).map((r) => r.challengeId);
+      if (ids.length === 0) {
+        setError("No selected challenges are available to add to playing.");
+        return;
+      }
+      void runBulk("Add to playing", ids, (id) =>
+        addPlayingChallenges(activeId, [id]).then(() => undefined),
+      );
       return;
     }
-    void runBulk("Add", ids, (id) =>
-      attachChallengeToHackathon(activeId, id).then(() => undefined),
-    );
+    const ids = selectedRows.map((r) => r.challengeId);
+    if (ids.length === 0) {
+      setError("Select at least one challenge to add to playing.");
+      return;
+    }
+    setAttachTarget({
+      challengeIds: ids,
+      label: ids.length === 1 ? selectedRows[0]?.name : undefined,
+      playingByChallengeId: buildPlayingMap(ids),
+    });
+  }
+
+  function openAttachOne(row: Row) {
+    setAttachTarget({
+      challengeIds: [row.challengeId],
+      label: row.name,
+      playingByChallengeId: buildPlayingMap([row.challengeId]),
+    });
   }
 
   async function bulkRemoveFromEvent() {
     if (isAllScope) return;
-    const targets = selectedRows.filter((r) => r.isAdded && r.link);
-    if (targets.length === 0) {
-      setError("No selected challenges are attached to remove.");
+    const ids = selectedRows.filter((r) => r.isAdded).map((r) => r.challengeId);
+    if (ids.length === 0) {
+      setError("No selected challenges are on the playing roster to remove.");
       return;
     }
     const ok = await confirm({
-      title: "Remove from event",
-      message: `Remove ${targets.length} challenge(s) from this hackathon?`,
+      title: "Remove from playing",
+      message: `Remove ${ids.length} challenge(s) from this event's playing roster?`,
       confirmLabel: "Remove",
       destructive: true,
     });
     if (!ok) {
       return;
     }
-    void runBulk(
-      "Remove",
-      targets.map((r) => r.challengeId),
-      async (id) => {
-        const row = targets.find((r) => r.challengeId === id);
-        if (!row?.link) return;
-        await removeChallengeFromHackathon(activeId, row.link.id);
-      },
+    void runBulk("Remove from playing", ids, (id) =>
+      removePlayingChallenge(activeId, id).then(() => undefined),
     );
   }
 
@@ -741,10 +844,14 @@ export function EventChallengesView({
             {!isAllScope ? (
               <>
                 <ListPageStatsDot />
-                <ListPageStat label="Added" value={addedCount} tone="accent" />
+                <ListPageStat
+                  label="On playing"
+                  value={addedCount}
+                  tone="accent"
+                />
                 <ListPageStatsDot />
                 <ListPageStat
-                  label="Not added"
+                  label="Not on playing"
                   value={notAddedCount}
                   tone="warning"
                 />
@@ -763,21 +870,21 @@ export function EventChallengesView({
           </ListPageStats>
         }
       >
-        <FilterSelect
-          label="Hackathon"
-          value={activeId || ALL_EVENTS_SCOPE}
-          onChange={onHackathonChange}
-          className="min-w-[180px]"
-        >
-          {!hackathonIdProp ? (
+        {!hackathonIdProp ? (
+          <FilterSelect
+            label="Hackathon"
+            value={activeId || ALL_EVENTS_SCOPE}
+            onChange={onHackathonChange}
+            className="min-w-[180px]"
+          >
             <option value={ALL_EVENTS_SCOPE}>All challenges</option>
-          ) : null}
-          {hackathons.map((h) => (
-            <option key={h.id} value={h.id}>
-              {hackathonLabel(h)}
-            </option>
-          ))}
-        </FilterSelect>
+            {hackathons.map((h) => (
+              <option key={h.id} value={h.id}>
+                {hackathonLabel(h)}
+              </option>
+            ))}
+          </FilterSelect>
+        ) : null}
 
         <FilterTextField
           label="Search"
@@ -794,8 +901,8 @@ export function EventChallengesView({
             onChange={(v) => setMembership(v as MembershipFilter)}
           >
             <option value="all">All</option>
-            <option value="added">Added</option>
-            <option value="not_added">Not added</option>
+            <option value="added">On playing</option>
+            <option value="not_added">Not on playing</option>
           </FilterSelect>
         ) : null}
 
@@ -878,6 +985,20 @@ export function EventChallengesView({
         challengeId={editingChallengeId}
       />
 
+      <AttachChallengeModal
+        open={attachTarget != null}
+        onClose={() => setAttachTarget(null)}
+        onAttached={() => {
+          setSelectedKeys(new Set());
+          void load();
+        }}
+        challengeIds={attachTarget?.challengeIds ?? []}
+        challengeLabel={attachTarget?.label}
+        hackathons={hackathons}
+        playingByChallengeId={attachTarget?.playingByChallengeId ?? {}}
+        defaultHackathonId={scopeHackathonId()}
+      />
+
       <ChallengeDetailModal
         open={detailChallengeId != null}
         onClose={closeDetail}
@@ -930,16 +1051,16 @@ export function EventChallengesView({
             variant: "danger",
             onClick: bulkDelete,
           },
+          {
+            id: "add",
+            label: isAllScope ? "Add to playing…" : "Add to playing",
+            onClick: bulkAdd,
+          },
           ...(!isAllScope
             ? [
                 {
-                  id: "add",
-                  label: "Add to event",
-                  onClick: bulkAdd,
-                },
-                {
                   id: "remove",
-                  label: "Remove from event",
+                  label: "Remove from playing",
                   onClick: bulkRemoveFromEvent,
                 },
               ]
@@ -948,7 +1069,7 @@ export function EventChallengesView({
       />
 
       {isLoading ? (
-        <TableSkeleton columns={9} rows={10} selectable />
+        <TableSkeleton columns={11} rows={10} selectable />
       ) : filtered.length === 0 ? (
         <div className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-10 text-center text-sm text-[var(--text-muted)]">
           {catalogLimited && !hasActiveFilters
@@ -989,8 +1110,9 @@ export function EventChallengesView({
                 <th className="px-4 py-3">Created in</th>
                 <th className="px-4 py-3">Created by</th>
                 <th className="px-4 py-3">Created at</th>
+                <th className="px-4 py-3">Playing in</th>
                 {!isAllScope ? (
-                  <th className="px-4 py-3">In this hackathon</th>
+                  <th className="px-4 py-3">Membership</th>
                 ) : null}
                 <th className={`px-4 py-3 text-right w-12 ${TABLE_STICKY_ACTIONS_CLASS}`} />
               </tr>
@@ -1063,25 +1185,24 @@ export function EventChallengesView({
                   <td className="px-4 py-3 text-xs text-[var(--text-muted)] whitespace-nowrap">
                     {formatCreatedAt(row.createdAt)}
                   </td>
+                  <td className="px-4 py-3 min-w-[10rem] max-w-[16rem]">
+                    <PlayingInChips
+                      events={row.playingIn}
+                      busy={busyId === row.challengeId}
+                      emptyLabel="Not on any playing roster"
+                      onRemove={(hackathonId) =>
+                        void removePlayingAssociation(
+                          row.challengeId,
+                          hackathonId,
+                          row.name,
+                        )
+                      }
+                    />
+                  </td>
                   {!isAllScope ? (
                     <td className="px-4 py-3">
                       {row.isAdded ? (
-                        <div className="flex flex-wrap gap-1">
-                          <Badge tone="success">Added</Badge>
-                          {row.link?.status ? (
-                            <Badge
-                              tone={
-                                row.link.status === "approved"
-                                  ? "success"
-                                  : row.link.status === "draft"
-                                    ? "warning"
-                                    : "neutral"
-                              }
-                            >
-                              {row.link.status}
-                            </Badge>
-                          ) : null}
-                        </div>
+                        <Badge tone="success">Added</Badge>
                       ) : (
                         <Badge tone="warning">Not added</Badge>
                       )}
@@ -1115,31 +1236,26 @@ export function EventChallengesView({
                           destructive: true,
                           onClick: () => void removeChallenge(row),
                         },
+                        {
+                          id: "add-hackathons",
+                          label: "Add to playing…",
+                          disabled: busyId === row.challengeId,
+                          onClick: () => openAttachOne(row),
+                        },
                         ...(!isAllScope
-                          ? row.isAdded && row.link
+                          ? row.isAdded
                             ? [
-                                ...(row.link.status === "draft"
-                                  ? [
-                                      {
-                                        id: "approve",
-                                        label: "Approve",
-                                        disabled: busyId === row.link!.id,
-                                        onClick: () =>
-                                          void approveLink(row.link!.id),
-                                      },
-                                    ]
-                                  : []),
                                 {
-                                  id: "remove-link",
+                                  id: "remove-playing",
                                   label:
-                                    busyId === row.link.id
+                                    busyId === row.challengeId
                                       ? "Removing…"
-                                      : "Remove from event",
-                                  disabled: busyId === row.link.id,
+                                      : "Remove from playing",
+                                  disabled: busyId === row.challengeId,
                                   onClick: () =>
-                                    void removeLink(
-                                      row.link!.id,
+                                    void removeFromPlaying(
                                       row.challengeId,
+                                      row.name,
                                     ),
                                 },
                               ]
@@ -1149,7 +1265,7 @@ export function EventChallengesView({
                                   label:
                                     busyId === row.challengeId
                                       ? "Adding…"
-                                      : "Add to event",
+                                      : "Add to playing",
                                   disabled: busyId === row.challengeId,
                                   onClick: () =>
                                     void addChallenge(row.challengeId),

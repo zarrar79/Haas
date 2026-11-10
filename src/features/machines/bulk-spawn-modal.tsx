@@ -61,8 +61,27 @@ export function BulkSpawnModal({
     setBusy(true);
     setError(null);
     try {
-      await bulkSpawnMachines(hackathonId, { team_ids: teamIds, challenge_ids: challengeIds });
+      const res = await bulkSpawnMachines(hackathonId, {
+        team_ids: teamIds,
+        challenge_ids: challengeIds,
+      });
+      const failed = (res?.results ?? []).filter((r) => !r.success);
       onSaved();
+      if (failed.length > 0) {
+        const teamName = (id: string) => teams.find((t) => t.id === id)?.name ?? id;
+        const chName = (id: string) =>
+          challenges.find((c) => c.id === id)?.name ?? id;
+        setError(
+          `${failed.length} of ${res.results.length} failed:\n` +
+            failed
+              .slice(0, 8)
+              .map(
+                (r) => `${teamName(r.team_id)} / ${chName(r.challenge_id)}: ${r.detail}`,
+              )
+              .join("\n"),
+        );
+        return;
+      }
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bulk spawn failed");
@@ -129,7 +148,9 @@ export function BulkSpawnModal({
         <div className="border-t border-[var(--border)] px-5 py-4">
           {error ? (
             <div className="mb-3">
-              <Alert variant="error">{error}</Alert>
+              <Alert variant="error">
+                <span className="whitespace-pre-wrap">{error}</span>
+              </Alert>
             </div>
           ) : null}
           <div className="flex justify-end gap-2">

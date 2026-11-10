@@ -1,4 +1,4 @@
-import { haasGet, haasList, haasSend } from "@/lib/haas-api";
+import { haasGet, haasList, haasListAll, haasSend } from "@/lib/haas-api";
 import type { UserBrief } from "@/types";
 
 export type ChallengeUserBrief = UserBrief;
@@ -8,6 +8,12 @@ export type ChallengeCreatedInHackathon = {
   name?: string;
   display_name?: string;
   playing_hackathon_id?: string | null;
+};
+
+export type ChallengeLinkedHackathon = {
+  id: string;
+  name?: string;
+  display_name?: string;
 };
 
 export type ChallengeSummary = {
@@ -39,7 +45,6 @@ export type ChallengeSummary = {
     flag_num?: number;
     time_limit?: number;
   } | null;
-  challenge_for?: string;
   techniques?: string[];
   technique_details?: Array<{
     id: string;
@@ -50,6 +55,9 @@ export type ChallengeSummary = {
   created_by_detail?: ChallengeUserBrief | null;
   created_in?: string | null;
   created_in_hackathon?: ChallengeCreatedInHackathon | null;
+  linked_hackathons?: ChallengeLinkedHackathon[];
+  /** Live playing-roster membership (catalog hackathon ids). */
+  playing_in?: ChallengeLinkedHackathon[];
   playing_hackathon?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -131,6 +139,53 @@ export function listEventChallengeLinks(
   });
 }
 
+/** Challenges on the live playing roster for this event (= "Added" / membership). */
+export function listPlayingChallenges(
+  hackathonId: string,
+  filters?: { search?: string; limit?: string },
+) {
+  return haasList<ChallengeSummary>(
+    `hackathons/${hackathonId}/playing/challenges`,
+    {
+      search: filters?.search,
+      limit: filters?.limit ?? "100",
+    },
+  );
+}
+
+/** All pages of the live playing challenge roster. */
+export function listAllPlayingChallenges(
+  hackathonId: string,
+  filters?: { search?: string },
+) {
+  return haasListAll<ChallengeSummary>(
+    `hackathons/${hackathonId}/playing/challenges`,
+    { search: filters?.search },
+  );
+}
+
+/** Add challenges to the live playing roster (also approves catalog link). */
+export function addPlayingChallenges(
+  hackathonId: string,
+  challengeIds: string[],
+) {
+  return haasSend<unknown>(`hackathons/${hackathonId}/playing/challenges`, {
+    method: "POST",
+    body: { challenge_ids: challengeIds },
+  });
+}
+
+/** Remove one challenge from the live playing roster. */
+export function removePlayingChallenge(
+  hackathonId: string,
+  challengeId: string,
+) {
+  return haasSend<unknown>(
+    `hackathons/${hackathonId}/playing/challenges/${challengeId}`,
+    { method: "DELETE" },
+  );
+}
+
 /** Attach an existing challenge to the hackathon (creates a draft link). */
 export function attachChallengeToHackathon(
   hackathonId: string,
@@ -169,7 +224,6 @@ export type ChallengeCreateInput = {
   challenge_type?: string | null;
   challenge_source?: string | null;
   is_dynamic?: boolean;
-  challenge_for?: string;
   hackathon?: string;
   techniques?: string[];
 };
@@ -179,7 +233,6 @@ export function createPlatformChallenge(body: ChallengeCreateInput) {
   return haasSend<ChallengeSummary>("challenges", {
     method: "POST",
     body: {
-      challenge_for: "hackathon",
       is_active: true,
       ...body,
     },
@@ -194,9 +247,6 @@ export function createChallengeMultipart(
   formData: FormData,
   hackathonId?: string | null,
 ) {
-  if (!formData.has("challenge_for")) {
-    formData.set("challenge_for", "hackathon");
-  }
   if (!formData.has("is_active")) {
     formData.set("is_active", "true");
   }
@@ -304,6 +354,8 @@ export type ChallengeDetail = ChallengeSummary & {
   max_allowed_attempts?: number;
   first_blood_score?: number;
   hints?: string | null;
+  hint_text?: string;
+  hint_visible?: boolean;
   description_markdown?: string | null;
   file_url?: string | null;
   markdown_url?: string | null;

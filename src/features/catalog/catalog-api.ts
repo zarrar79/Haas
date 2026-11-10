@@ -21,7 +21,24 @@ export type CatalogKind =
   | "sources"
   | "hints"
   | "skills"
-  | "techniques";
+  | "techniques"
+  | "referers";
+
+export type RefererItem = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  is_active?: boolean;
+};
+
+export function listReferers(filters?: { search?: string; is_active?: string }) {
+  return haasList<RefererItem>("catalog/referers", {
+    limit: "100",
+    search: filters?.search,
+    is_active: filters?.is_active ?? "true",
+  });
+}
 
 export function listCatalog(
   kind: CatalogKind,

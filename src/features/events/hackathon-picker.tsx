@@ -37,9 +37,10 @@ export function HackathonPicker({
   useEffect(() => {
     void (async () => {
       try {
+        // Match header event picker: include ended/inactive events so the
+        // Event Workspace selection stays consistent across pages.
         const { items: rows } = await listHackathons({
           show_deleted: "false",
-          is_active: "true",
         });
         setItems(rows);
       } catch (err) {
@@ -49,6 +50,8 @@ export function HackathonPicker({
   }, [router]);
 
   const shouldNavigate = navigateOnChange ?? Boolean(section);
+  // On event-scoped pages (section set / navigate), never offer "All hackathons".
+  const allowEmpty = !shouldNavigate;
 
   function handleChange(next: string) {
     onChange(next);
@@ -58,6 +61,9 @@ export function HackathonPicker({
     }
   }
 
+  const knownIds = new Set(items.map((h) => h.id));
+  const valueMissing = Boolean(value) && !knownIds.has(value);
+
   return (
     <FormSelect
       label="Hackathon"
@@ -65,8 +71,11 @@ export function HackathonPicker({
       onChange={handleChange}
       className={className}
     >
-      {!shouldNavigate ? <option value="">{emptyLabel}</option> : null}
-      {items.length === 0 ? (
+      {allowEmpty ? <option value="">{emptyLabel}</option> : null}
+      {valueMissing ? (
+        <option value={value}>Current event</option>
+      ) : null}
+      {items.length === 0 && !valueMissing ? (
         <option value="">No hackathons available</option>
       ) : (
         items.map((h) => (

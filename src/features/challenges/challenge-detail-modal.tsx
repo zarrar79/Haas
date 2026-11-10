@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { CopyableText } from "@/components/ui/copyable-text";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { FormTextarea, FormSelect, FormCheckbox } from "@/components/ui/form-fields";
+import { MarkdownContent } from "@/components/ui/markdown-content";
+import { MarkdownField } from "@/components/ui/markdown-field";
 import { FormSkeleton } from "@/components/ui/skeleton";
 import { ModalShell } from "@/components/ui/modal-shell";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
@@ -178,9 +180,9 @@ function QuestionForm({
         value={draft.name}
         onChange={(e) => onChange({ ...draft, name: e.target.value })}
       />
-      <FormTextarea
+      <MarkdownField
         label="Description"
-        controlClassName="min-h-[72px]"
+        controlClassName="min-h-[100px]"
         value={draft.description}
         onChange={(value) => onChange({ ...draft, description: value })}
       />
@@ -454,7 +456,14 @@ function QuestionRow({
             />
           ) : (
             <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <DetailField label="Description" value={question.description} />
+              <DetailField
+                label="Description"
+                value={
+                  question.description ? (
+                    <MarkdownContent>{question.description}</MarkdownContent>
+                  ) : null
+                }
+              />
               <DetailField label="Score" value={question.score} />
               <DetailField
                 label="Negative score"
@@ -1009,18 +1018,21 @@ export function ChallengeDetailModal({
                     <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                       Description
                     </dt>
-                    <dd className="mt-1 whitespace-pre-wrap text-sm text-[var(--text)]">
-                      {challenge.description}
+                    <dd className="mt-1">
+                      <MarkdownContent>{challenge.description}</MarkdownContent>
                     </dd>
                   </div>
                 ) : null}
-                {challenge.hints ? (
+                {challenge.hint_text ? (
                   <div className="mt-4">
                     <dt className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-                      Hints
+                      Hint{" "}
+                      <span className="normal-case">
+                        ({challenge.hint_visible ? "visible to players" : "hidden"})
+                      </span>
                     </dt>
                     <dd className="mt-1 whitespace-pre-wrap text-sm text-[var(--text)]">
-                      {challenge.hints}
+                      {challenge.hint_text}
                     </dd>
                   </div>
                 ) : null}

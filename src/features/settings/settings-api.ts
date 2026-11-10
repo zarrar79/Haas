@@ -13,8 +13,11 @@ export type UserRules = {
 };
 
 export type PlayingState = {
+  id?: string;
   is_open?: boolean;
   is_active?: boolean;
+  team_count?: number;
+  challenge_count?: number;
   challenges?: Array<{ id: string; name?: string }>;
   teams?: Array<{ id: string; name?: string }>;
 };

@@ -18,7 +18,10 @@ export function useLogout() {
   const logout = useCallback(async () => {
     setIsLoggingOut(true);
     try {
-      await callAppApi("/api/auth/logout", { method: "POST" });
+      await callAppApi("/api/auth/logout", {
+        method: "POST",
+        skipAuthRedirect: true,
+      });
     } catch {
       // Still clear client state if the network call fails (cookie may already be gone).
     } finally {

@@ -20,7 +20,6 @@ import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
-import { HackathonPicker } from "@/features/events/hackathon-picker";
 import {
   deleteScore,
   listScores,
@@ -172,11 +171,6 @@ export function EventTeamScoresView({ hackathonId }: Props) {
         }
       >
         <div className="flex flex-wrap items-end gap-3">
-          <HackathonPicker
-            value={activeId}
-            onChange={setActiveId}
-            section="scores"
-          />
           <FilterTextField
             label="Search"
             value={search}

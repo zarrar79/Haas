@@ -1,10 +1,16 @@
 import "server-only";
 
+import { NextResponse } from "next/server";
+
 import { callBackend } from "@/lib/call-backend";
 import { errorResponse, successResponse } from "@/lib/bff-response";
 import { decryptBackendPayload } from "@/lib/decrypt-backend-payload";
 import { getClientIpAddress, getQueryString } from "@/lib/request-helpers";
-import { getSessionToken } from "@/lib/session-cookie";
+import {
+  getClearedSessionCookieOptions,
+  getSessionToken,
+  SESSION_COOKIE_NAME,
+} from "@/lib/session-cookie";
 
 type DjangoEnvelope = {
   status?: boolean;
@@ -25,6 +31,32 @@ type ForwardToDjangoOptions = {
   extraHeaders?: HeadersInit;
 };
 
+const AUTH_FAILURE_MESSAGE_RE =
+  /token_not_valid|token is expired|invalid or expired token|given token not valid|not authenticated|authentication credentials|authentication required|session has expired|session superseded|signed in on another device/i;
+
+function isDjangoAuthFailure(
+  djangoStatus: number,
+  envelope: DjangoEnvelope,
+): boolean {
+  if (djangoStatus === 401) return true;
+  const code = envelope.code !== undefined ? String(envelope.code) : "";
+  if (code === "401" || code === "unauthorized" || code === "token_not_valid") {
+    return true;
+  }
+  const message = envelope.message ?? "";
+  return AUTH_FAILURE_MESSAGE_RE.test(message);
+}
+
+function unauthorizedResponse(message = "Unauthorized") {
+  const response = errorResponse(message, 401, "unauthorized");
+  response.cookies.set(
+    SESSION_COOKIE_NAME,
+    "",
+    getClearedSessionCookieOptions(),
+  );
+  return response;
+}
+
 /**
  * Reusable BFF forwarder:
  * browser → HAS /api/... → Django BACKEND_URL/...
@@ -42,7 +74,7 @@ export async function forwardToDjango(options: ForwardToDjangoOptions) {
   const accessToken = await getSessionToken();
 
   if (requireSession && !accessToken) {
-    return errorResponse("Unauthorized", 401);
+    return unauthorizedResponse();
   }
 
   const pathWithQuery = `${backendPath.replace(/^\//, "")}${getQueryString(request)}`;
@@ -82,7 +114,10 @@ export async function forwardToDjango(options: ForwardToDjangoOptions) {
       djangoResponse.headers.get("content-type") ?? "";
 
     if (!responseContentType.includes("application/json")) {
-      return new Response(djangoResponse.body, {
+      if (djangoResponse.status === 401) {
+        return unauthorizedResponse();
+      }
+      return new NextResponse(djangoResponse.body, {
         status: djangoResponse.status,
         headers: {
           "Content-Type": responseContentType || "application/octet-stream",
@@ -93,9 +128,28 @@ export async function forwardToDjango(options: ForwardToDjangoOptions) {
     const envelope = (await djangoResponse.json()) as DjangoEnvelope;
 
     if (!djangoResponse.ok || envelope.status === false) {
+      if (isDjangoAuthFailure(djangoResponse.status, envelope)) {
+        return unauthorizedResponse(
+          envelope.message ?? "Your session has expired. Please sign in again.",
+        );
+      }
+      // Prefer Django's HTTP status; fall back to envelope.code, then 400.
+      // (Some Django paths return HTTP 200 with status:false and code:4xx.)
+      const envelopeCode =
+        typeof envelope.code === "number"
+          ? envelope.code
+          : typeof envelope.code === "string" && /^\d+$/.test(envelope.code)
+            ? Number(envelope.code)
+            : undefined;
+      const httpStatus =
+        djangoResponse.status >= 400
+          ? djangoResponse.status
+          : envelopeCode !== undefined && envelopeCode >= 400
+            ? envelopeCode
+            : 400;
       return errorResponse(
         envelope.message ?? "Backend request failed",
-        djangoResponse.status >= 400 ? djangoResponse.status : 400,
+        httpStatus,
         envelope.code !== undefined ? String(envelope.code) : undefined,
       );
     }

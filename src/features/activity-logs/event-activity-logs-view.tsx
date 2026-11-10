@@ -14,7 +14,6 @@ import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
 import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { ActivityLogFormModal } from "@/features/activity-logs/activity-log-form-modal";
-import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { listEventUsers, eventUserLabel, type EventUser } from "@/features/users/users-api";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
 import {
@@ -187,11 +186,6 @@ export function EventActivityLogsView({ hackathonId }: Props) {
         }
       >
         <div className="flex flex-wrap items-end gap-3">
-          <HackathonPicker
-            value={activeId}
-            onChange={setActiveId}
-            section="activity-logs"
-          />
           <FilterTextField
             label="Search"
             value={search}

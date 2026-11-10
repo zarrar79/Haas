@@ -28,14 +28,13 @@ export function createChallengeAdmin(
     difficulty_level?: string | null;
     challenge_type?: string | null;
     is_dynamic?: boolean;
-    challenge_for?: string;
   },
 ) {
   return haasSend<ChallengeSummary>(
     `hackathons/${hackathonId}/challenge-admin`,
     {
       method: "POST",
-      body: { challenge_for: "hackathon", is_active: true, ...body },
+      body: { is_active: true, ...body },
     },
   );
 }

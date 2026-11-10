@@ -1,3 +1,4 @@
+import { getHackathonAnalytics } from "@/features/hackathons/hackathon-api";
 import { haasGet, haasList, haasSend } from "@/lib/haas-api";
 import type { UserBrief } from "@/types";
 
@@ -67,7 +68,6 @@ export type MachineRow = {
   blocked?: boolean;
   blocked_at?: string | null;
   expires_at?: string | null;
-  is_for_lms?: boolean;
   spawned_by?: UserBrief;
   created_at?: string;
   updated_at?: string;
@@ -86,7 +86,6 @@ export type MachineWriteInput = {
   is_deleted?: boolean;
   blocked?: boolean;
   expires_at?: string | null;
-  is_for_lms?: boolean;
 };
 
 export type MachineListFilters = {
@@ -240,11 +239,18 @@ export function deleteMachine(hackathonId: string, machineId: string) {
   });
 }
 
+export type BulkSpawnResult = {
+  team_id: string;
+  challenge_id: string;
+  success: boolean;
+  detail: string;
+};
+
 export function bulkSpawnMachines(
   hackathonId: string,
   body: { team_ids: string[]; challenge_ids: string[] },
 ) {
-  return haasSend<unknown>(`hackathons/${hackathonId}/machines/bulk-spawn`, {
+  return haasSend<{ results: BulkSpawnResult[] }>(`hackathons/${hackathonId}/machines/bulk-spawn`, {
     method: "POST",
     body,
   });
@@ -328,6 +334,46 @@ export function listActivityLogs(
     ...filters,
     limit: filters?.limit ?? "100",
   });
+}
+
+/** Haas audit log row (event-scoped). */
+export type AuditLog = {
+  id: string;
+  action?: string;
+  resource_type?: string;
+  resource_id?: string;
+  success?: boolean;
+  created_at?: string;
+  actor?: string;
+  detail?: string;
+};
+
+export function listAuditLogs(hackathonId: string) {
+  return haasList<AuditLog>(`hackathons/${hackathonId}/audit-logs`, {
+    limit: "100",
+  });
+}
+
+export function getEventAnalytics(hackathonId: string) {
+  return getHackathonAnalytics(hackathonId);
+}
+
+/** Trigger CSV download for event analytics export. */
+export async function downloadAnalyticsExport(hackathonId: string) {
+  const path = `/api/haas/hackathons/${hackathonId}/analytics/export`;
+  const res = await fetch(path, { credentials: "include" });
+  if (!res.ok) {
+    throw new Error(`Export failed (${res.status})`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `event-${hackathonId}-analytics.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 export function getActivityLog(hackathonId: string, logId: string | number) {

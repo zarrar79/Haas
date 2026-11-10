@@ -50,6 +50,8 @@ type DataTableProps<T> = {
   selectedKeys?: Set<string>;
   onSelectionChange?: (next: Set<string>) => void;
   onRowDoubleClick?: (row: T) => void;
+  /** Extra classes for each body row (e.g. priority coloring). */
+  rowClassName?: (row: T) => string | undefined;
   /** Client-side pagination (default true). */
   paginate?: boolean;
   pageSizeOptions?: readonly number[];
@@ -68,6 +70,7 @@ export function DataTable<T>({
   selectedKeys,
   onSelectionChange,
   onRowDoubleClick,
+  rowClassName,
   paginate = true,
   pageSizeOptions = TABLE_PAGE_SIZE_OPTIONS,
   defaultPageSize = DEFAULT_TABLE_PAGE_SIZE,
@@ -154,7 +157,7 @@ export function DataTable<T>({
             <thead className="border-b border-[var(--border-strong)] bg-[var(--surface-raised)] text-xs uppercase tracking-wide text-[var(--text-subtle)]">
               <tr>
                 {selectable ? (
-                  <th className="sticky left-0 z-10 w-10 whitespace-nowrap bg-[var(--surface-raised)] px-3 py-3">
+                  <th className="sticky left-0 z-10 w-10 whitespace-nowrap bg-[var(--surface-raised)] px-2.5 py-2.5">
                     <input
                       type="checkbox"
                       aria-label="Select all rows"
@@ -169,7 +172,7 @@ export function DataTable<T>({
                 {columns.map((column) => (
                   <th
                     key={column.key}
-                    className={`whitespace-nowrap px-4 py-3 font-semibold ${column.className ?? ""} ${
+                    className={`whitespace-nowrap px-3 py-2.5 font-semibold ${column.className ?? ""} ${
                       isStickyActionsColumn(column) ? TABLE_STICKY_ACTIONS_CLASS : ""
                     }`}
                   >
@@ -189,10 +192,10 @@ export function DataTable<T>({
                     onDoubleClick={() => onRowDoubleClick?.(row)}
                     className={`group border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface-hover)] ${
                       isSelected ? "bg-[var(--accent-muted)]" : ""
-                    }`}
+                    } ${rowClassName?.(row) ?? ""}`}
                   >
                     {selectable ? (
-                      <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface)] px-3 py-3 group-hover:bg-[var(--surface-hover)] group-data-[selected=true]:bg-[var(--accent-muted)]">
+                      <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface)] px-2.5 py-2.5 group-hover:bg-[var(--surface-hover)] group-data-[selected=true]:bg-[var(--accent-muted)]">
                         <input
                           type="checkbox"
                           aria-label={`Select row ${key}`}
@@ -205,8 +208,10 @@ export function DataTable<T>({
                     {columns.map((column) => (
                       <td
                         key={column.key}
-                        className={`px-4 py-3 align-middle text-[var(--text)] ${
-                          column.wrap ? "whitespace-normal" : "whitespace-nowrap"
+                        className={`px-3 py-2.5 align-middle text-[var(--text)] ${
+                          column.wrap
+                            ? "!whitespace-normal break-words"
+                            : "whitespace-nowrap"
                         } ${column.className ?? ""} ${
                           isStickyActionsColumn(column) ? TABLE_STICKY_ACTIONS_CLASS : ""
                         }`}

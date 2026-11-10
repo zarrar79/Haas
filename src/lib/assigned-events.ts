@@ -51,6 +51,11 @@ export function resolveAssignedEventId(
   me: HaasMePayload | null | undefined,
   selectedId: string | null,
 ): string | null {
+  // Root / HigherStaff / system.admin may open any event from the navbar —
+  // do not clamp to /me.hackathon_admins (that list is often partial or empty).
+  if (isPlatformOperator(me)) {
+    return selectedId;
+  }
   const assigned = getAssignedHackathons(me);
   if (assigned.length === 0) return null;
   if (selectedId && assigned.some((row) => row.hackathon_id === selectedId)) {

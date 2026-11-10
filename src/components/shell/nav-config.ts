@@ -75,8 +75,15 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
       {
         id: "teams",
         label: "Teams",
-        href: "/events/current/teams",
+        href: "/teams",
         icon: "teams",
+      },
+      {
+        id: "users",
+        label: "Users",
+        href: "/users",
+        icon: "system-users",
+        platformOnly: true,
       },
       {
         id: "catalog",
@@ -217,6 +224,24 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
             label: "Groups",
             href: "/system/groups",
             icon: "system-groups",
+          },
+          {
+            id: "system-platform-settings",
+            label: "Platform settings",
+            href: "/system/platform-settings",
+            icon: "system-platform-settings",
+          },
+          {
+            id: "system-change-log",
+            label: "Change log",
+            href: "/system/change-log",
+            icon: "system-change-log",
+          },
+          {
+            id: "system-referer-gate",
+            label: "Referer gate",
+            href: "/system/referer-gate",
+            icon: "system-referer-gate",
           },
         ],
       },
