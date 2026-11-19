@@ -28,7 +28,11 @@ import {
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { redirectIfUnauthorized } from "@/lib/client-api";
 
-type Props = { hackathonId: string };
+type Props = {
+  hackathonId: string;
+  eyebrow?: string;
+  title?: string;
+};
 
 type LimitOption = "25" | "50" | "100" | "200";
 type SideFilter = "all" | string;
@@ -167,7 +171,11 @@ function TopTeamCard({
   );
 }
 
-export function EventLeaderboardView({ hackathonId }: Props) {
+export function EventLeaderboardView({
+  hackathonId,
+  eyebrow = "Event workspace",
+  title = "Leaderboard",
+}: Props) {
   const router = useRouter();
   const { setSelectedHackathonId } = useSelectedEvent();
   const [limit, setLimit] = useState<LimitOption>("100");
@@ -270,9 +278,9 @@ export function EventLeaderboardView({ hackathonId }: Props) {
   return (
     <div className="w-full space-y-4">
       <PageHeader
-        eyebrow="Event workspace"
-        title="Leaderboard"
-        description="Team ranking for this hackathon — same layout as the live dashboard, with admin search and filters."
+        eyebrow={eyebrow}
+        title={title}
+        description="Team ranking for this CTF — same layout as the live dashboard, with admin search and filters."
         actions={
           <Button variant="secondary" size="sm" onClick={() => void load()}>
             Refresh

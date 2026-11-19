@@ -434,15 +434,35 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         name: "Playing control",
         method: "GET",
         pathTemplate: "/api/haas/hackathons/{hackathonId}/playing/",
+        description:
+          "Roster counts, event window, modes (ctf/koth/attackDefense), scheduleOrder",
         requiresHackathonId: true,
       },
       {
         id: "playing-patch",
-        name: "Update playing flags",
+        name: "Update playing & mode schedules",
         method: "PATCH",
         pathTemplate: "/api/haas/hackathons/{hackathonId}/playing/",
+        description:
+          "is_open/is_active, eventPaused, nested ctf/koth/attackDefense (start/end/enabled/isPaused/isInfinite)",
         requiresHackathonId: true,
-        sampleBody: JSON.stringify({ is_open: true, is_active: true }, null, 2),
+        sampleBody: JSON.stringify(
+          {
+            is_open: true,
+            show_to_clients: true,
+            is_active: true,
+            eventPaused: false,
+            ctf: {
+              enabled: true,
+              start: "2026-09-01T10:00:00+05:00",
+              end: "2026-09-03T16:00:00+05:00",
+              isPaused: false,
+              isInfinite: false,
+            },
+          },
+          null,
+          2,
+        ),
       },
       {
         id: "playing-challenges-list",

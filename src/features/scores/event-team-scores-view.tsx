@@ -32,7 +32,11 @@ import { redirectIfUnauthorized } from "@/lib/client-api";
 import { formatDate } from "@/lib/format";
 import { formatPersonName } from "@/lib/display-name";
 
-type Props = { hackathonId: string };
+type Props = {
+  hackathonId: string;
+  eyebrow?: string;
+  title?: string;
+};
 
 type ValidityFilter = "all" | "correct" | "incorrect";
 
@@ -40,7 +44,11 @@ function userLabel(row: ScoreRow) {
   return formatPersonName(row.user_detail, row.user || "—");
 }
 
-export function EventTeamScoresView({ hackathonId }: Props) {
+export function EventTeamScoresView({
+  hackathonId,
+  eyebrow = "Event workspace",
+  title = "Team submissions",
+}: Props) {
   const { confirm } = usePlatformDialog();
   const router = useRouter();
   const { canMutateEvent } = useHaasAccess();
@@ -144,8 +152,8 @@ export function EventTeamScoresView({ hackathonId }: Props) {
   return (
     <div className="w-full">
       <PageHeader
-        eyebrow="Event workspace"
-        title="Team scores"
+        eyebrow={eyebrow}
+        title={title}
         actions={
           canWrite ? (
             <Button

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BiChevronDown } from "react-icons/bi";
 
 import { AppBrandMark } from "@/components/shell/app-brand-mark";
@@ -51,17 +51,33 @@ export function AppSidebar({
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     hackathons: true,
-    event: true,
+    "event-ctf": true,
+    "event-koth": true,
+    "event-ad": false,
     system: false,
   });
 
-  const isActive = (href?: string) =>
-    Boolean(
-      href &&
-        (href === "/home"
-          ? pathname === href
-          : pathname === href || pathname.startsWith(`${href}/`)),
-    );
+  useEffect(() => {
+    // Keep the active mode umbrella expanded while browsing its tabs.
+    if (pathname.includes("/ctf")) {
+      setOpenGroups((prev) => ({ ...prev, "event-ctf": true }));
+    }
+    if (pathname.includes("/koth")) {
+      setOpenGroups((prev) => ({ ...prev, "event-koth": true }));
+    }
+    if (pathname.includes("/ad")) {
+      setOpenGroups((prev) => ({ ...prev, "event-ad": true }));
+    }
+  }, [pathname]);
+
+  const isActive = (href?: string) => {
+    if (!href) return false;
+    if (href === "/home") return pathname === href;
+    if (pathname === href) return true;
+    // Mode roots (/ctf, /koth, /ad) must not stay active on nested tabs.
+    if (/\/(ctf|koth|ad)$/.test(href)) return false;
+    return pathname.startsWith(`${href}/`);
+  };
 
   function renderLink(item: NavItem, href: string, rawHref: string, isChild = false) {
     return (

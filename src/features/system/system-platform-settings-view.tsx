@@ -24,11 +24,17 @@ export function SystemPlatformSettingsView() {
 
   const [isLmsEnabled, setIsLmsEnabled] = useState(true);
   const [lmsDisabledMessage, setLmsDisabledMessage] = useState("");
+  const [idleMinutes, setIdleMinutes] = useState(30);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
   const applySettings = useCallback((row: PlatformSettings) => {
     setIsLmsEnabled(Boolean(row.is_lms_enabled));
     setLmsDisabledMessage(row.lms_disabled_message || "");
+    setIdleMinutes(
+      Number.isFinite(row.disposable_namespace_idle_minutes)
+        ? Number(row.disposable_namespace_idle_minutes)
+        : 30,
+    );
     setUpdatedAt(row.updated_at ?? null);
   }, []);
 
@@ -59,13 +65,10 @@ export function SystemPlatformSettingsView() {
       const row = await patchPlatformSettings({
         is_lms_enabled: isLmsEnabled,
         lms_disabled_message: lmsDisabledMessage,
+        disposable_namespace_idle_minutes: Math.max(0, Math.floor(idleMinutes || 0)),
       });
       applySettings(row);
-      setSuccess(
-        isLmsEnabled
-          ? "LMS / Academy is enabled for the player portal."
-          : "LMS / Academy is disabled for the player portal.",
-      );
+      setSuccess("Platform settings saved.");
     } catch (err) {
       if (redirectIfUnauthorized(err, router)) return;
       setError(
@@ -124,6 +127,23 @@ export function SystemPlatformSettingsView() {
           disabled={isSaving}
           placeholder="Learning Management System is currently disabled."
         />
+
+        <label className="block space-y-1.5 text-sm text-[var(--text)]">
+          <span className="font-medium">Solo namespace idle minutes</span>
+          <input
+            type="number"
+            min={0}
+            className="w-full rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2"
+            value={idleMinutes}
+            onChange={(e) => setIdleMinutes(Number(e.target.value))}
+            disabled={isSaving}
+          />
+          <span className="block text-xs text-[var(--text-muted)]">
+            After a Live solo team&apos;s last machine stops, wait this many
+            minutes then delete its Kubernetes namespace (team stays enrolled).
+            Set 0 to disable automatic disposal.
+          </span>
+        </label>
 
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={() => void onSave()} disabled={isSaving}>

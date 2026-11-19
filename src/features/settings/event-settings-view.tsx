@@ -27,8 +27,16 @@ import {
   patchPlaying,
   patchSettings,
   type EventSettings,
+  type ModeScheduleBlock,
+  type ModeSchedulePatch,
+  type PlayingModes,
   type PlayingState,
 } from "@/features/settings/settings-api";
+import { PlayingModeScheduleBoard } from "@/features/settings/playing-mode-schedule-board";
+import {
+  notifyPlayingScheduleChanged,
+  onPlayingScheduleChanged,
+} from "@/features/settings/playing-schedule-sync";
 import {
   addPlayingChallenges,
   addPlayingTeams,
@@ -63,6 +71,26 @@ function asString(value: unknown, fallback = ""): string {
   if (value == null) return fallback;
   const s = String(value).trim();
   return s || fallback;
+}
+
+function toIsoFromLocal(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toISOString();
+}
+
+function modePatchFromBlock(
+  block: ModeScheduleBlock | null | undefined,
+): ModeSchedulePatch | undefined {
+  if (!block) return undefined;
+  return {
+    enabled: block.enabled,
+    isPaused: block.isPaused,
+    isInfinite: block.isInfinite,
+    start: block.start == null ? block.start : toIsoFromLocal(block.start) ?? block.start,
+    end: block.end == null ? block.end : toIsoFromLocal(block.end) ?? block.end,
+  };
 }
 
 export function EventSettingsView({ hackathonId }: Props) {
@@ -118,6 +146,15 @@ export function EventSettingsView({ hackathonId }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    return onPlayingScheduleChanged((id) => {
+      if (id !== activeId) return;
+      void getPlaying(activeId)
+        .then((p) => setPlaying(p || {}))
+        .catch(() => undefined);
+    });
+  }, [activeId]);
 
   function setSetting<K extends string>(key: K, value: unknown) {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -192,16 +229,75 @@ export function EventSettingsView({ hackathonId }: Props) {
   async function savePlaying() {
     setError(null);
     try {
+      const modes = playing.modes;
+      const event = playing.event;
       setPlaying(
         await patchPlaying(activeId, {
           is_open: Boolean(playing.is_open),
+          show_to_clients: Boolean(playing.show_to_clients),
           is_active: Boolean(playing.is_active),
+          event: {
+            start:
+              event?.start == null
+                ? event?.start
+                : toIsoFromLocal(event.start) ?? event.start,
+            end:
+              event?.end == null
+                ? event?.end
+                : toIsoFromLocal(event.end) ?? event.end,
+            isPaused: Boolean(event?.isPaused),
+            isInfinite: Boolean(event?.isInfinite),
+          },
+          eventPaused: Boolean(event?.isPaused),
+          ctf: modePatchFromBlock(modes?.ctf),
+          koth: {
+            ...(modePatchFromBlock(modes?.koth) ?? {}),
+            ...(modes?.koth?.sessionId
+              ? { sessionId: modes.koth.sessionId }
+              : {}),
+          },
+          attackDefense: modePatchFromBlock(modes?.attackDefense),
         }),
       );
-      setInfo("Playing state saved.");
+      notifyPlayingScheduleChanged(activeId);
+      setInfo("Event + mode schedules saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save playing");
     }
+  }
+
+  function setPlayingMode(
+    key: keyof PlayingModes,
+    patch: Partial<ModeScheduleBlock>,
+  ) {
+    setPlaying((prev) => ({
+      ...prev,
+      modes: {
+        ...prev.modes,
+        [key]: { ...(prev.modes?.[key] ?? {}), ...patch },
+      },
+    }));
+  }
+
+  function setPlayingModeDatetime(
+    key: keyof PlayingModes,
+    field: "start" | "end",
+    localValue: string,
+  ) {
+    const iso = localValue ? toIsoFromLocal(localValue) : null;
+    setPlayingMode(key, { [field]: iso });
+  }
+
+  function setEventPatch(patch: Partial<NonNullable<PlayingState["event"]>>) {
+    setPlaying((prev) => ({
+      ...prev,
+      event: { ...(prev.event ?? {}), ...patch },
+    }));
+  }
+
+  function setEventDatetime(field: "start" | "end", localValue: string) {
+    const iso = localValue ? toIsoFromLocal(localValue) : null;
+    setEventPatch({ [field]: iso });
   }
 
   async function onAssignAdmin() {
@@ -252,8 +348,8 @@ export function EventSettingsView({ hackathonId }: Props) {
     <div className="w-full">
       <PageHeader
         eyebrow="Event workspace"
-        title="Hackathon settings"
-        description="Flag format, first-blood voice, and machine spawn limits for this event."
+        title="Hackathon · Event settings"
+        description="Hackathon is the Event envelope. CTF / KOTH / A&D clocks live under Playing."
       />
 
       <StickyToolbar>
@@ -459,11 +555,29 @@ export function EventSettingsView({ hackathonId }: Props) {
 
       {!isLoading && tab === "playing" ? (
         <div className="space-y-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">
+              Playing · Event &amp; mode clocks
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Set the Hackathon Event window separately from CTF, KOTH, and
+              Attack &amp; Defense. Mode play never uses Event start/end.
+            </p>
+          </div>
           <FormCheckbox
-            label="Event open (`is_open`)"
+            label="Allow team create / join (`is_open`)"
+            description="Players can create or join teams while this is on. Defaults to open before the event starts and auto-unchecks when the event starts."
             checked={Boolean(playing.is_open)}
             onChange={(checked) =>
               setPlaying((prev) => ({ ...prev, is_open: checked }))
+            }
+          />
+          <FormCheckbox
+            label="Show event to clients (`show_to_clients`)"
+            description="List this event in the player Events catalog. Turn off to hide it from clients without deleting the event."
+            checked={playing.show_to_clients !== false}
+            onChange={(checked) =>
+              setPlaying((prev) => ({ ...prev, show_to_clients: checked }))
             }
           />
           <FormCheckbox
@@ -474,8 +588,20 @@ export function EventSettingsView({ hackathonId }: Props) {
             }
           />
           <Button onClick={() => void savePlaying()} disabled={!canWrite}>
-            Save playing
+            Save Event &amp; modes
           </Button>
+
+          <PlayingModeScheduleBoard
+            event={playing.event}
+            modes={playing.modes}
+            scheduleOrder={playing.scheduleOrder}
+            canWrite={canWrite}
+            visibleModes={["ctf", "koth"]}
+            onEventChange={setEventPatch}
+            onEventDatetimeChange={setEventDatetime}
+            onModeChange={setPlayingMode}
+            onModeDatetimeChange={setPlayingModeDatetime}
+          />
 
           <div className="grid gap-3 border-t border-[var(--border)] pt-3 sm:grid-cols-2">
             <TextField

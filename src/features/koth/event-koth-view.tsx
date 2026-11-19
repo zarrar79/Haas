@@ -40,6 +40,7 @@ import {
   type KothSession,
   type KothTeamScore,
 } from "@/features/koth/koth-api";
+import { notifyPlayingScheduleChanged } from "@/features/settings/playing-schedule-sync";
 import { listTeams, type EventTeam } from "@/features/teams/team-api";
 import { redirectIfUnauthorized } from "@/lib/client-api";
 import { formatDate } from "@/lib/format";
@@ -352,6 +353,9 @@ export function EventKothView({ hackathonId, sessionId }: Props) {
           : {}),
       }),
     );
+    if (roundStartChanged || roundEndChanged) {
+      notifyPlayingScheduleChanged(activeId);
+    }
     setConfigUnlocked(false);
   };
 

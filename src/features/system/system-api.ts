@@ -398,12 +398,14 @@ export type PlatformSettings = {
   id: string;
   is_lms_enabled: boolean;
   lms_disabled_message: string;
+  disposable_namespace_idle_minutes: number;
   updated_at?: string;
 };
 
 export type PlatformSettingsUpdate = Partial<{
   is_lms_enabled: boolean;
   lms_disabled_message: string;
+  disposable_namespace_idle_minutes: number;
 }>;
 
 /** TEMPORARY EVENT FEATURE — referer allow-list gate (see accounts/referer_gate.py). */

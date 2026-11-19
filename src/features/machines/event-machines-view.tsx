@@ -42,7 +42,11 @@ import { listTeams, type EventTeam } from "@/features/teams/team-api";
 import { redirectIfUnauthorized } from "@/lib/client-api";
 import { formatDate } from "@/lib/format";
 
-type Props = { hackathonId: string };
+type Props = {
+  hackathonId: string;
+  eyebrow?: string;
+  title?: string;
+};
 
 type ActiveFilter = "all" | "active" | "inactive";
 type BlockedFilter = "all" | "blocked" | "not_blocked";
@@ -54,7 +58,11 @@ function spawnedByLabel(row: MachineRow) {
   return name || d.username || d.email || "—";
 }
 
-export function EventMachinesView({ hackathonId }: Props) {
+export function EventMachinesView({
+  hackathonId,
+  eyebrow = "Event workspace",
+  title = "Machines",
+}: Props) {
   const { confirm } = usePlatformDialog();
   const router = useRouter();
   const [activeId, setActiveId] = useState(hackathonId);
@@ -252,8 +260,8 @@ export function EventMachinesView({ hackathonId }: Props) {
   return (
     <div className="w-full">
       <PageHeader
-        eyebrow="Event workspace"
-        title="Machines"
+        eyebrow={eyebrow}
+        title={title}
         actions={
           <>
             <Button variant="secondary" onClick={() => setBulkSpawnOpen(true)}>

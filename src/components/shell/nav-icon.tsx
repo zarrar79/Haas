@@ -51,6 +51,8 @@ export const NAV_ICONS = {
   "event-question-answers": BiMessage,
   "event-scores": BiBarChart,
   "event-leaderboard": BiTrophy,
+  "event-ctf": BiFlag,
+  "event-ad": BiShield,
   "event-koth": BiCrown,
   "event-machines": BiMicrochip,
   "event-activity-logs": BiBook,

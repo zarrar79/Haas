@@ -20,8 +20,13 @@ import {
   getHackathonAnalytics,
   updateHackathon,
 } from "@/features/hackathons/hackathon-api";
-import { getPlaying } from "@/features/settings/settings-api";
+import {
+  getPlaying,
+  patchPlaying,
+} from "@/features/settings/settings-api";
+import { notifyPlayingScheduleChanged } from "@/features/settings/playing-schedule-sync";
 import { EventLiveDashboardSettingsPanel } from "@/features/events/event-live-dashboard-settings-panel";
+import { EventModeSchedulePanel } from "@/features/events/event-mode-schedule-panel";
 import { HackathonQuickActions } from "@/features/hackathons/hackathon-quick-actions";
 import { HackathonUserAssignmentSection } from "@/features/hackathons/hackathon-user-assignment-section";
 import { OrganizationPicker } from "@/features/organizations/organization-picker";
@@ -80,7 +85,12 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
   const [endDatetime, setEndDatetime] = useState("");
   const [discordLink, setDiscordLink] = useState("");
   const [isInfinite, setIsInfinite] = useState(false);
+  const [isPlatformLive, setIsPlatformLive] = useState(false);
   const [isActive, setIsActive] = useState(true);
+  /** PlayingHackathon.is_open — allow create/join teams. */
+  const [allowTeamRegistration, setAllowTeamRegistration] = useState(true);
+  /** PlayingHackathon.show_to_clients — list in player Events catalog. */
+  const [showToClients, setShowToClients] = useState(true);
   const [adminBindings, setAdminBindings] = useState<HackathonAdminBinding[]>(
     [],
   );
@@ -97,6 +107,7 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
     setEndDatetime(toDatetimeLocal(data.end_datetime));
     setDiscordLink(data.discord_link || "");
     setIsInfinite(coerceBool(data.is_infinite));
+    setIsPlatformLive(coerceBool(data.is_platform_live));
     setIsActive(coerceBool(data.is_active));
     setSponsorIds((data.sponsors || []).map((s) => s.id));
     setOrganizationId(data.city || data.organization?.id || null);
@@ -127,6 +138,12 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
       setChallengeCount(
         playing?.challenge_count ?? analytics?.challenges ?? null,
       );
+      setAllowTeamRegistration(
+        playing ? coerceBool(playing.is_open) : true,
+      );
+      setShowToClients(
+        playing ? playing.show_to_clients !== false : true,
+      );
       setAdminBindings(bindings);
       const activeBindings = bindings.filter((b) => b.is_active !== false);
       setAssigneeIds(activeBindings.map((b) => b.user));
@@ -152,6 +169,7 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
   }, [load]);
 
   function onInfiniteChange(checked: boolean) {
+    if (isPlatformLive) return;
     setIsInfinite(checked);
     if (!checked && hackathon && coerceBool(hackathon.is_infinite)) {
       setStartDatetime("");
@@ -191,11 +209,12 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
         display_name: displayName.trim() || name.trim() || undefined,
         description,
         discord_link: discordLink,
-        is_infinite: isInfinite,
+        // Platform Live is provisioned once via ensure_platform_live — not toggled here.
+        is_infinite: isInfinite || isPlatformLive,
         is_active: isActive,
         city: organizationId,
         sponsor_ids: sponsorIds,
-        ...(isInfinite
+        ...(isInfinite || isPlatformLive
           ? {}
           : {
               start_datetime: toIsoLocal(startDatetime),
@@ -204,6 +223,14 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
       });
       setHackathon(updated);
       applyLoadedHackathon(updated);
+
+      const playingUpdated = await patchPlaying(hackathonId, {
+        is_open: allowTeamRegistration,
+        show_to_clients: showToClients,
+        is_active: isActive,
+      });
+      setAllowTeamRegistration(coerceBool(playingUpdated.is_open));
+      setShowToClients(playingUpdated.show_to_clients !== false);
 
       if (isRoot || isPlatformOperator) {
         await syncHackathonAdmins(hackathonId, assigneeIds, adminBindings);
@@ -226,6 +253,7 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
       }
 
       setSuccess("Hackathon details saved.");
+      notifyPlayingScheduleChanged(hackathonId);
       onSaved?.(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Update failed");
@@ -302,27 +330,43 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
           />
 
           <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-4">
-            <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">
-              Schedule
+            <h3 className="mb-1 text-sm font-semibold text-[var(--text)]">
+              Event schedule
             </h3>
+            <p className="mb-3 text-xs text-[var(--text-muted)]">
+              Hackathon = Event envelope only. CTF and KOTH clocks are set in
+              the mode schedules panel below (and under the CTF / KOTH nav
+              tabs).
+            </p>
             <label className="mb-3 flex items-start gap-2 text-sm text-[var(--text)]">
               <input
                 type="checkbox"
                 className="mt-0.5 h-4 w-4 shrink-0"
-                checked={isInfinite}
+                checked={isInfinite || isPlatformLive}
                 onChange={(e) => onInfiniteChange(e.target.checked)}
-                disabled={!canWrite || isSaving}
+                disabled={!canWrite || isSaving || isPlatformLive}
               />
               <span>
                 <span className="font-medium">Infinite event</span>
                 <span className="mt-0.5 block text-[var(--text-muted)]">
-                  No fixed end window.
+                  No fixed Event end window (does not make CTF infinite).
                 </span>
               </span>
             </label>
+            {isPlatformLive ? (
+              <div className="mb-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text-muted)]">
+                <span className="font-medium text-[var(--text)]">
+                  Platform Live event
+                </span>
+                <span className="mt-0.5 block">
+                  Provisioned once for solo enrollment — not editable here. Only
+                  one Live event exists at a time.
+                </span>
+              </div>
+            ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
               <TextField
-                label="Start"
+                label="Event start"
                 name="start"
                 type="datetime-local"
                 required={!isInfinite}
@@ -331,7 +375,7 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
                 onChange={(e) => setStartDatetime(e.target.value)}
               />
               <TextField
-                label="End"
+                label="Event end"
                 name="end"
                 type="datetime-local"
                 required={!isInfinite}
@@ -350,16 +394,57 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
             disabled={!canWrite || isSaving}
           />
 
-          <div className="flex flex-wrap gap-4 text-sm text-[var(--text)]">
-            <label className="flex items-center gap-2">
+          <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-[var(--text)]">
+              Player access
+            </h3>
+            <label className="flex items-start gap-2 text-sm text-[var(--text)]">
               <input
                 type="checkbox"
-                className="h-4 w-4"
+                className="mt-0.5 h-4 w-4 shrink-0"
+                checked={allowTeamRegistration}
+                onChange={(e) => setAllowTeamRegistration(e.target.checked)}
+                disabled={!canWrite || isSaving}
+              />
+              <span>
+                <span className="font-medium">Allow team create / join</span>
+                <span className="mt-0.5 block text-[var(--text-muted)]">
+                  Players can create or join teams while this is on. Defaults to
+                  open before the event starts and auto-unchecks when the event
+                  starts.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-[var(--text)]">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0"
+                checked={showToClients}
+                onChange={(e) => setShowToClients(e.target.checked)}
+                disabled={!canWrite || isSaving}
+              />
+              <span>
+                <span className="font-medium">Show event to clients</span>
+                <span className="mt-0.5 block text-[var(--text-muted)]">
+                  List this event in the player Events catalog. Turn off to hide
+                  it from clients without deleting the event.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-[var(--text)]">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
                 disabled={!canWrite || isSaving}
               />
-              Active
+              <span>
+                <span className="font-medium">Active</span>
+                <span className="mt-0.5 block text-[var(--text-muted)]">
+                  Event and playing instance are active.
+                </span>
+              </span>
             </label>
           </div>
 
@@ -415,10 +500,21 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
         </div>
       </form>
 
-      <EventLiveDashboardSettingsPanel
+      <EventModeSchedulePanel
         hackathonId={hackathonId}
-        disabled={isSaving}
+        showEvent
+        visibleModes={["ctf", "koth"]}
+        title="Event & mode schedules"
+        description="Set Event, CTF, and KOTH times here. Mode play never uses Event start/end. A&D is skipped for now."
+        className="mt-5"
       />
+
+      <div className="mt-5">
+        <EventLiveDashboardSettingsPanel
+          hackathonId={hackathonId}
+          disabled={isSaving}
+        />
+      </div>
     </div>
   );
 }

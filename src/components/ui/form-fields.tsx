@@ -127,12 +127,14 @@ export function FormInput({
 
 export function FormCheckbox({
   label,
+  description,
   checked,
   onChange,
   disabled,
   className = "",
 }: {
   label: string;
+  description?: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
@@ -140,15 +142,23 @@ export function FormCheckbox({
 }) {
   return (
     <label
-      className={`flex items-center gap-2 text-sm text-[var(--text)] ${className}`.trim()}
+      className={`flex items-start gap-2 text-sm text-[var(--text)] ${className}`.trim()}
     >
       <input
         type="checkbox"
+        className="mt-0.5"
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
       />
-      {label}
+      <span>
+        <span className="font-medium">{label}</span>
+        {description ? (
+          <span className="mt-0.5 block text-[var(--text-muted)]">
+            {description}
+          </span>
+        ) : null}
+      </span>
     </label>
   );
 }

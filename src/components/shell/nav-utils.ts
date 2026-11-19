@@ -100,9 +100,11 @@ export function resolveEventWorkspaceNavigation(
 
 export function isNavHrefActive(pathname: string, href?: string) {
   if (!href) return false;
-  return href === "/home"
-    ? pathname === href
-    : pathname === href || pathname.startsWith(`${href}/`);
+  if (href === "/home") return pathname === href;
+  if (pathname === href) return true;
+  // Mode roots (/ctf, /koth, /ad) should not stay active on nested tabs.
+  if (/\/(ctf|koth|ad)$/.test(href)) return false;
+  return pathname.startsWith(`${href}/`);
 }
 
 export function isNavItemActive(

@@ -3,14 +3,8 @@ import { redirect } from "next/navigation";
 
 import { PlaceholderPage } from "@/components/shell/placeholder-page";
 import { EventActivityLogsView } from "@/features/activity-logs/event-activity-logs-view";
-import { EventChallengesView } from "@/features/challenges/event-challenges-view";
 import { EventHackathonView } from "@/features/events/event-hackathon-view";
-import { EventLeaderboardView } from "@/features/leaderboard/event-leaderboard-view";
-import { EventKothListView } from "@/features/koth/event-koth-list-view";
-import { EventMachinesView } from "@/features/machines/event-machines-view";
 import { EventMembersView } from "@/features/members/event-members-view";
-import { EventQuestionAnswersView } from "@/features/question-answers/event-question-answers-view";
-import { EventTeamScoresView } from "@/features/scores/event-team-scores-view";
 import { EventSettingsView } from "@/features/settings/event-settings-view";
 import { EventTeamsView } from "@/features/teams/event-teams-view";
 
@@ -38,9 +32,6 @@ export default async function EventSectionPage({ params }: PageProps) {
   if (section === "sponsors") {
     redirect(`/events/${hackathonId}/hackathon?tab=sponsors`);
   }
-  if (section === "challenges") {
-    return <EventChallengesView hackathonId={hackathonId} />;
-  }
   if (section === "members") {
     return <EventMembersView hackathonId={hackathonId} />;
   }
@@ -53,23 +44,31 @@ export default async function EventSectionPage({ params }: PageProps) {
   if (section === "ops") {
     redirect(`/events/${hackathonId}`);
   }
-  if (section === "question-answers") {
-    return <EventQuestionAnswersView hackathonId={hackathonId} />;
-  }
-  if (section === "scores") {
-    return <EventTeamScoresView hackathonId={hackathonId} />;
-  }
-  if (section === "leaderboard") {
-    return <EventLeaderboardView hackathonId={hackathonId} />;
-  }
-  if (section === "koth") {
-    return <EventKothListView hackathonId={hackathonId} />;
-  }
-  if (section === "machines") {
-    return <EventMachinesView hackathonId={hackathonId} />;
-  }
   if (section === "activity-logs") {
     return <EventActivityLogsView hackathonId={hackathonId} />;
+  }
+
+  // Legacy flat CTF routes → CTF umbrella
+  if (section === "leaderboard") {
+    redirect(`/events/${hackathonId}/ctf/leaderboard`);
+  }
+  if (section === "challenges") {
+    redirect(`/events/${hackathonId}/ctf/challenges`);
+  }
+  if (section === "question-answers") {
+    redirect(`/events/${hackathonId}/ctf/question-answers`);
+  }
+  if (section === "scores") {
+    redirect(`/events/${hackathonId}/ctf/submissions`);
+  }
+  if (section === "machines") {
+    redirect(`/events/${hackathonId}/ctf/machines`);
+  }
+  if (section === "ctf") {
+    redirect(`/events/${hackathonId}/ctf`);
+  }
+  if (section === "ad" || section === "attack-defense") {
+    redirect(`/events/${hackathonId}/ad`);
   }
 
   const title = section.charAt(0).toUpperCase() + section.slice(1);

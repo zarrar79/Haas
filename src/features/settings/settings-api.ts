@@ -12,14 +12,76 @@ export type UserRules = {
   force_password_policy?: boolean;
 };
 
+export type ModeScheduleBlock = {
+  id?: string;
+  enabled?: boolean;
+  start?: string | null;
+  end?: string | null;
+  isPaused?: boolean;
+  isInfinite?: boolean;
+  isOpen?: boolean;
+  phase?: string;
+  sessionId?: string;
+  status?: string;
+};
+
+export type PlayingEventWindow = {
+  id?: string;
+  start?: string | null;
+  end?: string | null;
+  isPaused?: boolean;
+  isInfinite?: boolean;
+};
+
+export type PlayingModes = {
+  ctf?: ModeScheduleBlock | null;
+  koth?: ModeScheduleBlock | null;
+  attackDefense?: ModeScheduleBlock | null;
+};
+
+export type ModeSchedulePatch = {
+  start?: string | null;
+  end?: string | null;
+  enabled?: boolean;
+  isPaused?: boolean;
+  isInfinite?: boolean;
+  /** KOTH: pin the shared session ModeSchedule / Sessions / Play window edit. */
+  sessionId?: string;
+};
+
 export type PlayingState = {
   id?: string;
+  /** Allow players to create/join teams. Auto-closes when the event starts. */
   is_open?: boolean;
+  /** Show this event in the player Events catalog. */
+  show_to_clients?: boolean;
   is_active?: boolean;
   team_count?: number;
   challenge_count?: number;
   challenges?: Array<{ id: string; name?: string }>;
   teams?: Array<{ id: string; name?: string }>;
+  event?: PlayingEventWindow | null;
+  modes?: PlayingModes;
+  scheduleOrder?: string[];
+};
+
+export type EventSchedulePatch = {
+  start?: string | null;
+  end?: string | null;
+  isPaused?: boolean;
+  isInfinite?: boolean;
+};
+
+export type PlayingPatchBody = {
+  is_open?: boolean;
+  show_to_clients?: boolean;
+  is_active?: boolean;
+  /** Hackathon = Event envelope (not CTF). */
+  event?: EventSchedulePatch;
+  eventPaused?: boolean;
+  ctf?: ModeSchedulePatch;
+  koth?: ModeSchedulePatch;
+  attackDefense?: ModeSchedulePatch;
 };
 
 export type ScoringConfig = Record<string, unknown>;
@@ -65,10 +127,7 @@ export function getPlaying(hackathonId: string) {
   return haasGet<PlayingState>(eventPath(hackathonId, "playing"));
 }
 
-export function patchPlaying(
-  hackathonId: string,
-  body: { is_open?: boolean; is_active?: boolean },
-) {
+export function patchPlaying(hackathonId: string, body: PlayingPatchBody) {
   return haasSend<PlayingState>(eventPath(hackathonId, "playing"), {
     method: "PATCH",
     body,

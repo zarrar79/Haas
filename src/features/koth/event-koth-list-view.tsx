@@ -18,6 +18,10 @@ import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import {
+  EventModeSubnav,
+  kothSubnavItems,
+} from "@/features/events/event-mode-subnav";
+import {
   createKothSession,
   deleteKothSession,
   listKothSessions,
@@ -27,6 +31,10 @@ import {
 } from "@/features/koth/koth-api";
 import { redirectIfUnauthorized } from "@/lib/client-api";
 import { KothScheduleModal } from "@/features/koth/koth-schedule-modal";
+import {
+  notifyPlayingScheduleChanged,
+  onPlayingScheduleChanged,
+} from "@/features/settings/playing-schedule-sync";
 import { formatDate } from "@/lib/format";
 
 type Props = { hackathonId: string };
@@ -81,6 +89,12 @@ export function EventKothListView({ hackathonId }: Props) {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    return onPlayingScheduleChanged((id) => {
+      if (id === activeId) void load();
+    });
+  }, [activeId, load]);
+
   const openSession = (sessionId: string) => {
     router.push(`/events/${activeId}/koth/${sessionId}`);
   };
@@ -100,6 +114,7 @@ export function EventKothListView({ hackathonId }: Props) {
     setError(null);
     try {
       const created = await createKothSession(activeId, { name: trimmed });
+      notifyPlayingScheduleChanged(activeId);
       await load();
       openSession(created.id);
     } catch (err) {
@@ -120,6 +135,7 @@ export function EventKothListView({ hackathonId }: Props) {
       if (redirectIfUnauthorized(err, router)) return;
       throw err;
     }
+    notifyPlayingScheduleChanged(activeId);
     await load();
   };
 
@@ -199,7 +215,8 @@ export function EventKothListView({ hackathonId }: Props) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="King of the Hill"
+        eyebrow="King of the Hill"
+        title="Sessions"
         description="Create, open, rename, or delete KOTH instances for this hackathon. Each instance is scored separately."
         actions={
           canWrite ? (
@@ -210,6 +227,8 @@ export function EventKothListView({ hackathonId }: Props) {
           ) : undefined
         }
       />
+
+      <EventModeSubnav items={kothSubnavItems(activeId)} />
 
       {error ? <Alert variant="error">{error}</Alert> : null}
 

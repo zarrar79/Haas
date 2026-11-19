@@ -42,11 +42,19 @@ import type { EventTeam } from "@/features/teams/team-api";
 import { redirectIfUnauthorized } from "@/lib/client-api";
 import { formatDate } from "@/lib/format";
 
-type Props = { hackathonId: string };
+type Props = {
+  hackathonId: string;
+  eyebrow?: string;
+  title?: string;
+};
 type ModeFilter = "all" | "static" | "dynamic";
 type ValidityFilter = "all" | "correct" | "incorrect" | "pending";
 
-export function EventQuestionAnswersView({ hackathonId }: Props) {
+export function EventQuestionAnswersView({
+  hackathonId,
+  eyebrow = "Event workspace",
+  title = "Question answers",
+}: Props) {
   const { confirm } = usePlatformDialog();
   const router = useRouter();
   const { setSelectedHackathonId } = useSelectedEvent();
@@ -290,8 +298,8 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
   return (
     <div className="w-full">
       <PageHeader
-        eyebrow="Event workspace"
-        title="Question answers"
+        eyebrow={eyebrow}
+        title={title}
         actions={<Button onClick={openCreate}>Create answer</Button>}
       />
 
