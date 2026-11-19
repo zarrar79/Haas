@@ -206,7 +206,7 @@ export function HackathonCreateForm() {
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 <TextField
-                  label="Start"
+                  label="Event start"
                   name="start"
                   type="datetime-local"
                   required
@@ -215,7 +215,7 @@ export function HackathonCreateForm() {
                   disabled={isSubmitting}
                 />
                 <TextField
-                  label="End"
+                  label="Event end"
                   name="end"
                   type="datetime-local"
                   required

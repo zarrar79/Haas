@@ -14,7 +14,6 @@ import { ListPageStat, ListPageStats } from "@/components/ui/list-page-stats";
 import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
-import { listHackathons } from "@/features/hackathons/hackathon-api";
 import {
   applySectionSearch,
   useSectionSearch,
@@ -31,8 +30,6 @@ import { EventUserRowActions } from "@/features/users/event-user-row-actions";
 import { UserFormModal } from "@/features/users/user-form-modal";
 import { useEventUserActions } from "@/features/users/use-event-user-actions";
 import { redirectIfUnauthorized } from "@/lib/client-api";
-import { hackathonLabel } from "@/lib/display-name";
-import type { Hackathon } from "@/types/hackathon";
 
 type Props = { hackathonId: string };
 
@@ -44,7 +41,6 @@ export function EventMembersView({ hackathonId }: Props) {
   const { canMutateEvent } = useHaasAccess();
   const { setSelectedHackathonId } = useSelectedEvent();
   const [activeId, setActiveId] = useState(hackathonId);
-  const [hackathons, setHackathons] = useState<Hackathon[]>([]);
   const [allRows, setAllRows] = useState<EventUser[]>([]);
   const { search, setSearch, debouncedSearch, focusId, clearDeepSearch } =
     useSectionSearch();
@@ -65,26 +61,8 @@ export function EventMembersView({ hackathonId }: Props) {
 
   useEffect(() => {
     setActiveId(hackathonId);
-  }, [hackathonId]);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const { items } = await listHackathons({ show_deleted: "false" });
-        setHackathons(items);
-      } catch (err) {
-        redirectIfUnauthorized(err, router);
-      }
-    })();
-  }, [router]);
-
-  function onHackathonChange(nextId: string) {
-    setActiveId(nextId);
-    setSelectedHackathonId(nextId || null);
-    if (nextId) {
-      router.push(`/events/${nextId}/members`);
-    }
-  }
+    if (hackathonId) setSelectedHackathonId(hackathonId);
+  }, [hackathonId, setSelectedHackathonId]);
 
   const load = useCallback(async () => {
     if (!activeId) return;
@@ -212,23 +190,6 @@ export function EventMembersView({ hackathonId }: Props) {
           </ListPageStats>
         }
       >
-        <FilterSelect
-          label="Hackathon"
-          value={activeId}
-          onChange={onHackathonChange}
-          className="min-w-[180px]"
-        >
-          {hackathons.length === 0 ? (
-            <option value="">No events</option>
-          ) : (
-            hackathons.map((h) => (
-              <option key={h.id} value={h.id}>
-                {hackathonLabel(h)}
-              </option>
-            ))
-          )}
-        </FilterSelect>
-
         <FilterTextField
           label="Search"
           name="search"

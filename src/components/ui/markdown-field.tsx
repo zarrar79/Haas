@@ -13,7 +13,6 @@ export function MarkdownField({
   className = "",
   controlClassName = "",
   placeholder = "Supports markdown — **bold**, `code`, lists, links, tables…",
-  disabled = false,
 }: {
   label: string;
   value: string;
@@ -21,7 +20,6 @@ export function MarkdownField({
   className?: string;
   controlClassName?: string;
   placeholder?: string;
-  disabled?: boolean;
 }) {
   const [preview, setPreview] = useState(false);
   const tab = (active: boolean) =>
@@ -35,18 +33,10 @@ export function MarkdownField({
       <div className="flex items-center justify-between">
         <span className="font-medium text-[var(--text)]">{label}</span>
         <div className="flex gap-1">
-          <button
-            type="button"
-            className={tab(!preview)}
-            onClick={() => setPreview(false)}
-          >
+          <button type="button" className={tab(!preview)} onClick={() => setPreview(false)}>
             Write
           </button>
-          <button
-            type="button"
-            className={tab(preview)}
-            onClick={() => setPreview(true)}
-          >
+          <button type="button" className={tab(preview)} onClick={() => setPreview(true)}>
             Preview
           </button>
         </div>
@@ -64,7 +54,6 @@ export function MarkdownField({
           className={`${FORM_CONTROL_CLASS} ${controlClassName}`.trim()}
           value={value}
           placeholder={placeholder}
-          disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
         />
       )}

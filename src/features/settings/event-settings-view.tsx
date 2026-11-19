@@ -13,8 +13,8 @@ import { PageLoader } from "@/components/ui/loader";
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { TextField } from "@/components/ui/text-field";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
-import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
+import { useSelectedEvent } from "@/features/events/selected-event-context";
 import {
   assignHackathonAdmin,
   listHackathonAdmins,
@@ -22,19 +22,21 @@ import {
   type HackathonAdminBinding,
 } from "@/features/hackathon-admins/hackathon-admin-api";
 import {
-  getModules,
   getPlaying,
   getSettings,
-  getUserRules,
-  patchModules,
   patchPlaying,
   patchSettings,
-  patchUserRules,
-  type EventModules,
   type EventSettings,
+  type ModeScheduleBlock,
+  type ModeSchedulePatch,
+  type PlayingModes,
   type PlayingState,
-  type UserRules,
 } from "@/features/settings/settings-api";
+import { PlayingModeScheduleBoard } from "@/features/settings/playing-mode-schedule-board";
+import {
+  notifyPlayingScheduleChanged,
+  onPlayingScheduleChanged,
+} from "@/features/settings/playing-schedule-sync";
 import {
   addPlayingChallenges,
   addPlayingTeams,
@@ -43,40 +45,70 @@ import {
 } from "@/features/challenges/challenge-admin-api";
 import { redirectIfUnauthorized } from "@/lib/client-api";
 
-type Tab = "settings" | "modules" | "rules" | "playing" | "admins";
+type Tab = "settings" | "playing" | "admins";
 
 type Props = { hackathonId: string };
 
-const MANAGER_SETTING_KEYS = [
-  "broadcast_message",
-  "dashboard_auto",
-  "dashboard_auto_interval",
-  "set_spawning_queue_message",
-  "hackathon_stop_message",
-  "important_message",
-  "is_important_message_show",
-  "max_team_challenge_spawn_limit",
-  "per_team_windows_machine_limit",
-  "per_team_linux_machine_limit",
-] as const;
+const DEFAULT_FLAG_FORMAT = "CYBERRANGE";
+
+function asBool(value: unknown, fallback = false): boolean {
+  if (typeof value === "boolean") return value;
+  if (value === 1 || value === "1" || value === "true" || value === "True") {
+    return true;
+  }
+  if (value === 0 || value === "0" || value === "false" || value === "False") {
+    return false;
+  }
+  return fallback;
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function asString(value: unknown, fallback = ""): string {
+  if (value == null) return fallback;
+  const s = String(value).trim();
+  return s || fallback;
+}
+
+function toIsoFromLocal(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toISOString();
+}
+
+function modePatchFromBlock(
+  block: ModeScheduleBlock | null | undefined,
+): ModeSchedulePatch | undefined {
+  if (!block) return undefined;
+  return {
+    enabled: block.enabled,
+    isPaused: block.isPaused,
+    isInfinite: block.isInfinite,
+    start: block.start == null ? block.start : toIsoFromLocal(block.start) ?? block.start,
+    end: block.end == null ? block.end : toIsoFromLocal(block.end) ?? block.end,
+  };
+}
 
 export function EventSettingsView({ hackathonId }: Props) {
   const { confirm } = usePlatformDialog();
   const router = useRouter();
   const { canMutateEvent, isRoot } = useHaasAccess();
+  const { setSelectedHackathonId } = useSelectedEvent();
   const [activeId, setActiveId] = useState(hackathonId);
   const [tab, setTab] = useState<Tab>("settings");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settings, setSettings] = useState<EventSettings>({});
-  const [modules, setModules] = useState<EventModules>({});
-  const [rules, setRules] = useState<UserRules>({});
   const [playing, setPlaying] = useState<PlayingState>({});
   const [admins, setAdmins] = useState<HackathonAdminBinding[]>([]);
   const [adminUser, setAdminUser] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
-  const [settingsJson, setSettingsJson] = useState("{}");
   const [rosterChallengeId, setRosterChallengeId] = useState("");
   const [rosterTeamId, setRosterTeamId] = useState("");
 
@@ -84,7 +116,8 @@ export function EventSettingsView({ hackathonId }: Props) {
 
   useEffect(() => {
     setActiveId(hackathonId);
-  }, [hackathonId]);
+    if (hackathonId) setSelectedHackathonId(hackathonId);
+  }, [hackathonId, setSelectedHackathonId]);
 
   const load = useCallback(async () => {
     if (!activeId) return;
@@ -94,17 +127,12 @@ export function EventSettingsView({ hackathonId }: Props) {
       const adminPromise = isRoot
         ? listHackathonAdmins({ hackathon: activeId })
         : Promise.resolve([] as HackathonAdminBinding[]);
-      const [s, m, r, p, adminRows] = await Promise.all([
+      const [s, p, adminRows] = await Promise.all([
         getSettings(activeId),
-        getModules(activeId),
-        getUserRules(activeId),
         getPlaying(activeId),
         adminPromise,
       ]);
       setSettings(s || {});
-      setSettingsJson(JSON.stringify(s || {}, null, 2));
-      setModules(m || {});
-      setRules(r || {});
       setPlaying(p || {});
       setAdmins(adminRows);
     } catch (err) {
@@ -119,53 +147,157 @@ export function EventSettingsView({ hackathonId }: Props) {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    return onPlayingScheduleChanged((id) => {
+      if (id !== activeId) return;
+      void getPlaying(activeId)
+        .then((p) => setPlaying(p || {}))
+        .catch(() => undefined);
+    });
+  }, [activeId]);
+
+  function setSetting<K extends string>(key: K, value: unknown) {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+  }
+
   async function saveSettings() {
     setError(null);
     setInfo(null);
+    setIsSavingSettings(true);
     try {
-      const parsed = JSON.parse(settingsJson) as EventSettings;
-      const saved = await patchSettings(activeId, parsed);
+      const flagFormat = String(settings.flag_format ?? "").trim();
+      if (!flagFormat) {
+        setError("Flag format is required.");
+        return;
+      }
+      const platformDefaults =
+        settings.platform_defaults &&
+        typeof settings.platform_defaults === "object"
+          ? (settings.platform_defaults as Record<string, unknown>)
+          : {};
+      const defaultContainer = asNumber(
+        platformDefaults.per_team_container_machine_limit,
+        5,
+      );
+      const defaultVm = asNumber(
+        platformDefaults.per_team_vm_machine_limit,
+        1,
+      );
+      // Only patch fields that are actually used by the platform.
+      const payload: EventSettings = {
+        flag_format: flagFormat,
+        first_blood_voice_enabled: asBool(
+          settings.first_blood_voice_enabled,
+          true,
+        ),
+        show_test_teams: asBool(settings.show_test_teams, false),
+        per_team_container_machine_limit: asNumber(
+          settings.per_team_container_machine_limit,
+          defaultContainer,
+        ),
+        is_active_per_team_container_machine_limit: asBool(
+          settings.is_active_per_team_container_machine_limit,
+          true,
+        ),
+        per_team_vm_machine_limit: asNumber(
+          settings.per_team_vm_machine_limit,
+          defaultVm,
+        ),
+        is_active_per_team_vm_machine_limit: asBool(
+          settings.is_active_per_team_vm_machine_limit,
+          true,
+        ),
+      };
+      const saved = await patchSettings(activeId, payload);
       setSettings(saved);
-      setSettingsJson(JSON.stringify(saved, null, 2));
-      setInfo("Settings saved.");
+      setInfo("Hackathon settings saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save settings");
+    } finally {
+      setIsSavingSettings(false);
     }
   }
 
-  async function saveModules() {
-    setError(null);
-    try {
-      setModules(await patchModules(activeId, modules));
-      setInfo("Modules saved.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save modules");
-    }
-  }
-
-  async function saveRules() {
-    setError(null);
-    try {
-      setRules(await patchUserRules(activeId, rules));
-      setInfo("User rules saved.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save rules");
-    }
-  }
+  // Keep the raw value while editing so backspace can clear the field;
+  // only fall back to the default for preview / save.
+  const flagFormatInput =
+    settings.flag_format == null ? DEFAULT_FLAG_FORMAT : String(settings.flag_format);
+  const flagPreview = `${
+    flagFormatInput.trim() || DEFAULT_FLAG_FORMAT
+  }{a1b2c3…}`;
 
   async function savePlaying() {
     setError(null);
     try {
+      const modes = playing.modes;
+      const event = playing.event;
       setPlaying(
         await patchPlaying(activeId, {
           is_open: Boolean(playing.is_open),
+          show_to_clients: Boolean(playing.show_to_clients),
           is_active: Boolean(playing.is_active),
+          event: {
+            start:
+              event?.start == null
+                ? event?.start
+                : toIsoFromLocal(event.start) ?? event.start,
+            end:
+              event?.end == null
+                ? event?.end
+                : toIsoFromLocal(event.end) ?? event.end,
+            isPaused: Boolean(event?.isPaused),
+            isInfinite: Boolean(event?.isInfinite),
+          },
+          eventPaused: Boolean(event?.isPaused),
+          ctf: modePatchFromBlock(modes?.ctf),
+          koth: {
+            ...(modePatchFromBlock(modes?.koth) ?? {}),
+            ...(modes?.koth?.sessionId
+              ? { sessionId: modes.koth.sessionId }
+              : {}),
+          },
+          attackDefense: modePatchFromBlock(modes?.attackDefense),
         }),
       );
-      setInfo("Playing state saved.");
+      notifyPlayingScheduleChanged(activeId);
+      setInfo("Event + mode schedules saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save playing");
     }
+  }
+
+  function setPlayingMode(
+    key: keyof PlayingModes,
+    patch: Partial<ModeScheduleBlock>,
+  ) {
+    setPlaying((prev) => ({
+      ...prev,
+      modes: {
+        ...prev.modes,
+        [key]: { ...(prev.modes?.[key] ?? {}), ...patch },
+      },
+    }));
+  }
+
+  function setPlayingModeDatetime(
+    key: keyof PlayingModes,
+    field: "start" | "end",
+    localValue: string,
+  ) {
+    const iso = localValue ? toIsoFromLocal(localValue) : null;
+    setPlayingMode(key, { [field]: iso });
+  }
+
+  function setEventPatch(patch: Partial<NonNullable<PlayingState["event"]>>) {
+    setPlaying((prev) => ({
+      ...prev,
+      event: { ...(prev.event ?? {}), ...patch },
+    }));
+  }
+
+  function setEventDatetime(field: "start" | "end", localValue: string) {
+    const iso = localValue ? toIsoFromLocal(localValue) : null;
+    setEventPatch({ [field]: iso });
   }
 
   async function onAssignAdmin() {
@@ -208,8 +340,6 @@ export function EventSettingsView({ hackathonId }: Props) {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "settings", label: "Settings" },
-    { id: "modules", label: "Modules" },
-    { id: "rules", label: "User rules" },
     { id: "playing", label: "Playing" },
     ...(isRoot ? [{ id: "admins" as const, label: "Hackathon admins" }] : []),
   ];
@@ -218,17 +348,11 @@ export function EventSettingsView({ hackathonId }: Props) {
     <div className="w-full">
       <PageHeader
         eyebrow="Event workspace"
-        title="Settings"
+        title="Hackathon · Event settings"
+        description="Hackathon is the Event envelope. CTF / KOTH / A&D clocks live under Playing."
       />
 
-      <StickyToolbar layout="stack">
-        <HackathonPicker
-          value={activeId}
-          onChange={setActiveId}
-          section="settings"
-        />
-
-        <div className="flex flex-wrap gap-2">
+      <StickyToolbar>
         {tabs.map((t) => (
           <Button
             key={t.id}
@@ -239,7 +363,6 @@ export function EventSettingsView({ hackathonId }: Props) {
             {t.label}
           </Button>
         ))}
-        </div>
       </StickyToolbar>
 
       {error ? (
@@ -249,121 +372,212 @@ export function EventSettingsView({ hackathonId }: Props) {
       ) : null}
       {info ? (
         <div className="mb-3">
-          <Alert variant="info">{info}</Alert>
+          <Alert variant="success">{info}</Alert>
         </div>
       ) : null}
 
       {isLoading ? <PageLoader label="Loading settings…" variant="form" /> : null}
 
       {!isLoading && tab === "settings" ? (
-        <div className="space-y-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4">
-          <p className="text-xs text-[var(--text-muted)]">
-            Managers may only PATCH ops fields (
-            {MANAGER_SETTING_KEYS.join(", ")}
-            ). Organizers can PATCH the full object.
-          </p>
-          <textarea
-            className="min-h-[280px] w-full rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-3 font-mono text-xs text-[var(--text)]"
-            value={settingsJson}
-            onChange={(e) => setSettingsJson(e.target.value)}
-          />
-          <Button onClick={() => void saveSettings()} disabled={!canWrite}>
-            Save settings
-          </Button>
-          <pre className="overflow-auto rounded-[var(--radius-sm)] bg-[var(--bg)] p-3 text-[10px] text-[var(--text-muted)]">
-            {JSON.stringify(settings, null, 2)}
-          </pre>
-        </div>
-      ) : null}
-
-      {!isLoading && tab === "modules" ? (
-        <div className="space-y-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4">
-          {(
-            [
-              ["jeopardy_enabled", "Jeopardy"],
-              ["koth_enabled", "King of the Hill"],
-              ["attack_defence_enabled", "Attack & Defence"],
-              ["viewer_can_export", "Viewer can export CSV"],
-            ] as const
-          ).map(([key, label]) => (
-            <label
-              key={key}
-              className="flex items-center gap-2 text-sm text-[var(--text)]"
-            >
-              <input
-                type="checkbox"
-                checked={Boolean(modules[key])}
-                onChange={(e) =>
-                  setModules((prev) => ({ ...prev, [key]: e.target.checked }))
-                }
+        <div className="space-y-4">
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">
+              Flag format
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Prefix used for dynamically generated challenge flags. Default is{" "}
+              <code className="text-[var(--text)]">{DEFAULT_FLAG_FORMAT}</code>.
+              Spawned machines will use{" "}
+              <code className="text-[var(--text)]">{`PREFIX{hash}`}</code>.
+            </p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <TextField
+                label="Flag prefix"
+                name="flag_format"
+                value={flagFormatInput}
+                onChange={(e) => setSetting("flag_format", e.target.value)}
+                disabled={!canWrite || isSavingSettings}
+                placeholder={DEFAULT_FLAG_FORMAT}
               />
-              {label}
-            </label>
-          ))}
-          <Button onClick={() => void saveModules()} disabled={!canWrite}>
-            Save modules
-          </Button>
-        </div>
-      ) : null}
-
-      {!isLoading && tab === "rules" ? (
-        <div className="grid gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-2">
-          <TextField
-            label="Max attempts (0 = inherit)"
-            name="max_attempts"
-            type="number"
-            value={String(rules.max_attempts ?? 0)}
-            onChange={(e) =>
-              setRules((prev) => ({
-                ...prev,
-                max_attempts: Number(e.target.value),
-              }))
-            }
-          />
-          <TextField
-            label="Spawn limit (0 = inherit)"
-            name="spawn_limit"
-            type="number"
-            value={String(rules.spawn_limit ?? 0)}
-            onChange={(e) =>
-              setRules((prev) => ({
-                ...prev,
-                spawn_limit: Number(e.target.value),
-              }))
-            }
-          />
-          <FormCheckbox
-            label="VPN allowed"
-            checked={Boolean(rules.vpn_allowed)}
-            onChange={(checked) =>
-              setRules((prev) => ({ ...prev, vpn_allowed: checked }))
-            }
-          />
-          <FormCheckbox
-            label="Force password policy"
-            checked={Boolean(rules.force_password_policy)}
-            onChange={(checked) =>
-              setRules((prev) => ({
-                ...prev,
-                force_password_policy: checked,
-              }))
-            }
-          />
-          <div className="sm:col-span-2">
-            <Button onClick={() => void saveRules()} disabled={!canWrite}>
-              Save user rules
-            </Button>
+              <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                  Preview
+                </p>
+                <p className="mt-2 font-mono text-sm text-[var(--text)]">
+                  {flagPreview}
+                </p>
+              </div>
+            </div>
           </div>
+
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5">
+            <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">
+              First blood
+            </h2>
+            <p className="mb-3 text-sm text-[var(--text-muted)]">
+              Controls the player-portal first-blood sound/voice for this event.
+              Scoring uses the shared first-blood bonus, not attempt bonuses.
+            </p>
+            <FormCheckbox
+              label="Play first-blood voice / sound for the solving team"
+              checked={asBool(settings.first_blood_voice_enabled, true)}
+              onChange={(checked) =>
+                setSetting("first_blood_voice_enabled", checked)
+              }
+              disabled={!canWrite || isSavingSettings}
+            />
+          </div>
+
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5">
+            <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">
+              Public boards
+            </h2>
+            <p className="mb-3 text-sm text-[var(--text-muted)]">
+              When off, teams marked testing or load-testing are hidden from
+              leaderboard, scoreboard, KOTH, and live dashboards for this event.
+            </p>
+            <FormCheckbox
+              label="Show test teams on public boards"
+              checked={asBool(settings.show_test_teams, false)}
+              onChange={(checked) => setSetting("show_test_teams", checked)}
+              disabled={!canWrite || isSavingSettings}
+            />
+          </div>
+
+          <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5">
+            <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">
+              Machine limits
+            </h2>
+      
+        
+            {(() => {
+              const platformDefaults =
+                settings.platform_defaults &&
+                typeof settings.platform_defaults === "object"
+                  ? (settings.platform_defaults as Record<string, unknown>)
+                  : {};
+              const defaultContainer = asNumber(
+                platformDefaults.per_team_container_machine_limit,
+                5,
+              );
+              const defaultVm = asNumber(
+                platformDefaults.per_team_vm_machine_limit,
+                1,
+              );
+              return (
+                <>
+                 
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <TextField
+                      label="Container machines per team"
+                      name="per_team_container_machine_limit"
+                      type="number"
+                      value={String(
+                        asNumber(
+                          settings.per_team_container_machine_limit,
+                          defaultContainer,
+                        ),
+                      )}
+                      onChange={(e) =>
+                        setSetting(
+                          "per_team_container_machine_limit",
+                          Number(e.target.value),
+                        )
+                      }
+                      disabled={!canWrite || isSavingSettings}
+                    />
+                    <TextField
+                      label="VM machines per team"
+                      name="per_team_vm_machine_limit"
+                      type="number"
+                      value={String(
+                        asNumber(
+                          settings.per_team_vm_machine_limit,
+                          defaultVm,
+                        ),
+                      )}
+                      onChange={(e) =>
+                        setSetting(
+                          "per_team_vm_machine_limit",
+                          Number(e.target.value),
+                        )
+                      }
+                      disabled={!canWrite || isSavingSettings}
+                    />
+                    <FormCheckbox
+                      label="Enforce container machine limit"
+                      checked={asBool(
+                        settings.is_active_per_team_container_machine_limit,
+                        true,
+                      )}
+                      onChange={(checked) =>
+                        setSetting(
+                          "is_active_per_team_container_machine_limit",
+                          checked,
+                        )
+                      }
+                      disabled={!canWrite || isSavingSettings}
+                    />
+                    <FormCheckbox
+                      label="Enforce VM machine limit"
+                      checked={asBool(
+                        settings.is_active_per_team_vm_machine_limit,
+                        true,
+                      )}
+                      onChange={(checked) =>
+                        setSetting(
+                          "is_active_per_team_vm_machine_limit",
+                          checked,
+                        )
+                      }
+                      disabled={!canWrite || isSavingSettings}
+                    />
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+
+          {canWrite ? (
+            <Button
+              onClick={() => void saveSettings()}
+              disabled={isSavingSettings}
+            >
+              {isSavingSettings ? "Saving…" : "Save hackathon settings"}
+            </Button>
+          ) : (
+            <Alert variant="info">
+              You have read-only access to this event&apos;s settings.
+            </Alert>
+          )}
         </div>
       ) : null}
 
       {!isLoading && tab === "playing" ? (
         <div className="space-y-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">
+              Playing · Event &amp; mode clocks
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Set the Hackathon Event window separately from CTF, KOTH, and
+              Attack &amp; Defense. Mode play never uses Event start/end.
+            </p>
+          </div>
           <FormCheckbox
-            label="Event open (`is_open`)"
+            label="Allow team create / join (`is_open`)"
+            description="Players can create or join teams while this is on. Defaults to open before the event starts and auto-unchecks when the event starts."
             checked={Boolean(playing.is_open)}
             onChange={(checked) =>
               setPlaying((prev) => ({ ...prev, is_open: checked }))
+            }
+          />
+          <FormCheckbox
+            label="Show event to clients (`show_to_clients`)"
+            description="List this event in the player Events catalog. Turn off to hide it from clients without deleting the event."
+            checked={playing.show_to_clients !== false}
+            onChange={(checked) =>
+              setPlaying((prev) => ({ ...prev, show_to_clients: checked }))
             }
           />
           <FormCheckbox
@@ -374,8 +588,20 @@ export function EventSettingsView({ hackathonId }: Props) {
             }
           />
           <Button onClick={() => void savePlaying()} disabled={!canWrite}>
-            Save playing
+            Save Event &amp; modes
           </Button>
+
+          <PlayingModeScheduleBoard
+            event={playing.event}
+            modes={playing.modes}
+            scheduleOrder={playing.scheduleOrder}
+            canWrite={canWrite}
+            visibleModes={["ctf", "koth"]}
+            onEventChange={setEventPatch}
+            onEventDatetimeChange={setEventDatetime}
+            onModeChange={setPlayingMode}
+            onModeDatetimeChange={setPlayingModeDatetime}
+          />
 
           <div className="grid gap-3 border-t border-[var(--border)] pt-3 sm:grid-cols-2">
             <TextField

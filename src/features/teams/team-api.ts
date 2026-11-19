@@ -41,6 +41,8 @@ export type EventTeam = {
   is_active?: boolean;
   is_blocked?: boolean;
   register_as?: string | null;
+  /** actual | testing | load_testing — hidden from public boards when event setting is off */
+  team_type?: string | null;
   /** K8s namespace (alias of name_code) */
   namespace?: string | null;
   name_code?: string | null;
@@ -92,6 +94,7 @@ export type TeamWriteInput = {
   name?: string;
   description?: string;
   register_as?: string;
+  team_type?: string;
   affiliation?: string;
   website?: string;
   is_active?: boolean;
@@ -160,6 +163,7 @@ export function createTeam(
     name: string;
     description?: string;
     register_as?: string;
+    team_type?: string;
     affiliation?: string;
     /** When creating from system /teams, link to one or many events. */
     hackathon?: string | null;
@@ -172,6 +176,7 @@ export function createTeam(
     name: body.name,
     description: body.description,
     register_as: body.register_as,
+    team_type: body.team_type,
     affiliation: body.affiliation,
   };
   if (hackathonId) {

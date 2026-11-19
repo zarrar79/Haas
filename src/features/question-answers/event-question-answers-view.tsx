@@ -22,14 +22,8 @@ import {
 import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
-import { listAllChallenges } from "@/features/challenges/challenge-api";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
-import { listHackathons } from "@/features/hackathons/hackathon-api";
-import {
-  ALL_EVENTS_SCOPE,
-  isAllEventsScope,
-} from "@/features/events/event-scope";
 import {
   applySectionSearch,
   questionAnswerRowSearchParts,
@@ -38,30 +32,33 @@ import {
 import { QuestionAnswerFormModal } from "@/features/question-answers/question-answer-form-modal";
 import {
   deleteAnswerKey,
-  listAllQuestionAnswerRows,
   listQuestionAnswerRows,
   resolveAnswerHackathonScope,
   updateAnswerKey,
   type QuestionAnswerRow,
 } from "@/features/question-answers/question-answers-api";
-import { listAllTeams, listTeams } from "@/features/teams/team-api";
+import { listTeams } from "@/features/teams/team-api";
 import type { EventTeam } from "@/features/teams/team-api";
 import { redirectIfUnauthorized } from "@/lib/client-api";
 import { formatDate } from "@/lib/format";
-import { hackathonLabel } from "@/lib/display-name";
-import type { Hackathon } from "@/types/hackathon";
 
-type Props = { hackathonId: string };
+type Props = {
+  hackathonId: string;
+  eyebrow?: string;
+  title?: string;
+};
 type ModeFilter = "all" | "static" | "dynamic";
 type ValidityFilter = "all" | "correct" | "incorrect" | "pending";
 
-export function EventQuestionAnswersView({ hackathonId }: Props) {
+export function EventQuestionAnswersView({
+  hackathonId,
+  eyebrow = "Event workspace",
+  title = "Question answers",
+}: Props) {
   const { confirm } = usePlatformDialog();
   const router = useRouter();
   const { setSelectedHackathonId } = useSelectedEvent();
-  const [hackathons, setHackathons] = useState<Hackathon[]>([]);
-  const [activeId, setActiveId] = useState(hackathonId || ALL_EVENTS_SCOPE);
-  const isAllScope = isAllEventsScope(activeId);
+  const [activeId, setActiveId] = useState(hackathonId);
   const [rows, setRows] = useState<QuestionAnswerRow[]>([]);
   const [challenges, setChallenges] = useState<ChallengeSummary[]>([]);
   const [teams, setTeams] = useState<EventTeam[]>([]);
@@ -81,23 +78,13 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
   const [editingRow, setEditingRow] = useState<QuestionAnswerRow | null>(null);
 
   function scopeHackathonId(): string | null {
-    return isAllScope ? null : activeId;
+    return activeId || null;
   }
 
   useEffect(() => {
-    if (hackathonId) setActiveId(hackathonId);
-  }, [hackathonId]);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const { items } = await listHackathons({ show_deleted: "false" });
-        setHackathons(items);
-      } catch {
-        setHackathons([]);
-      }
-    })();
-  }, []);
+    setActiveId(hackathonId);
+    if (hackathonId) setSelectedHackathonId(hackathonId);
+  }, [hackathonId, setSelectedHackathonId]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedIp(ipFilter.trim()), 300);
@@ -105,7 +92,7 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
   }, [ipFilter]);
 
   const load = useCallback(async () => {
-    if (!isAllScope && !activeId) return;
+    if (!activeId) return;
     setIsLoading(true);
     setError(null);
     const filters = {
@@ -123,11 +110,9 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
     };
     try {
       const [report, challengeList, teamList] = await Promise.all([
-        isAllScope
-          ? listAllQuestionAnswerRows(filters)
-          : listQuestionAnswerRows(activeId, filters),
-        isAllScope ? listAllChallenges() : listChallengeAdmin(activeId),
-        isAllScope ? listAllTeams() : listTeams(activeId),
+        listQuestionAnswerRows(activeId, filters),
+        listChallengeAdmin(activeId),
+        listTeams(activeId),
       ]);
       setRows(report.items);
       setChallenges(challengeList);
@@ -145,21 +130,10 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
     challengeFilter,
     debouncedIp,
     debouncedSearch,
-    isAllScope,
     modeFilter,
     router,
     validityFilter,
   ]);
-
-  function onHackathonChange(nextId: string) {
-    const id = nextId || ALL_EVENTS_SCOPE;
-    setActiveId(id);
-    setSelectedKeys(new Set());
-    if (id && id !== ALL_EVENTS_SCOPE) {
-      setSelectedHackathonId(id);
-      router.push(`/events/${id}/question-answers`);
-    }
-  }
 
   useEffect(() => {
     void load();
@@ -190,7 +164,7 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
   const staticCount = filteredRows.length - dynamicCount;
 
   function rowScope(row: QuestionAnswerRow) {
-    return resolveAnswerHackathonScope(row, activeId, isAllScope);
+    return resolveAnswerHackathonScope(row, activeId, false);
   }
 
   function openCreate() {
@@ -324,8 +298,8 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
   return (
     <div className="w-full">
       <PageHeader
-        eyebrow="Event workspace"
-        title="Question answers"
+        eyebrow={eyebrow}
+        title={title}
         actions={<Button onClick={openCreate}>Create answer</Button>}
       />
 
@@ -340,20 +314,6 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
           </ListPageStats>
         }
       >
-        <FilterSelect
-          label="Hackathon"
-          value={activeId || ALL_EVENTS_SCOPE}
-          onChange={onHackathonChange}
-          className="min-w-[200px]"
-        >
-          <option value={ALL_EVENTS_SCOPE}>All events</option>
-          {hackathons.map((h) => (
-            <option key={h.id} value={h.id}>
-              {hackathonLabel(h)}
-            </option>
-          ))}
-        </FilterSelect>
-
         <FilterTextField
           label="Search"
           value={search}
@@ -456,19 +416,6 @@ export function EventQuestionAnswersView({ hackathonId }: Props) {
             : "No question answers match your filters."
         }
         columns={[
-          ...(isAllScope
-            ? [
-                {
-                  key: "hackathon",
-                  header: "Event",
-                  render: (row: QuestionAnswerRow) => (
-                    <span className="font-medium">
-                      {row.hackathon_name || "—"}
-                    </span>
-                  ),
-                },
-              ]
-            : []),
           {
             key: "challenge",
             header: "Challenge",

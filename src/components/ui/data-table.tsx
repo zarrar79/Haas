@@ -55,6 +55,8 @@ type DataTableProps<T> = {
   focusRowKey?: string | null;
   /** Apply highlight/blink styling to this row key. */
   highlightedRowKey?: string | null;
+  /** Extra classes for each body row (e.g. priority coloring). */
+  rowClassName?: (row: T) => string | undefined;
   /** Client-side pagination (default true). */
   paginate?: boolean;
   pageSizeOptions?: readonly number[];
@@ -76,6 +78,7 @@ export function DataTable<T>({
   onRowDoubleClick,
   focusRowKey = null,
   highlightedRowKey = null,
+  rowClassName,
   paginate = true,
   pageSizeOptions = TABLE_PAGE_SIZE_OPTIONS,
   defaultPageSize = DEFAULT_TABLE_PAGE_SIZE,
@@ -211,7 +214,7 @@ export function DataTable<T>({
                       onRowClick ? "cursor-pointer" : ""
                     } ${isSelected ? "bg-[var(--accent-muted)]" : ""} ${
                       isHighlighted ? "animate-row-blink" : ""
-                    }`}
+                    } ${rowClassName?.(row) ?? ""}`}
                   >
                     {selectable ? (
                       <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface)] px-2.5 py-2.5 group-hover:bg-[var(--surface-hover)] group-data-[selected=true]:bg-[var(--accent-muted)]">

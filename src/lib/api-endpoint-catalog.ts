@@ -228,6 +228,29 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         description: "Query: type, user, hackathon",
       },
       {
+        id: "system-platform-settings-get",
+        name: "Platform settings",
+        method: "GET",
+        pathTemplate: "/api/haas/system/platform-settings/",
+        description: "System LMS / Academy toggle and related flags",
+      },
+      {
+        id: "system-platform-settings-patch",
+        name: "Update platform settings",
+        method: "PATCH",
+        pathTemplate: "/api/haas/system/platform-settings/",
+        description: "Enable/disable LMS for the player portal",
+        sampleBody: JSON.stringify(
+          {
+            is_lms_enabled: true,
+            lms_disabled_message:
+              "Learning Management System is currently disabled.",
+          },
+          null,
+          2,
+        ),
+      },
+      {
         id: "system-referer-gate-get",
         name: "Referer registration gate",
         method: "GET",
@@ -317,7 +340,36 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         method: "PATCH",
         pathTemplate: "/api/haas/hackathons/{hackathonId}/settings/",
         requiresHackathonId: true,
-        sampleBody: JSON.stringify({ broadcast_message: "Hello teams" }, null, 2),
+        sampleBody: JSON.stringify({
+          flag_format: "CYBERRANGE",
+          first_blood_voice_enabled: true,
+          per_team_container_machine_limit: 5,
+          is_active_per_team_container_machine_limit: true,
+          per_team_vm_machine_limit: 1,
+          is_active_per_team_vm_machine_limit: true,
+        }, null, 2),
+      },
+      {
+        id: "live-dashboard-tabs-get",
+        name: "Get live dashboard tabs",
+        method: "GET",
+        pathTemplate: "/api/haas/hackathons/{hackathonId}/live-dashboard-tabs/",
+        requiresHackathonId: true,
+      },
+      {
+        id: "live-dashboard-tabs-patch",
+        name: "Update live dashboard tabs",
+        method: "PATCH",
+        pathTemplate: "/api/haas/hackathons/{hackathonId}/live-dashboard-tabs/",
+        requiresHackathonId: true,
+        sampleBody: JSON.stringify(
+          {
+            view_on_dashboard: true,
+            tabs: [{ name: "leaderboard", is_enabled: true }],
+          },
+          null,
+          2,
+        ),
       },
       {
         id: "modules-get",
@@ -382,15 +434,35 @@ export const API_ENDPOINT_GROUPS: ApiEndpointGroup[] = [
         name: "Playing control",
         method: "GET",
         pathTemplate: "/api/haas/hackathons/{hackathonId}/playing/",
+        description:
+          "Roster counts, event window, modes (ctf/koth/attackDefense), scheduleOrder",
         requiresHackathonId: true,
       },
       {
         id: "playing-patch",
-        name: "Update playing flags",
+        name: "Update playing & mode schedules",
         method: "PATCH",
         pathTemplate: "/api/haas/hackathons/{hackathonId}/playing/",
+        description:
+          "is_open/is_active, eventPaused, nested ctf/koth/attackDefense (start/end/enabled/isPaused/isInfinite)",
         requiresHackathonId: true,
-        sampleBody: JSON.stringify({ is_open: true, is_active: true }, null, 2),
+        sampleBody: JSON.stringify(
+          {
+            is_open: true,
+            show_to_clients: true,
+            is_active: true,
+            eventPaused: false,
+            ctf: {
+              enabled: true,
+              start: "2026-09-01T10:00:00+05:00",
+              end: "2026-09-03T16:00:00+05:00",
+              isPaused: false,
+              isInfinite: false,
+            },
+          },
+          null,
+          2,
+        ),
       },
       {
         id: "playing-challenges-list",

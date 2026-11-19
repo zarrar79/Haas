@@ -270,10 +270,10 @@ export function EventHackathonRosterPanel({ hackathonId }: Props) {
 
       {section === "teams" ? (
         <RosterTransfer
-          title="Team playing roster"
-          description="Move teams between the platform catalog and this event's live playing hackathon. Double-click a row to move it."
-          availableLabel="Available teams"
-          addedLabel="Added to playing"
+          title="Team event approval"
+          description="Catalog teams wait for approval. Move them onto the playing roster to approve (or remove to unapprove). Double-click a row to move it."
+          availableLabel="Pending / catalog"
+          addedLabel="Approved (playing)"
           available={availableTeams}
           added={addedTeams}
           busy={busy}

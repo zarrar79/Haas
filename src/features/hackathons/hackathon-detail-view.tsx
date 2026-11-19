@@ -316,9 +316,13 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
         </label>
 
         <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-4">
-          <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">
-            Schedule
+          <h3 className="mb-1 text-sm font-semibold text-[var(--text)]">
+            Event schedule
           </h3>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">
+            Hackathon = Event envelope. CTF / KOTH / A&amp;D have their own
+            clocks under Event settings → Playing.
+          </p>
           <label className="mb-3 flex items-start gap-2 text-sm text-[var(--text)]">
             <input
               type="checkbox"
@@ -328,11 +332,14 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
             />
             <span>
               <span className="font-medium">Infinite event</span>
+              <span className="mt-0.5 block text-[var(--text-muted)]">
+                Does not make CTF infinite.
+              </span>
             </span>
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField
-              label="Start"
+              label="Event start"
               name="start"
               type="datetime-local"
               required={!isInfinite}
@@ -341,7 +348,7 @@ export function HackathonDetailView({ hackathonId }: HackathonDetailViewProps) {
               onChange={(e) => setStartDatetime(e.target.value)}
             />
             <TextField
-              label="End"
+              label="Event end"
               name="end"
               type="datetime-local"
               required={!isInfinite}

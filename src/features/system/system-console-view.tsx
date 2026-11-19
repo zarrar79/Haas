@@ -12,7 +12,9 @@ import { StatsGridSkeleton, TableSkeleton } from "@/components/ui/skeleton";
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { SystemActivityView } from "@/features/system/system-activity-view";
 import { SystemAdminsSection } from "@/features/system/system-admins-section";
+import { SystemChangeLogView } from "@/features/system/system-change-log-view";
 import { SystemGroupsView } from "@/features/system/system-groups-view";
+import { SystemPlatformSettingsView } from "@/features/system/system-platform-settings-view";
 import { SystemRefererGateView } from "@/features/system/system-referer-gate-view";
 import { SystemUsersView } from "@/features/system/system-users-view";
 import {
@@ -29,7 +31,9 @@ type Section =
   | "audit"
   | "activity"
   | "groups"
-  | "referer-gate";
+  | "platform-settings"
+  | "referer-gate"
+  | "change-log";
 
 type Props = { section?: string };
 
@@ -41,7 +45,9 @@ export function SystemConsoleView({ section }: Props) {
     section === "audit" ||
     section === "activity" ||
     section === "groups" ||
-    section === "referer-gate"
+    section === "platform-settings" ||
+    section === "referer-gate" ||
+    section === "change-log"
       ? section
       : "stats";
 
@@ -76,6 +82,16 @@ export function SystemConsoleView({ section }: Props) {
     { id: "audit", href: "/system/audit", label: "Audit" },
     { id: "activity", href: "/system/activity", label: "Activity" },
     { id: "groups", href: "/system/groups", label: "Groups" },
+    {
+      id: "platform-settings",
+      href: "/system/platform-settings",
+      label: "Platform settings",
+    },
+    {
+      id: "change-log",
+      href: "/system/change-log",
+      label: "Change log",
+    },
     {
       id: "referer-gate",
       href: "/system/referer-gate",
@@ -139,6 +155,8 @@ export function SystemConsoleView({ section }: Props) {
       {active === "admins" ? <SystemAdminsSection /> : null}
       {active === "activity" ? <SystemActivityView /> : null}
       {active === "groups" ? <SystemGroupsView /> : null}
+      {active === "platform-settings" ? <SystemPlatformSettingsView /> : null}
+      {active === "change-log" ? <SystemChangeLogView /> : null}
       {active === "referer-gate" ? <SystemRefererGateView /> : null}
 
       {!showLegacyLoader && active === "audit" ? (

@@ -18,7 +18,6 @@ import {
   BiPlusCircle,
   BiPulse,
   BiShield,
-  BiShieldQuarter,
   BiBuildings,
   BiSlider,
   BiStar,
@@ -26,12 +25,12 @@ import {
   BiTrophy,
   BiUser,
   BiLockAlt,
+  BiNews,
 } from "react-icons/bi";
 
 export const NAV_ICONS = {
   overview: BiGridAlt,
   hackathons: BiCalendarEvent,
-  "attack-defence": BiShieldQuarter,
   challenges: BiFlag,
   teams: BiGroup,
   catalog: BiCollection,
@@ -52,6 +51,8 @@ export const NAV_ICONS = {
   "event-question-answers": BiMessage,
   "event-scores": BiBarChart,
   "event-leaderboard": BiTrophy,
+  "event-ctf": BiFlag,
+  "event-ad": BiShield,
   "event-koth": BiCrown,
   "event-machines": BiMicrochip,
   "event-activity-logs": BiBook,
@@ -62,6 +63,8 @@ export const NAV_ICONS = {
   "system-audit": BiClipboard,
   "system-activity": BiPulse,
   "system-groups": BiCollection,
+  "system-platform-settings": BiSlider,
+  "system-change-log": BiNews,
   "system-referer-gate": BiLockAlt,
 } as const satisfies Record<string, IconType>;
 

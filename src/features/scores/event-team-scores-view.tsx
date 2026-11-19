@@ -20,7 +20,6 @@ import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { listChallengeAdmin } from "@/features/challenges/challenge-admin-api";
 import type { ChallengeSummary } from "@/features/challenges/challenge-api";
-import { HackathonPicker } from "@/features/events/hackathon-picker";
 import {
   deleteScore,
   listScores,
@@ -33,7 +32,11 @@ import { redirectIfUnauthorized } from "@/lib/client-api";
 import { formatDate } from "@/lib/format";
 import { formatPersonName } from "@/lib/display-name";
 
-type Props = { hackathonId: string };
+type Props = {
+  hackathonId: string;
+  eyebrow?: string;
+  title?: string;
+};
 
 type ValidityFilter = "all" | "correct" | "incorrect";
 
@@ -41,7 +44,11 @@ function userLabel(row: ScoreRow) {
   return formatPersonName(row.user_detail, row.user || "—");
 }
 
-export function EventTeamScoresView({ hackathonId }: Props) {
+export function EventTeamScoresView({
+  hackathonId,
+  eyebrow = "Event workspace",
+  title = "Team submissions",
+}: Props) {
   const { confirm } = usePlatformDialog();
   const router = useRouter();
   const { canMutateEvent } = useHaasAccess();
@@ -145,8 +152,8 @@ export function EventTeamScoresView({ hackathonId }: Props) {
   return (
     <div className="w-full">
       <PageHeader
-        eyebrow="Event workspace"
-        title="Team scores"
+        eyebrow={eyebrow}
+        title={title}
         actions={
           canWrite ? (
             <Button
@@ -172,11 +179,6 @@ export function EventTeamScoresView({ hackathonId }: Props) {
         }
       >
         <div className="flex flex-wrap items-end gap-3">
-          <HackathonPicker
-            value={activeId}
-            onChange={setActiveId}
-            section="scores"
-          />
           <FilterTextField
             label="Search"
             value={search}

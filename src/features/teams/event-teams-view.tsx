@@ -238,6 +238,7 @@ export function TeamFormModal({
   const [affiliation, setAffiliation] = useState("");
   const [website, setWebsite] = useState("");
   const [registerAs, setRegisterAs] = useState("red");
+  const [teamType, setTeamType] = useState("actual");
   const [isActive, setIsActive] = useState(true);
   const [createdForIds, setCreatedForIds] = useState<string[]>([]);
   const [pictureUrl, setPictureUrl] = useState<string | null>(null);
@@ -267,6 +268,7 @@ export function TeamFormModal({
       setAffiliation("");
       setWebsite("");
       setRegisterAs("red");
+      setTeamType("actual");
       setIsActive(true);
       setCreatedForIds([]);
       setPictureUrl(null);
@@ -283,6 +285,7 @@ export function TeamFormModal({
         setAffiliation(team.affiliation || "");
         setWebsite(team.website || "");
         setRegisterAs(team.register_as || "red");
+        setTeamType(team.team_type || "actual");
         setIsActive(team.is_active !== false);
         const ids = new Set<string>();
         for (const h of team.created_for || []) {
@@ -327,6 +330,7 @@ export function TeamFormModal({
             affiliation: affiliation.trim() || undefined,
             website: website.trim() || undefined,
             register_as: registerAs || undefined,
+            team_type: teamType || undefined,
             is_active: isActive,
             ...createdForPayload,
           },
@@ -340,6 +344,7 @@ export function TeamFormModal({
             description: description.trim() || undefined,
             affiliation: affiliation.trim() || undefined,
             register_as: registerAs || undefined,
+            team_type: teamType || undefined,
             ...createdForPayload,
           },
           { file: imageFile },
@@ -455,6 +460,15 @@ export function TeamFormModal({
                 <option value="red">red</option>
                 <option value="blue">blue</option>
                 <option value="mix">mix</option>
+              </FormSelect>
+              <FormSelect
+                label="Team type"
+                value={teamType}
+                onChange={setTeamType}
+              >
+                <option value="actual">Actual</option>
+                <option value="testing">Testing</option>
+                <option value="load_testing">Load testing</option>
               </FormSelect>
               <TextField
                 label="Affiliation"
@@ -691,14 +705,6 @@ export function EventTeamsView({
     setSideFilter("");
     setActiveFilter("all");
     setRefererFilter("");
-  }
-
-  function onHackathonChange(nextId: string) {
-    setActiveId(nextId);
-    if (nextId) {
-      setSelectedHackathonId(nextId);
-      if (syncUrl) router.push(`/events/${nextId}/teams`);
-    }
   }
 
   function scopeHackathonId() {
@@ -1038,23 +1044,6 @@ export function EventTeamsView({
           </ListPageStats>
         }
       >
-        <FilterSelect
-          label="Hackathon"
-          value={activeId}
-          onChange={onHackathonChange}
-          className="min-w-[180px]"
-        >
-          {hackathons.length === 0 ? (
-            <option value="">No events</option>
-          ) : (
-            hackathons.map((h) => (
-              <option key={h.id} value={h.id}>
-                {hackathonLabel(h)}
-              </option>
-            ))
-          )}
-        </FilterSelect>
-
         <FilterTextField
           label="Search"
           name="search"
@@ -1299,6 +1288,23 @@ export function EventTeamsView({
                 onDelete={() => void onDeletePolicy(row)}
               />
             ),
+          },
+          {
+            key: "team_type",
+            header: "Type",
+            render: (row) => {
+              const label =
+                row.team_type === "testing"
+                  ? "Testing"
+                  : row.team_type === "load_testing"
+                    ? "Load testing"
+                    : row.team_type === "actual"
+                      ? "Actual"
+                      : row.team_type || "Actual";
+              return (
+                <span className="text-xs text-[var(--text-muted)]">{label}</span>
+              );
+            },
           },
           {
             key: "members",

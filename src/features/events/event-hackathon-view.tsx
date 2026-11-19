@@ -9,7 +9,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { EventHackathonDetailsPanel } from "@/features/events/event-hackathon-details-panel";
 import { EventHackathonRosterPanel } from "@/features/events/event-hackathon-roster-panel";
-import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { getHackathon } from "@/features/hackathons/hackathon-api";
 import { EventOrganizationsView } from "@/features/organizations/event-organizations-view";
@@ -77,7 +76,8 @@ export function EventHackathonView({ hackathonId }: Props) {
 
   useEffect(() => {
     setActiveId(hackathonId);
-  }, [hackathonId]);
+    if (hackathonId) setSelectedHackathonId(hackathonId);
+  }, [hackathonId, setSelectedHackathonId]);
 
   useEffect(() => {
     setTab(parseTab(searchParams.get("tab")));
@@ -98,14 +98,6 @@ export function EventHackathonView({ hackathonId }: Props) {
   useEffect(() => {
     void loadTitle();
   }, [loadTitle]);
-
-  function onHackathonChange(nextId: string) {
-    setActiveId(nextId);
-    setSelectedHackathonId(nextId || null);
-    if (nextId) {
-      router.push(`/events/${nextId}/hackathon?tab=${tab}`);
-    }
-  }
 
   function onTabChange(next: Tab) {
     setTab(next);
@@ -135,11 +127,6 @@ export function EventHackathonView({ hackathonId }: Props) {
       />
 
       <StickyToolbar layout="stack">
-        <HackathonPicker
-          value={activeId}
-          onChange={onHackathonChange}
-          navigateOnChange={false}
-        />
         <div className="flex flex-wrap gap-2">
           {TABS.map((item) => (
             <Button

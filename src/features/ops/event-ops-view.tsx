@@ -11,8 +11,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DashboardSkeleton, TableSkeleton } from "@/components/ui/skeleton";
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { TextField } from "@/components/ui/text-field";
-import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
+import { useSelectedEvent } from "@/features/events/selected-event-context";
 import type { HackathonAnalytics } from "@/features/hackathons/hackathon-api";
 import {
   downloadAnalyticsExport,
@@ -35,6 +35,7 @@ type Props = { hackathonId: string };
 export function EventOpsView({ hackathonId }: Props) {
   const router = useRouter();
   const { canMutateEvent } = useHaasAccess();
+  const { setSelectedHackathonId } = useSelectedEvent();
   const [activeId, setActiveId] = useState(hackathonId);
   const [tab, setTab] = useState<Tab>("overview");
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +52,8 @@ export function EventOpsView({ hackathonId }: Props) {
 
   useEffect(() => {
     setActiveId(hackathonId);
-  }, [hackathonId]);
+    if (hackathonId) setSelectedHackathonId(hackathonId);
+  }, [hackathonId, setSelectedHackathonId]);
 
   const load = useCallback(async () => {
     if (!activeId) return;
@@ -136,21 +138,17 @@ export function EventOpsView({ hackathonId }: Props) {
         }
       />
 
-      <StickyToolbar layout="stack">
-        <HackathonPicker value={activeId} onChange={setActiveId} section="ops" />
-
-        <div className="flex flex-wrap gap-2">
-          {tabs.map((t) => (
-            <Button
-              key={t.id}
-              size="sm"
-              variant={tab === t.id ? "primary" : "secondary"}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </Button>
-          ))}
-        </div>
+      <StickyToolbar>
+        {tabs.map((t) => (
+          <Button
+            key={t.id}
+            size="sm"
+            variant={tab === t.id ? "primary" : "secondary"}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </Button>
+        ))}
       </StickyToolbar>
 
       {error ? (

@@ -21,6 +21,8 @@ export type Hackathon = {
   start_datetime?: string | null;
   end_datetime?: string | null;
   is_infinite?: boolean;
+  /** Exactly one platform Live (always-on) event. */
+  is_platform_live?: boolean;
   is_active?: boolean;
   is_deleted?: boolean;
   view_on_dashboard?: boolean;
@@ -46,6 +48,7 @@ export type HackathonWriteInput = {
   start_datetime?: string;
   end_datetime?: string;
   is_infinite?: boolean;
+  is_platform_live?: boolean;
   is_active?: boolean;
   view_on_dashboard?: boolean;
   discord_link?: string;

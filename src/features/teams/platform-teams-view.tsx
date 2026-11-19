@@ -1113,6 +1113,23 @@ export function PlatformTeamsView() {
               ),
           },
           {
+            key: "team_type",
+            header: "Type",
+            render: (row) => {
+              const label =
+                row.team_type === "testing"
+                  ? "Testing"
+                  : row.team_type === "load_testing"
+                    ? "Load testing"
+                    : row.team_type === "actual"
+                      ? "Actual"
+                      : row.team_type || "Actual";
+              return (
+                <span className="text-xs text-[var(--text-muted)]">{label}</span>
+              );
+            },
+          },
+          {
             key: "referer",
             header: "Referer",
             render: (row) =>

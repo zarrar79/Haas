@@ -98,6 +98,8 @@ type Row = {
 type EventChallengesViewProps = {
   hackathonId?: string;
   syncUrl?: boolean;
+  eyebrow?: string;
+  title?: string;
 };
 
 function asId(value: unknown): string | null {
@@ -172,6 +174,8 @@ function toRow(
 export function EventChallengesView({
   hackathonId: hackathonIdProp,
   syncUrl = true,
+  eyebrow = "Event workspace",
+  title = "Challenges",
 }: EventChallengesViewProps) {
   const router = useRouter();
   const { confirm, alert } = usePlatformDialog();
@@ -816,8 +820,8 @@ export function EventChallengesView({
   return (
     <div className="w-full">
       <PageHeader
-        eyebrow="Event workspace"
-        title="Challenges"
+        eyebrow={eyebrow}
+        title={title}
         actions={
           canCreateChallenge || isEventOnlyAdmin ? (
             <Button
@@ -870,21 +874,21 @@ export function EventChallengesView({
           </ListPageStats>
         }
       >
-        <FilterSelect
-          label="Hackathon"
-          value={activeId || ALL_EVENTS_SCOPE}
-          onChange={onHackathonChange}
-          className="min-w-[180px]"
-        >
-          {!hackathonIdProp ? (
+        {!hackathonIdProp ? (
+          <FilterSelect
+            label="Hackathon"
+            value={activeId || ALL_EVENTS_SCOPE}
+            onChange={onHackathonChange}
+            className="min-w-[180px]"
+          >
             <option value={ALL_EVENTS_SCOPE}>All challenges</option>
-          ) : null}
-          {hackathons.map((h) => (
-            <option key={h.id} value={h.id}>
-              {hackathonLabel(h)}
-            </option>
-          ))}
-        </FilterSelect>
+            {hackathons.map((h) => (
+              <option key={h.id} value={h.id}>
+                {hackathonLabel(h)}
+              </option>
+            ))}
+          </FilterSelect>
+        ) : null}
 
         <FilterTextField
           label="Search"

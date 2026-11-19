@@ -17,7 +17,6 @@ import {
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { usePlatformDialog } from "@/components/ui/platform-dialog-provider";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
-import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import {
   deleteKothSession,
@@ -41,6 +40,7 @@ import {
   type KothSession,
   type KothTeamScore,
 } from "@/features/koth/koth-api";
+import { notifyPlayingScheduleChanged } from "@/features/settings/playing-schedule-sync";
 import { listTeams, type EventTeam } from "@/features/teams/team-api";
 import { redirectIfUnauthorized } from "@/lib/client-api";
 import { formatDate } from "@/lib/format";
@@ -119,8 +119,9 @@ export function EventKothView({ hackathonId, sessionId }: Props) {
 
   useEffect(() => {
     setActiveId(hackathonId);
+    if (hackathonId) setSelectedHackathonId(hackathonId);
     setConfigUnlocked(true);
-  }, [hackathonId, sessionId]);
+  }, [hackathonId, sessionId, setSelectedHackathonId]);
 
   const applySession = useCallback((s: KothSession) => {
     setSession(s);
@@ -352,6 +353,9 @@ export function EventKothView({ hackathonId, sessionId }: Props) {
           : {}),
       }),
     );
+    if (roundStartChanged || roundEndChanged) {
+      notifyPlayingScheduleChanged(activeId);
+    }
     setConfigUnlocked(false);
   };
 
@@ -396,12 +400,6 @@ export function EventKothView({ hackathonId, sessionId }: Props) {
       default:
         return "neutral" as const;
     }
-  };
-
-  const onHackathonChange = (nextId: string) => {
-    setActiveId(nextId);
-    setSelectedHackathonId(nextId);
-    router.push(`/events/${nextId}/koth`);
   };
 
   const onDeleteInstance = async () => {
@@ -461,7 +459,6 @@ export function EventKothView({ hackathonId, sessionId }: Props) {
                 {busy === "delete" ? "Deleting…" : "Delete"}
               </Button>
             ) : null}
-            <HackathonPicker value={activeId} onChange={onHackathonChange} section="koth" />
           </div>
         }
       />

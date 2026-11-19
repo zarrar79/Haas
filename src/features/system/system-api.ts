@@ -1,4 +1,10 @@
-import { haasGet, haasList, haasSend, toFormData } from "@/lib/haas-api";
+import {
+  haasGet,
+  haasList,
+  haasListAll,
+  haasSend,
+  toFormData,
+} from "@/lib/haas-api";
 import type { UserBrief } from "@/types";
 
 export type SystemStats = {
@@ -252,6 +258,156 @@ export function listSystemActivity(filters?: {
   });
 }
 
+export type ChangeLogPriority =
+  | "critical"
+  | "big_change"
+  | "need_to_test"
+  | "info";
+
+export type PlatformChangeLog = {
+  id: string;
+  change_date: string;
+  changed_by_name?: string;
+  title: string;
+  affects?: string;
+  worst_case?: string;
+  what_to_test?: string;
+  status: string;
+  priority?: ChangeLogPriority;
+  priority_label?: string;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string | null;
+  created_by_username?: string | null;
+  updated_by?: string | null;
+  updated_by_username?: string | null;
+};
+
+export type PlatformChangeLogInput = {
+  change_date?: string;
+  changed_by_name?: string;
+  title: string;
+  affects?: string;
+  worst_case?: string;
+  what_to_test?: string;
+  status: string;
+};
+
+export type PlatformChangeLogOptions = {
+  statuses: string[];
+  changed_by: string[];
+  changes: string[];
+  affects: string[];
+};
+
+export function listPlatformChangeLogs(filters?: {
+  status?: string;
+  search?: string;
+  date_from?: string;
+  date_to?: string;
+}) {
+  return haasListAll<PlatformChangeLog>("system/change-log", {
+    ...filters,
+    limit: "100",
+  });
+}
+
+export function getPlatformChangeLogOptions() {
+  return haasGet<PlatformChangeLogOptions>("system/change-log/field-options");
+}
+
+export function createPlatformChangeLog(body: PlatformChangeLogInput) {
+  return haasSend<PlatformChangeLog>("system/change-log", {
+    method: "POST",
+    body,
+  });
+}
+
+export function updatePlatformChangeLog(
+  id: string,
+  body: Partial<PlatformChangeLogInput>,
+) {
+  return haasSend<PlatformChangeLog>(`system/change-log/${id}`, {
+    method: "PATCH",
+    body,
+  });
+}
+
+export function deletePlatformChangeLog(id: string) {
+  return haasSend<unknown>(`system/change-log/${id}`, { method: "DELETE" });
+}
+
+export async function downloadPlatformChangeLogSheet(filters?: {
+  status?: string;
+  search?: string;
+  date_from?: string;
+  date_to?: string;
+}) {
+  const { haasApiPath } = await import("@/lib/haas-api");
+  const path = haasApiPath("system/change-log/export", filters);
+  const res = await fetch(path, { credentials: "include" });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Failed to download change log sheet");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "platform-change-log.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function getPlatformChangeLogGoogleSheet() {
+  return haasGet<{
+    sheet_id?: string;
+    sheet_url?: string;
+    push_configured?: boolean;
+  }>("system/change-log/google-sheet");
+}
+
+export function syncPlatformChangeLogGoogle(body?: {
+  direction?: "pull" | "push" | "both";
+  replace_all?: boolean;
+}) {
+  const direction = body?.direction || "both";
+  // Pull treats the Google Sheet as source of truth unless replace_all is false.
+  const replace_all =
+    body?.replace_all ?? (direction === "pull" || direction === "both");
+  return haasSend<{
+    created?: number;
+    updated?: number;
+    deleted?: number;
+    pushed?: boolean;
+    rows?: number;
+    sheet_rows?: number;
+    sheet_url?: string;
+    push_configured?: boolean;
+    push_skipped?: string;
+  }>("system/change-log/sync-google", {
+    method: "POST",
+    body: { direction, replace_all },
+  });
+}
+
+/** Platform-wide feature toggles (LMS / Academy for the player portal). */
+export type PlatformSettings = {
+  id: string;
+  is_lms_enabled: boolean;
+  lms_disabled_message: string;
+  disposable_namespace_idle_minutes: number;
+  updated_at?: string;
+};
+
+export type PlatformSettingsUpdate = Partial<{
+  is_lms_enabled: boolean;
+  lms_disabled_message: string;
+  disposable_namespace_idle_minutes: number;
+}>;
+
 /** TEMPORARY EVENT FEATURE — referer allow-list gate (see accounts/referer_gate.py). */
 export type RefererRegistrationGate = {
   id: string;
@@ -409,6 +565,17 @@ export function removeSystemUserMembership(
 
 export function getSystemUserAnalytics(userId: string) {
   return haasGet<SystemUserAnalytics>(`system/users/${userId}/analytics`);
+}
+
+export function getPlatformSettings() {
+  return haasGet<PlatformSettings>("system/platform-settings");
+}
+
+export function patchPlatformSettings(body: PlatformSettingsUpdate) {
+  return haasSend<PlatformSettings>("system/platform-settings", {
+    method: "PATCH",
+    body,
+  });
 }
 
 export function getRefererRegistrationGate() {

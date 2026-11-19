@@ -13,11 +13,6 @@ import {
   resolveNavHref,
 } from "@/components/shell/nav-utils";
 import { WorkspaceNavLink } from "@/components/shell/workspace-nav-link";
-import {
-  adEventIdFromPathname,
-  buildAdEventNavChildren,
-  isAdEventSectionHrefActive,
-} from "@/features/attack-defence/ad-nav";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { useEffectiveHackathonId } from "@/features/events/use-effective-hackathon-id";
 import { useScrollThumbVisible } from "@/lib/use-scroll-thumb-visible";
@@ -48,45 +43,40 @@ export function AppSidebar({
   const workspaceHackathonId = effectiveHackathonId ?? selectedHackathonId;
   const { setMobileNavOpen } = useUiPreferences();
   const { ref: navScrollRef, className: navScrollClass } = useScrollThumbVisible();
-  const adEventId = adEventIdFromPathname(pathname);
 
-  const sections = useMemo(() => {
-    const base = filterSections(isPlatformOperator, isEventOnlyAdmin);
-    return base.map((section) => ({
-      ...section,
-      items: section.items.map((item) => {
-        if (item.id !== "attack-defence") return item;
-        return {
-          ...item,
-          // Parent becomes an expandable group; links live in children.
-          href: undefined,
-          children: buildAdEventNavChildren(adEventId),
-        };
-      }),
-    }));
-  }, [isPlatformOperator, isEventOnlyAdmin, adEventId]);
+  const sections = useMemo(
+    () => filterSections(isPlatformOperator, isEventOnlyAdmin),
+    [isPlatformOperator, isEventOnlyAdmin],
+  );
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     hackathons: true,
-    event: true,
+    "event-ctf": true,
+    "event-koth": true,
+    "event-ad": false,
     system: false,
-    "attack-defence": true,
   });
 
   useEffect(() => {
-    if (!adEventId) return;
-    setOpenGroups((prev) =>
-      prev["attack-defence"] ? prev : { ...prev, "attack-defence": true },
-    );
-  }, [adEventId]);
+    // Keep the active mode umbrella expanded while browsing its tabs.
+    if (pathname.includes("/ctf")) {
+      setOpenGroups((prev) => ({ ...prev, "event-ctf": true }));
+    }
+    if (pathname.includes("/koth")) {
+      setOpenGroups((prev) => ({ ...prev, "event-koth": true }));
+    }
+    if (pathname.includes("/ad")) {
+      setOpenGroups((prev) => ({ ...prev, "event-ad": true }));
+    }
+  }, [pathname]);
 
   const isActive = (href?: string) => {
     if (!href) return false;
     if (href === "/home") return pathname === href;
-    if (href === "/attack-defence" || href.startsWith("/attack-defence/")) {
-      return isAdEventSectionHrefActive(pathname, href);
-    }
-    return pathname === href || pathname.startsWith(`${href}/`);
+    if (pathname === href) return true;
+    // Mode roots (/ctf, /koth, /ad) must not stay active on nested tabs.
+    if (/\/(ctf|koth|ad)$/.test(href)) return false;
+    return pathname.startsWith(`${href}/`);
   };
 
   function renderLink(item: NavItem, href: string, rawHref: string, isChild = false) {
