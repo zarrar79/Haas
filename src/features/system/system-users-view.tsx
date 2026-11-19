@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
@@ -20,6 +21,10 @@ import {
   userRowSearchParts,
 } from "@/features/search/section-search";
 import {
+  listReferers,
+  type RefererItem,
+} from "@/features/catalog/catalog-api";
+import {
   blockSystemUser,
   listSystemUsers,
   unblockSystemUser,
@@ -36,11 +41,13 @@ export function SystemUsersView() {
   const router = useRouter();
   const { prompt } = usePlatformDialog();
   const [allRows, setAllRows] = useState<SystemUser[]>([]);
+  const [referers, setReferers] = useState<RefererItem[]>([]);
   const { search, setSearch, debouncedSearch, focusId, clearDeepSearch } =
     useSectionSearch();
   const [blockFilter, setBlockFilter] = useState<BlockFilter>("all");
   const [organizationFilter, setOrganizationFilter] = useState("");
   const [staffFilter, setStaffFilter] = useState<StaffFilter>("all");
+  const [refererFilter, setRefererFilter] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -48,6 +55,12 @@ export function SystemUsersView() {
   const [shownCount, setShownCount] = useState(0);
   const onPaginationInfo = useCallback((info: { shown: number }) => {
     setShownCount(info.shown);
+  }, []);
+
+  useEffect(() => {
+    void listReferers()
+      .then(setReferers)
+      .catch(() => setReferers([]));
   }, []);
 
   const load = useCallback(async () => {
@@ -63,6 +76,7 @@ export function SystemUsersView() {
               : blockFilter === "not_blocked"
                 ? "false"
                 : undefined,
+          referer: refererFilter || undefined,
         }),
       );
     } catch (err) {
@@ -71,7 +85,7 @@ export function SystemUsersView() {
     } finally {
       setIsLoading(false);
     }
-  }, [blockFilter, debouncedSearch, router]);
+  }, [blockFilter, debouncedSearch, refererFilter, router]);
 
   useEffect(() => {
     void load();
@@ -187,6 +201,20 @@ export function SystemUsersView() {
           <option value="non_staff">Non-staff</option>
         </FilterSelect>
 
+        <FilterSelect
+          label="Referer"
+          value={refererFilter}
+          onChange={setRefererFilter}
+        >
+          <option value="">All</option>
+          <option value="none">Unset</option>
+          {referers.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </FilterSelect>
+
         <div className="flex shrink-0 items-end gap-2 pb-0.5">
           {debouncedSearch || focusId ? (
             <Button size="sm" variant="secondary" onClick={clearDeepSearch}>
@@ -217,9 +245,12 @@ export function SystemUsersView() {
               <div className="flex items-center gap-3">
                 <Avatar src={row.media_url} name={userLabel(row)} size="sm" />
                 <div>
-                  <div className="font-medium text-[var(--text)]">
+                  <Link
+                    href={`/users/${row.id}`}
+                    className="font-medium text-[var(--text)] hover:underline"
+                  >
                     {userLabel(row)}
-                  </div>
+                  </Link>
                   <div className="text-xs text-[var(--text-muted)]">
                     {row.email || row.username}
                   </div>
@@ -231,6 +262,12 @@ export function SystemUsersView() {
             key: "organization",
             header: "Organization",
             render: (row) => row.organization_name || "—",
+          },
+          {
+            key: "referer",
+            header: "Referer",
+            render: (row) =>
+              row.referer_detail?.name || row.referer_detail?.slug || "—",
           },
           {
             key: "blocked",
@@ -263,6 +300,27 @@ export function SystemUsersView() {
             render: (row) => staffCreatorLabel(row) ?? "—",
           },
           {
+            key: "otp",
+            header: "OTP",
+            render: (row) => {
+              if (!row.otp) return "—";
+              const expired =
+                row.otp_expires_at && new Date(row.otp_expires_at) < new Date();
+              return (
+                <span
+                  className={`font-mono text-xs ${expired ? "text-[var(--text-muted)] line-through" : ""}`}
+                  title={
+                    row.otp_expires_at
+                      ? `Expires ${new Date(row.otp_expires_at).toLocaleString()}`
+                      : undefined
+                  }
+                >
+                  {row.otp}
+                </span>
+              );
+            },
+          },
+          {
             key: "status",
             header: "Status",
             render: (row) =>
@@ -280,6 +338,16 @@ export function SystemUsersView() {
               <RowActionsMenu
                 label={`Actions for ${row.email || row.username || row.id}`}
                 items={[
+                  {
+                    id: "view",
+                    label: "View details",
+                    onClick: () => router.push(`/users/${row.id}`),
+                  },
+                  {
+                    id: "edit",
+                    label: "Edit",
+                    onClick: () => router.push(`/users/${row.id}?edit=1`),
+                  },
                   row.is_block
                     ? {
                         id: "unblock",

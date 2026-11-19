@@ -20,6 +20,7 @@ import {
   getHackathonAnalytics,
   updateHackathon,
 } from "@/features/hackathons/hackathon-api";
+import { getPlaying } from "@/features/settings/settings-api";
 import { HackathonQuickActions } from "@/features/hackathons/hackathon-quick-actions";
 import { HackathonUserAssignmentSection } from "@/features/hackathons/hackathon-user-assignment-section";
 import { OrganizationPicker } from "@/features/organizations/organization-picker";
@@ -107,7 +108,7 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
     setError(null);
     setSuccess(null);
     try {
-      const [data, bindings, analytics] = await Promise.all([
+      const [data, bindings, analytics, playing] = await Promise.all([
         getHackathon(hackathonId),
         isRoot || isPlatformOperator
           ? listHackathonAdmins({
@@ -116,11 +117,17 @@ export function EventHackathonDetailsPanel({ hackathonId, onSaved }: Props) {
             })
           : Promise.resolve([] as HackathonAdminBinding[]),
         getHackathonAnalytics(hackathonId).catch(() => null),
+        getPlaying(hackathonId).catch(() => null),
       ]);
       setHackathon(data);
       applyLoadedHackathon(data);
-      setTeamCount(analytics?.teams ?? null);
-      setChallengeCount(analytics?.challenges ?? null);
+      // Prefer live playing-roster counts over catalog/created-for analytics.
+      setTeamCount(
+        playing?.team_count ?? analytics?.teams ?? null,
+      );
+      setChallengeCount(
+        playing?.challenge_count ?? analytics?.challenges ?? null,
+      );
       setAdminBindings(bindings);
       const activeBindings = bindings.filter((b) => b.is_active !== false);
       setAssigneeIds(activeBindings.map((b) => b.user));

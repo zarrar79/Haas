@@ -67,6 +67,22 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         ],
       },
       {
+        id: "attack-defence",
+        label: "Attack & Defence",
+        icon: "attack-defence",
+        platformOnly: true,
+        // Children are injected in AppSidebar from the selected AD event route.
+        children: [
+          {
+            id: "ad-all-events",
+            label: "All events",
+            href: "/attack-defence",
+            icon: "hackathons-list",
+            platformOnly: true,
+          },
+        ],
+      },
+      {
         id: "challenges",
         label: "Challenges",
         href: "/challenges",
@@ -75,8 +91,15 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
       {
         id: "teams",
         label: "Teams",
-        href: "/events/current/teams",
+        href: "/teams",
         icon: "teams",
+      },
+      {
+        id: "users",
+        label: "Users",
+        href: "/users",
+        icon: "system-users",
+        platformOnly: true,
       },
       {
         id: "catalog",
@@ -217,6 +240,12 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
             label: "Groups",
             href: "/system/groups",
             icon: "system-groups",
+          },
+          {
+            id: "system-referer-gate",
+            label: "Referer gate",
+            href: "/system/referer-gate",
+            icon: "system-referer-gate",
           },
         ],
       },

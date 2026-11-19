@@ -163,16 +163,22 @@ export function editStateToUpdatePayload(
   existingTeamType?: unknown,
   newPassword?: string,
 ): EventUserUpdateInput {
-  return {
+  const trimmedPassword = (newPassword || "").trim();
+  const payload: EventUserUpdateInput = {
     username: state.username.trim() || undefined,
     name: state.name.trim() || undefined,
     last_name: state.last_name.trim() || undefined,
     phone_number: state.phone_number.trim() || undefined,
     gender: state.gender.trim() || undefined,
-    password: newPassword || undefined,
     education: educationToPayload(state.education),
     certifications: certificationsToPayload(state.certifications),
     expertise: expertiseToPayload(state.expertise),
     team_type: buildTeamTypePayload(existingTeamType, state.teamType),
   };
+  // Only include password when the admin explicitly typed a new one.
+  // Omitting the key avoids multipart FormData turning undefined → "undefined".
+  if (trimmedPassword) {
+    payload.password = trimmedPassword;
+  }
+  return payload;
 }

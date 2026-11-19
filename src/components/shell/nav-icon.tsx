@@ -18,17 +18,20 @@ import {
   BiPlusCircle,
   BiPulse,
   BiShield,
+  BiShieldQuarter,
   BiBuildings,
   BiSlider,
   BiStar,
   BiTrendingUp,
   BiTrophy,
   BiUser,
+  BiLockAlt,
 } from "react-icons/bi";
 
 export const NAV_ICONS = {
   overview: BiGridAlt,
   hackathons: BiCalendarEvent,
+  "attack-defence": BiShieldQuarter,
   challenges: BiFlag,
   teams: BiGroup,
   catalog: BiCollection,
@@ -59,6 +62,7 @@ export const NAV_ICONS = {
   "system-audit": BiClipboard,
   "system-activity": BiPulse,
   "system-groups": BiCollection,
+  "system-referer-gate": BiLockAlt,
 } as const satisfies Record<string, IconType>;
 
 export type NavIconName = keyof typeof NAV_ICONS;

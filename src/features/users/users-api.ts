@@ -128,16 +128,30 @@ export function updateEventUser(
   options?: { file?: File | null; clearMedia?: boolean },
 ) {
   const path = `hackathons/${hackathonId}/users/${userId}`;
+  const safeBody: EventUserUpdateInput = { ...body };
+  const pw = typeof safeBody.password === "string" ? safeBody.password.trim() : "";
+  if (!pw || pw.toLowerCase() === "undefined" || pw.toLowerCase() === "null") {
+    delete safeBody.password;
+  } else {
+    safeBody.password = pw;
+  }
   const needsMultipart = Boolean(options?.file || options?.clearMedia);
   if (!needsMultipart) {
-    return haasSend<EventUser>(path, { method: "PATCH", body });
+    return haasSend<EventUser>(path, { method: "PATCH", body: safeBody });
   }
   return haasSend<EventUser>(path, {
     method: "PATCH",
-    body: toFormData(body as Record<string, unknown>, {
-      file: options?.file,
-      flags: { clear_media: options?.clearMedia },
-    }),
+    body: toFormData(
+      Object.fromEntries(
+        Object.entries(safeBody as Record<string, unknown>).filter(
+          ([, v]) => v !== undefined,
+        ),
+      ),
+      {
+        file: options?.file,
+        flags: { clear_media: options?.clearMedia },
+      },
+    ),
   });
 }
 

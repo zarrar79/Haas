@@ -40,6 +40,7 @@ export function LoginForm() {
       await callAppApi<ApiResult<LoginSuccessData>>("/api/auth/login", {
         method: "POST",
         body: { email, password },
+        skipAuthRedirect: true,
       });
       hardReloadApplication("/home");
     } catch (error) {

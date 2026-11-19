@@ -23,6 +23,8 @@ type Props = {
   state: UserProfileEditState;
   onChange: (next: UserProfileEditState) => void;
   mode: "create" | "edit";
+  /** Platform admins may change a user's email; event admins may not. */
+  emailEditable?: boolean;
   password?: string;
   onPasswordChange?: (value: string) => void;
   mediaUrl?: string | null;
@@ -44,6 +46,7 @@ export function UserProfileEditFields({
   state,
   onChange,
   mode,
+  emailEditable = false,
   password = "",
   onPasswordChange,
   mediaUrl = null,
@@ -139,7 +142,7 @@ export function UserProfileEditFields({
             name="email"
             type="email"
             value={state.email}
-            disabled={mode === "edit"}
+            disabled={mode === "edit" && !emailEditable}
             onChange={(e) => patch({ email: e.target.value })}
           />
           <TextField
@@ -162,9 +165,11 @@ export function UserProfileEditFields({
               label="New password (optional)"
               name="new_password"
               type="password"
+              autoComplete="new-password"
               className="sm:col-span-2"
               value={password}
               onChange={(e) => onPasswordChange?.(e.target.value)}
+              placeholder="Leave blank to keep current password"
             />
           )}
           <TextField

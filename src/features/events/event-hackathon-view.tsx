@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { EventHackathonDetailsPanel } from "@/features/events/event-hackathon-details-panel";
+import { EventHackathonRosterPanel } from "@/features/events/event-hackathon-roster-panel";
 import { HackathonPicker } from "@/features/events/hackathon-picker";
 import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { getHackathon } from "@/features/hackathons/hackathon-api";
@@ -18,13 +19,19 @@ import { redirectIfUnauthorized } from "@/lib/client-api";
 import { hackathonLabel } from "@/lib/display-name";
 import type { Hackathon } from "@/types/hackathon";
 
-type Tab = "details" | "staff" | "organizations" | "sponsors";
+type Tab = "details" | "roster" | "staff" | "organizations" | "sponsors";
 
 const TABS: { id: Tab; label: string; description: string }[] = [
   {
     id: "details",
     label: "Details",
     description: "Name, schedule, status, main admins, and primary attachments.",
+  },
+  {
+    id: "roster",
+    label: "Teams & challenges",
+    description:
+      "Compare available vs playing-roster teams and challenges. Add or remove from the live event.",
   },
   {
     id: "staff",
@@ -49,6 +56,7 @@ function parseTab(value: string | null): Tab {
     value === "organizations" ||
     value === "sponsors" ||
     value === "staff" ||
+    value === "roster" ||
     value === "details"
   ) {
     return value;
@@ -121,8 +129,8 @@ export function EventHackathonView({ hackathonId }: Props) {
         title="Hackathon"
         description={
           hackathon
-            ? `Manage ${hackathonLabel(hackathon)} — details, staff roles, organizations, and sponsors.`
-            : "Edit this event and manage staff, organizations, and sponsors."
+            ? `Manage ${hackathonLabel(hackathon)} — details, playing roster, staff, organizations, and sponsors.`
+            : "Edit this event and manage roster, staff, organizations, and sponsors."
         }
       />
 
@@ -158,6 +166,9 @@ export function EventHackathonView({ hackathonId }: Props) {
           hackathonId={activeId}
           onSaved={(h) => setHackathon(h)}
         />
+      ) : null}
+      {tab === "roster" ? (
+        <EventHackathonRosterPanel hackathonId={activeId} />
       ) : null}
       {tab === "staff" ? <EventStaffRolesPanel hackathonId={activeId} /> : null}
       {tab === "organizations" ? (

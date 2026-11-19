@@ -22,7 +22,7 @@ import {
   ListPageStats,
   ListPageStatsDot,
 } from "@/components/ui/list-page-stats";
-import { FormSelect, FormTextarea } from "@/components/ui/form-fields";
+import { FormCheckbox, FormSelect, FormTextarea } from "@/components/ui/form-fields";
 import { FormSkeleton } from "@/components/ui/skeleton";
 import { FilterSelect, FilterTextField, StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { TextField } from "@/components/ui/text-field";
@@ -31,17 +31,23 @@ import { useSelectedEvent } from "@/features/events/selected-event-context";
 import { useEffectiveHackathonId } from "@/features/events/use-effective-hackathon-id";
 import { useHaasAccess } from "@/features/auth/haas-access-context";
 import { useSectionSearch, applySectionSearch, teamRowSearchParts } from "@/features/search/section-search";
+import {
+  listReferers,
+  type RefererItem,
+} from "@/features/catalog/catalog-api";
 import { listHackathons } from "@/features/hackathons/hackathon-api";
 import {
+  applyTeamNetworkPolicyEnsuringPool,
   attachTeam,
   blockTeam,
   createTeam,
+  deleteTeamNetworkPolicy,
   detachTeamFromHackathon,
   getTeam,
-  listAllTeams,
+  listPlatformTeams,
   listPlayingTeams,
-  listTeams,
   provisionTeamIpPool,
+  removeTeamMember,
   setTeamActive,
   unblockTeam,
   updateTeam,
@@ -53,6 +59,7 @@ import {
   MAX_TEAM_MEMBERS,
 } from "@/features/teams/add-team-member-modal";
 import { TeamEditMembersPanel } from "@/features/teams/team-edit-members-panel";
+import { TeamNetworkPolicyCell } from "@/features/teams/team-network-policy-cell";
 import { eventUserDetailPath } from "@/features/users/users-api";
 import { redirectIfUnauthorized } from "@/lib/client-api";
 import { hackathonLabel } from "@/lib/display-name";
@@ -64,7 +71,6 @@ type ActiveFilter = "all" | "active" | "inactive";
 
 type Row = EventTeam & {
   isAdded: boolean;
-  createdInName?: string | null;
 };
 
 type EventTeamsViewProps = {
@@ -82,51 +88,104 @@ function memberUserId(m: TeamMember) {
   return m.user_detail?.id || m.user || null;
 }
 
-function TeamMembersCell({
+export function TeamMembersCell({
   members,
   memberCount,
   hackathonId,
+  teamId,
+  teamName,
   canAdd,
+  canRemove,
   onAdd,
+  onRemoved,
 }: {
   members: TeamMember[];
   memberCount: number;
   hackathonId: string | null;
+  teamId?: string | null;
+  teamName?: string;
   canAdd: boolean;
+  canRemove?: boolean;
   onAdd?: () => void;
+  onRemoved?: () => void;
 }) {
+  const { confirm } = usePlatformDialog();
+  const [busyId, setBusyId] = useState<string | null>(null);
   const showAdd = canAdd && hackathonId && memberCount < MAX_TEAM_MEMBERS;
+  const showRemove = Boolean(canRemove && hackathonId && teamId);
   const visible = members.slice(0, 5);
   const extra = memberCount > visible.length ? memberCount - visible.length : 0;
 
+  async function onRemoveMember(member: TeamMember) {
+    if (!hackathonId || !teamId || busyId) return;
+    const label = memberLabel(member);
+    const ok = await confirm({
+      title: "Remove member",
+      message: `Remove ${label} from ${teamName || "this team"}? Their membership will be deactivated.`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusyId(member.id);
+    try {
+      await removeTeamMember(hackathonId, teamId, member.id);
+      onRemoved?.();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
-    <div className="max-w-[260px] flex items-center gap-2">
-      <div className="flex items-center gap-2">
-        {/* <span className="text-xs font-medium">{memberCount}</span> */}
-      </div>
+    <div className="flex max-w-[220px] items-center gap-1.5">
       {memberCount > 0 ? (
-        <div className="mt-1 flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1">
           {visible.map((member) => {
             const userId = memberUserId(member);
             const label = memberLabel(member);
+            const isBusy = busyId === member.id;
+            const chipClass =
+              "inline-flex max-w-[120px] items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold";
+            const removeBtn = showRemove ? (
+              <button
+                type="button"
+                title={`Remove ${label}`}
+                aria-label={`Remove ${label}`}
+                disabled={isBusy || busyId !== null}
+                className="ml-0.5 inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[11px] leading-none text-[var(--text-muted)] hover:bg-[var(--danger)]/15 hover:text-[var(--danger)] disabled:opacity-50"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void onRemoveMember(member);
+                }}
+              >
+                ×
+              </button>
+            ) : null;
+
             if (hackathonId && userId) {
               return (
-                <Link
+                <span
                   key={member.id}
-                  href={eventUserDetailPath(hackathonId, userId)}
-                  className="rounded-full bg-[var(--accent-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)] hover:underline"
-                  onClick={(e) => e.stopPropagation()}
+                  className={`${chipClass} bg-[var(--accent-muted)] text-[var(--accent)]`}
                 >
-                  {label}
-                </Link>
+                  <Link
+                    href={eventUserDetailPath(hackathonId, userId)}
+                    className="truncate hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {label}
+                  </Link>
+                  {removeBtn}
+                </span>
               );
             }
             return (
               <span
                 key={member.id}
-                className="rounded-full bg-[var(--surface-hover)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]"
+                className={`${chipClass} bg-[var(--surface-hover)] text-[var(--text-muted)]`}
               >
-                {label}
+                <span className="truncate">{label}</span>
+                {removeBtn}
               </span>
             );
           })}
@@ -135,31 +194,32 @@ function TeamMembersCell({
           ) : null}
         </div>
       ) : showAdd ? null : (
-        <span className="mt-1 text-[10px] text-[var(--text-muted)]">No members</span>
+        <span className="text-[10px] text-[var(--text-muted)]">No members</span>
       )}
       {showAdd && onAdd ? (
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-6 px-2 text-[10px]"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAdd();
-            }}
-          >
-            Add
-          </Button>
-        ) : null}
+        <Button
+          size="sm"
+          variant="secondary"
+          className="h-6 shrink-0 px-2 text-[10px]"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAdd();
+          }}
+        >
+          Add
+        </Button>
+      ) : null}
     </div>
   );
 }
 
-function TeamFormModal({
+export function TeamFormModal({
   open,
   mode,
   hackathonId,
   teamId,
   canManageMembers,
+  hackathons,
   onClose,
   onSaved,
 }: {
@@ -168,6 +228,8 @@ function TeamFormModal({
   hackathonId?: string | null;
   teamId?: string | null;
   canManageMembers?: boolean;
+  /** System /teams: pick which events this team is created for (multi). */
+  hackathons?: Hackathon[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -177,12 +239,22 @@ function TeamFormModal({
   const [website, setWebsite] = useState("");
   const [registerAs, setRegisterAs] = useState("red");
   const [isActive, setIsActive] = useState(true);
+  const [createdForIds, setCreatedForIds] = useState<string[]>([]);
   const [pictureUrl, setPictureUrl] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [clearPicture, setClearPicture] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const showCreatedFor = !hackathonId && Array.isArray(hackathons);
+
+  function toggleCreatedFor(id: string, checked: boolean) {
+    setCreatedForIds((prev) => {
+      if (checked) return prev.includes(id) ? prev : [...prev, id];
+      return prev.filter((x) => x !== id);
+    });
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -196,6 +268,7 @@ function TeamFormModal({
       setWebsite("");
       setRegisterAs("red");
       setIsActive(true);
+      setCreatedForIds([]);
       setPictureUrl(null);
       setLoading(false);
       return;
@@ -211,6 +284,13 @@ function TeamFormModal({
         setWebsite(team.website || "");
         setRegisterAs(team.register_as || "red");
         setIsActive(team.is_active !== false);
+        const ids = new Set<string>();
+        for (const h of team.created_for || []) {
+          if (h?.id) ids.add(h.id);
+        }
+        if (team.created_in) ids.add(team.created_in);
+        if (team.created_in_hackathon?.id) ids.add(team.created_in_hackathon.id);
+        setCreatedForIds([...ids]);
         setPictureUrl(team.team_picture_url || null);
       })
       .catch((err) => {
@@ -234,6 +314,9 @@ function TeamFormModal({
     setBusy(true);
     setError(null);
     try {
+      const createdForPayload = showCreatedFor
+        ? { hackathon_ids: createdForIds }
+        : {};
       if (mode === "edit" && teamId) {
         await updateTeam(
           hackathonId,
@@ -245,6 +328,7 @@ function TeamFormModal({
             website: website.trim() || undefined,
             register_as: registerAs || undefined,
             is_active: isActive,
+            ...createdForPayload,
           },
           { file: imageFile, clearPicture },
         );
@@ -256,6 +340,7 @@ function TeamFormModal({
             description: description.trim() || undefined,
             affiliation: affiliation.trim() || undefined,
             register_as: registerAs || undefined,
+            ...createdForPayload,
           },
           { file: imageFile },
         );
@@ -295,7 +380,7 @@ function TeamFormModal({
             <p className="mt-1 text-xs text-[var(--text-muted)]">
               {hackathonId
                 ? "Scoped to the selected hackathon."
-                : "Platform catalog (Root / system.admin)."}
+                : "Platform catalog (Root / system.admin). The same team can be created for multiple hackathons."}
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
@@ -324,6 +409,44 @@ function TeamFormModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
+              {showCreatedFor ? (
+                <div className="space-y-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg)] p-3">
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text)]">
+                      Created for hackathons
+                    </p>
+                    <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                      Catalog events only — does not add the team to any live
+                      playing roster. Use Playing in / Add to hackathon for that.
+                    </p>
+                  </div>
+                  <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                    {(hackathons || []).length === 0 ? (
+                      <p className="text-xs text-[var(--text-muted)]">
+                        No hackathons available.
+                      </p>
+                    ) : (
+                      (hackathons || []).map((h) => (
+                        <FormCheckbox
+                          key={h.id}
+                          label={hackathonLabel(h)}
+                          checked={createdForIds.includes(h.id)}
+                          onChange={(checked) => toggleCreatedFor(h.id, checked)}
+                        />
+                      ))
+                    )}
+                  </div>
+                  {createdForIds.length > 0 ? (
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      {createdForIds.length} selected
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      None selected — platform-only until linked to an event.
+                    </p>
+                  )}
+                </div>
+              ) : null}
               <FormSelect
                 label="Register as"
                 value={registerAs}
@@ -413,6 +536,7 @@ export function EventTeamsView({
   const effectiveHackathonId = useEffectiveHackathonId();
 
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
+  const [referers, setReferers] = useState<RefererItem[]>([]);
   const [activeId, setActiveId] = useState(
     hackathonIdProp || effectiveHackathonId || "",
   );
@@ -423,6 +547,7 @@ export function EventTeamsView({
   const [membership, setMembership] = useState<MembershipFilter>("all");
   const [sideFilter, setSideFilter] = useState<SideFilter>("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
+  const [refererFilter, setRefererFilter] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -454,8 +579,12 @@ export function EventTeamsView({
   useEffect(() => {
     void (async () => {
       try {
-        const { items } = await listHackathons({ show_deleted: "false" });
+        const [{ items }, refererRows] = await Promise.all([
+          listHackathons({ show_deleted: "false" }),
+          listReferers().catch(() => [] as RefererItem[]),
+        ]);
         setHackathons(items);
+        setReferers(refererRows);
       } catch (err) {
         redirectIfUnauthorized(err, router);
       }
@@ -472,9 +601,10 @@ export function EventTeamsView({
           : activeFilter === "inactive"
             ? "false"
             : undefined,
+      referer: refererFilter || undefined,
       limit: "100",
     }),
-    [debouncedSearch, sideFilter, activeFilter],
+    [debouncedSearch, sideFilter, activeFilter, refererFilter],
   );
 
   const load = useCallback(async () => {
@@ -489,45 +619,34 @@ export function EventTeamsView({
     setInfo(null);
 
     try {
-      let allTeams: EventTeam[] = await listAllTeams({
+      // Full catalog for this event: created-for (playing_hackathon) ∪ live roster (M2M).
+      const catalog = await listPlatformTeams({
         ...apiFilters,
         hackathon: activeId,
       });
 
-      const eventCatalog = await listTeams(activeId, {
-        search: debouncedSearch || undefined,
-        limit: "100",
-      });
-      for (const team of eventCatalog) {
-        if (!allTeams.some((t) => t.id === team.id)) {
-          allTeams.push(team);
-        }
-      }
-
       const playing = await listPlayingTeams(activeId, {
         search: debouncedSearch || undefined,
-        limit: "100",
+        limit: "500",
       });
       const addedIds = new Set(playing.map((t) => t.id));
 
-      setCatalogLimited(false);
-
-      const merged = new Map<string, Row>();
-      for (const team of allTeams) {
-        merged.set(team.id, {
-          ...team,
-          isAdded: addedIds.has(team.id),
-          createdInName:
-            team.created_in_hackathon?.display_name ||
-            team.created_in_hackathon?.name ||
-            null,
-        });
+      // Ensure every playing-roster team appears even if catalog pagination/filters missed it.
+      const byId = new Map<string, EventTeam>();
+      for (const team of catalog) byId.set(team.id, team);
+      for (const team of playing) {
+        if (!byId.has(team.id)) byId.set(team.id, team);
       }
 
+      setCatalogLimited(false);
+
+      const merged = Array.from(byId.values()).map((team) => ({
+        ...team,
+        isAdded: addedIds.has(team.id),
+      }));
+
       setRows(
-        Array.from(merged.values()).sort((a, b) =>
-          (a.name || "").localeCompare(b.name || ""),
-        ),
+        merged.sort((a, b) => (a.name || "").localeCompare(b.name || "")),
       );
     } catch (err) {
       if (redirectIfUnauthorized(err, router)) return;
@@ -571,6 +690,7 @@ export function EventTeamsView({
     setMembership("all");
     setSideFilter("");
     setActiveFilter("all");
+    setRefererFilter("");
   }
 
   function onHackathonChange(nextId: string) {
@@ -667,6 +787,65 @@ export function EventTeamsView({
     }
   }
 
+  async function onApplyPolicy(row: Row) {
+    setBusyId(row.id);
+    setError(null);
+    setInfo(null);
+    try {
+      await applyTeamNetworkPolicyEnsuringPool(scopeHackathonId(), row);
+      setInfo(`Network policy applied for "${row.name}".`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to apply network policy");
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function onDeletePolicy(row: Row) {
+    const ok = await confirm({
+      title: "Delete network policy",
+      message: `Delete the network policy for "${row.name}"?`,
+      confirmLabel: "Delete policy",
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusyId(row.id);
+    setError(null);
+    setInfo(null);
+    try {
+      await deleteTeamNetworkPolicy(scopeHackathonId(), row.id);
+      setInfo(`Network policy deleted for "${row.name}".`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete network policy");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function bulkPolicy(action: "apply" | "delete") {
+    const ids = selectedRows.map((r) => r.id);
+    if (ids.length === 0) return;
+    if (action === "delete") {
+      const ok = await confirm({
+        title: "Delete network policy",
+        message: `Delete the network policy for ${ids.length} team(s)?`,
+        confirmLabel: "Delete policy",
+        destructive: true,
+      });
+      if (!ok) return;
+    }
+    const byId = new Map(selectedRows.map((r) => [r.id, r]));
+    void runBulk(action === "apply" ? "Apply policy" : "Delete policy", ids, (id) =>
+      (action === "apply"
+        ? applyTeamNetworkPolicyEnsuringPool(scopeHackathonId(), byId.get(id)!)
+        : deleteTeamNetworkPolicy(scopeHackathonId(), id)
+      ).then(() => undefined),
+    );
+  }
+
   async function onBlock(row: Row) {
     if (!activeId) return;
     const reason = await prompt({
@@ -704,9 +883,9 @@ export function EventTeamsView({
   async function onRemoveFromHackathon(row: Row) {
     if (!activeId) return;
     const ok = await confirm({
-      title: "Remove from event",
-      message: `Remove team "${row.name}" from this hackathon? You can Add it again anytime.`,
-      confirmLabel: "Remove",
+      title: "Remove playing approval",
+      message: `Remove playing approval for team "${row.name}" on this hackathon? You can approve it again anytime.`,
+      confirmLabel: "Remove approval",
       destructive: true,
     });
     if (!ok) {
@@ -797,15 +976,15 @@ export function EventTeamsView({
       return;
     }
     const ok = await confirm({
-      title: "Remove from event",
-      message: `Remove ${ids.length} team(s) from this hackathon? You can Add them again later.`,
-      confirmLabel: "Remove",
+      title: "Remove playing approval",
+      message: `Remove playing approval for ${ids.length} team(s) on this hackathon? You can approve them again later.`,
+      confirmLabel: "Remove approval",
       destructive: true,
     });
     if (!ok) {
       return;
     }
-    void runBulk("Remove", ids, (id) =>
+    void runBulk("Remove playing approval", ids, (id) =>
       detachTeamFromHackathon(activeId, id).then(() => undefined),
     );
   }
@@ -817,7 +996,8 @@ export function EventTeamsView({
     Boolean(focusId) ||
     membership !== "all" ||
     Boolean(sideFilter) ||
-    activeFilter !== "all";
+    activeFilter !== "all" ||
+    Boolean(refererFilter);
 
   return (
     <div className="w-full">
@@ -838,10 +1018,10 @@ export function EventTeamsView({
             <ListPageStatsDot />
             <ListPageStat label="Shown" value={shownCount} />
             <ListPageStatsDot />
-            <ListPageStat label="Added" value={addedCount} tone="accent" />
+            <ListPageStat label="Approved" value={addedCount} tone="accent" />
             <ListPageStatsDot />
             <ListPageStat
-              label="Not added"
+              label="Not approved"
               value={notAddedCount}
               tone="warning"
             />
@@ -884,13 +1064,13 @@ export function EventTeamsView({
         />
 
         <FilterSelect
-          label="Membership"
+          label="Approved For Playing"
           value={membership}
           onChange={(v) => setMembership(v as MembershipFilter)}
         >
           <option value="all">All</option>
-          <option value="added">Added</option>
-          <option value="not_added">Not added</option>
+          <option value="added">Approved</option>
+          <option value="not_added">Not approved</option>
         </FilterSelect>
 
         <FilterSelect
@@ -912,6 +1092,20 @@ export function EventTeamsView({
           <option value="all">All</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
+        </FilterSelect>
+
+        <FilterSelect
+          label="Referer"
+          value={refererFilter}
+          onChange={setRefererFilter}
+        >
+          <option value="">All</option>
+          <option value="none">Unset</option>
+          {referers.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
         </FilterSelect>
 
         <div className="flex shrink-0 items-end gap-2 pb-0.5">
@@ -979,13 +1173,23 @@ export function EventTeamsView({
           },
           {
             id: "add",
-            label: "Add to event",
+            label: "Approve for playing",
             onClick: bulkAdd,
           },
           {
             id: "remove",
-            label: "Remove from event",
+            label: "Remove playing approval",
             onClick: bulkRemoveFromEvent,
+          },
+          {
+            id: "policy-apply",
+            label: "Apply policy",
+            onClick: () => void bulkPolicy("apply"),
+          },
+          {
+            id: "policy-delete",
+            label: "Delete policy",
+            onClick: () => void bulkPolicy("delete"),
           },
         ]}
       />
@@ -1008,9 +1212,10 @@ export function EventTeamsView({
           {
             key: "name",
             header: "Team",
+            className: "min-w-[10rem]",
             render: (row) => (
               <div
-                className={`flex items-center gap-3 ${!row.isAdded ? "cursor-pointer" : ""}`}
+                className={`flex items-center gap-2 ${!row.isAdded ? "cursor-pointer" : ""}`}
               >
                 <Avatar
                   src={row.team_picture_url}
@@ -1018,9 +1223,14 @@ export function EventTeamsView({
                   size="sm"
                   rounded="md"
                 />
-                <div>
-                  <div className="font-medium">{row.name}</div>
-                  <div className="font-mono text-[10px] text-[var(--text-muted)]">
+                <div className="min-w-0">
+                  <div className="max-w-[9rem] truncate text-sm font-medium">
+                    {row.name}
+                  </div>
+                  <div
+                    className="max-w-[9rem] truncate font-mono text-[10px] text-[var(--text-muted)]"
+                    title={row.team_code || row.id}
+                  >
                     {row.team_code || row.id}
                   </div>
                 </div>
@@ -1029,27 +1239,35 @@ export function EventTeamsView({
           },
           {
             key: "ip_pool",
-            header: "IP pool",
+            header: "IP",
+            className: "max-w-[7.5rem]",
             render: (row) => {
-              const pool =
-                row.ip_pool || row.pool_ip || row.subnet || null;
+              const pool = row.ip_pool || row.pool_ip || row.subnet || null;
               const eventId = teamHackathonId(row);
               const canAssign =
                 !pool &&
                 !row.is_blocked &&
                 Boolean(eventId && canMutateEvent(eventId));
               if (pool) {
-                return <span className="font-mono text-xs">{pool}</span>;
+                return (
+                  <span
+                    className="block max-w-[7rem] truncate font-mono text-[11px]"
+                    title={pool}
+                  >
+                    {pool}
+                  </span>
+                );
               }
               if (canAssign) {
                 return (
                   <Button
                     size="sm"
                     variant="secondary"
+                    className="h-6 px-2 text-[10px]"
                     disabled={busyId === row.id}
                     onClick={() => void onAssignPool(row)}
                   >
-                    {busyId === row.id ? "Assigning…" : "Assign pool"}
+                    {busyId === row.id ? "…" : "Assign"}
                   </Button>
                 );
               }
@@ -1058,16 +1276,35 @@ export function EventTeamsView({
           },
           {
             key: "namespace",
-            header: "Namespace",
+            header: "NS",
+            className: "max-w-[7rem]",
             render: (row) => (
-              <span className="font-mono text-xs">
+              <span
+                className="block max-w-[6.5rem] truncate font-mono text-[11px]"
+                title={row.namespace || row.name_code || undefined}
+              >
                 {row.namespace || row.name_code || "—"}
               </span>
             ),
           },
           {
+            key: "network_policy",
+            header: "Policy",
+            render: (row) => (
+              <TeamNetworkPolicyCell
+                team={row}
+                busy={busyId === row.id}
+                canManage={Boolean(activeId && canMutateEvent(activeId))}
+                onApply={() => void onApplyPolicy(row)}
+                onDelete={() => void onDeletePolicy(row)}
+              />
+            ),
+          },
+          {
             key: "members",
             header: "Members",
+            wrap: true,
+            className: "min-w-[9rem] max-w-[14rem]",
             render: (row) => {
               const members = row.members || [];
               const count =
@@ -1083,7 +1320,10 @@ export function EventTeamsView({
                   members={members}
                   memberCount={count}
                   hackathonId={eventId || null}
+                  teamId={row.id}
+                  teamName={row.name || row.team_code || "Team"}
                   canAdd={Boolean(eventId && canMutateEvent(eventId))}
+                  canRemove={Boolean(eventId && canMutateEvent(eventId))}
                   onAdd={
                     eventId
                       ? () =>
@@ -1095,15 +1335,16 @@ export function EventTeamsView({
                           })
                       : undefined
                   }
+                  onRemoved={() => void load()}
                 />
               );
             },
           },
           {
-            key: "created_in",
-            header: "Created in",
+            key: "referer",
+            header: "Referer",
             render: (row) =>
-              row.createdInName || (
+              row.referer_detail?.name || row.referer_detail?.slug || (
                 <span className="text-[var(--text-muted)]">—</span>
               ),
           },
@@ -1123,17 +1364,18 @@ export function EventTeamsView({
           },
           {
             key: "membership",
-            header: "In this hackathon",
+            header: "Playing",
             render: (row: Row) =>
               row.isAdded ? (
-                <Badge tone="success">Added</Badge>
+                <Badge tone="success">Approved</Badge>
               ) : (
-                <Badge tone="warning">Not added</Badge>
+                <Badge tone="warning">Not approved</Badge>
               ),
           },
           {
             key: "actions",
             header: "",
+            sticky: "right",
             className: "text-right w-12",
             render: (row) => (
               <RowActionsMenu
@@ -1168,7 +1410,10 @@ export function EventTeamsView({
                             },
                         {
                           id: "remove",
-                          label: busyId === row.id ? "Removing…" : "Remove",
+                          label:
+                            busyId === row.id
+                              ? "Removing…"
+                              : "Remove playing approval",
                           disabled: busyId === row.id,
                           onClick: () => void onRemoveFromHackathon(row),
                         },
@@ -1176,7 +1421,8 @@ export function EventTeamsView({
                     : [
                         {
                           id: "add",
-                          label: busyId === row.id ? "Adding…" : "Add",
+                          label:
+                            busyId === row.id ? "Approving…" : "Approve for playing",
                           disabled: busyId === row.id,
                           onClick: () => void onAdd(row.id),
                         },

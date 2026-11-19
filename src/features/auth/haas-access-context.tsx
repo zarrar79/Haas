@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -24,7 +24,11 @@ import {
   type HaasMePayload,
 } from "@/lib/haas-access";
 import type { HaasCapabilityName } from "@/lib/haas-capabilities";
-import { ApiRequestError, callAppApi } from "@/lib/client-api";
+import {
+  callAppApi,
+  handleClientUnauthorized,
+  isUnauthorizedError,
+} from "@/lib/client-api";
 import { clearClientSessionStorage } from "@/lib/client-session";
 import type { ApiResult } from "@/types";
 
@@ -50,7 +54,6 @@ type HaasAccessContextValue = {
 const HaasAccessContext = createContext<HaasAccessContextValue | null>(null);
 
 export function HaasAccessProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const pathname = usePathname();
   const [me, setMe] = useState<HaasMePayload | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,17 +67,23 @@ export function HaasAccessProvider({ children }: { children: ReactNode }) {
       );
       if (result.ok) {
         setMe(result.data.data);
-      }
-    } catch (error) {
-      if (error instanceof ApiRequestError && error.httpStatus === 401) {
+      } else {
+        // Session cookie present but /me rejected — force login.
         clearClientSessionStorage();
         setMe(null);
-        router.replace("/login");
+        handleClientUnauthorized();
+      }
+    } catch (error) {
+      setMe(null);
+      if (isUnauthorizedError(error)) {
+        // callAppApi already triggers logout + hard reload.
+        clearClientSessionStorage();
+        return;
       }
     } finally {
       setIsLoading(false);
     }
-  }, [router]);
+  }, []);
 
   const clearSession = useCallback(() => {
     setMe(null);

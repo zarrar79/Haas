@@ -1,4 +1,8 @@
-import { callAppApi } from "@/lib/client-api";
+import {
+  ApiRequestError,
+  callAppApi,
+  isAuthFailure,
+} from "@/lib/client-api";
 import type { ApiResult } from "@/types";
 
 export type HaasQuery = Record<string, string | undefined | null>;
@@ -47,7 +51,12 @@ export function unwrapHaasResult<T>(
   result: ApiResult<HaasForwardPayload<T>>,
 ): HaasUnwrapped<T> {
   if (!result.ok) {
-    throw new Error(result.message || "Request failed");
+    const message = result.message || "Request failed";
+    throw new ApiRequestError(
+      message,
+      isAuthFailure(400, message, result) ? 401 : 400,
+      result,
+    );
   }
   return {
     data: result.data.data,
@@ -95,6 +104,25 @@ export async function haasListPage<T>(path: string, query?: HaasQuery) {
   };
 }
 
+/** Walk every page of a paginated list (backend caps page size at 100). */
+export async function haasListAll<T>(
+  path: string,
+  query?: HaasQuery,
+  maxPages = 50,
+): Promise<T[]> {
+  const items: T[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const res = await haasListPage<T>(path, {
+      limit: "100",
+      ...query,
+      page: String(page),
+    });
+    items.push(...res.items);
+    if (!res.pagination?.next) break;
+  }
+  return items;
+}
+
 export async function haasSend<T>(
   path: string,
   options: HaasRequestOptions,
@@ -107,6 +135,7 @@ export function appendFormFields(
   body: Record<string, unknown>,
 ): FormData {
   for (const [key, value] of Object.entries(body)) {
+    // Never stringify undefined → "undefined" (that previously reset passwords).
     if (value === undefined) continue;
     if (value !== null && typeof value === "object") {
       form.append(key, JSON.stringify(value));

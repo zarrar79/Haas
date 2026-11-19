@@ -49,7 +49,12 @@ type DataTableProps<T> = {
   selectable?: boolean;
   selectedKeys?: Set<string>;
   onSelectionChange?: (next: Set<string>) => void;
+  onRowClick?: (row: T) => void;
   onRowDoubleClick?: (row: T) => void;
+  /** Jump pagination to the page containing this row key. */
+  focusRowKey?: string | null;
+  /** Apply highlight/blink styling to this row key. */
+  highlightedRowKey?: string | null;
   /** Client-side pagination (default true). */
   paginate?: boolean;
   pageSizeOptions?: readonly number[];
@@ -67,7 +72,10 @@ export function DataTable<T>({
   selectable = false,
   selectedKeys,
   onSelectionChange,
+  onRowClick,
   onRowDoubleClick,
+  focusRowKey = null,
+  highlightedRowKey = null,
   paginate = true,
   pageSizeOptions = TABLE_PAGE_SIZE_OPTIONS,
   defaultPageSize = DEFAULT_TABLE_PAGE_SIZE,
@@ -79,8 +87,15 @@ export function DataTable<T>({
   const [pageSize, setPageSize] = useState(defaultPageSize);
 
   useEffect(() => {
+    if (focusRowKey) {
+      const idx = rows.findIndex((row) => rowKey(row) === focusRowKey);
+      if (idx >= 0) {
+        setPage(Math.floor(idx / pageSize) + 1);
+        return;
+      }
+    }
     setPage(1);
-  }, [rows, pageSize]);
+  }, [rows, pageSize, focusRowKey, rowKey]);
 
   const total = rows.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
@@ -154,7 +169,7 @@ export function DataTable<T>({
             <thead className="border-b border-[var(--border-strong)] bg-[var(--surface-raised)] text-xs uppercase tracking-wide text-[var(--text-subtle)]">
               <tr>
                 {selectable ? (
-                  <th className="sticky left-0 z-10 w-10 whitespace-nowrap bg-[var(--surface-raised)] px-3 py-3">
+                  <th className="sticky left-0 z-10 w-10 whitespace-nowrap bg-[var(--surface-raised)] px-2.5 py-2.5">
                     <input
                       type="checkbox"
                       aria-label="Select all rows"
@@ -169,7 +184,7 @@ export function DataTable<T>({
                 {columns.map((column) => (
                   <th
                     key={column.key}
-                    className={`whitespace-nowrap px-4 py-3 font-semibold ${column.className ?? ""} ${
+                    className={`whitespace-nowrap px-3 py-2.5 font-semibold ${column.className ?? ""} ${
                       isStickyActionsColumn(column) ? TABLE_STICKY_ACTIONS_CLASS : ""
                     }`}
                   >
@@ -182,17 +197,24 @@ export function DataTable<T>({
               {pageRows.map((row) => {
                 const key = rowKey(row);
                 const isSelected = selected.has(key);
+                const isHighlighted = Boolean(
+                  highlightedRowKey && highlightedRowKey === key,
+                );
                 return (
                   <tr
                     key={key}
                     data-selected={isSelected ? "true" : undefined}
+                    data-highlighted={isHighlighted ? "true" : undefined}
+                    onClick={() => onRowClick?.(row)}
                     onDoubleClick={() => onRowDoubleClick?.(row)}
                     className={`group border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface-hover)] ${
-                      isSelected ? "bg-[var(--accent-muted)]" : ""
+                      onRowClick ? "cursor-pointer" : ""
+                    } ${isSelected ? "bg-[var(--accent-muted)]" : ""} ${
+                      isHighlighted ? "animate-row-blink" : ""
                     }`}
                   >
                     {selectable ? (
-                      <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface)] px-3 py-3 group-hover:bg-[var(--surface-hover)] group-data-[selected=true]:bg-[var(--accent-muted)]">
+                      <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--surface)] px-2.5 py-2.5 group-hover:bg-[var(--surface-hover)] group-data-[selected=true]:bg-[var(--accent-muted)]">
                         <input
                           type="checkbox"
                           aria-label={`Select row ${key}`}
@@ -205,8 +227,10 @@ export function DataTable<T>({
                     {columns.map((column) => (
                       <td
                         key={column.key}
-                        className={`px-4 py-3 align-middle text-[var(--text)] ${
-                          column.wrap ? "whitespace-normal" : "whitespace-nowrap"
+                        className={`px-3 py-2.5 align-middle text-[var(--text)] ${
+                          column.wrap
+                            ? "!whitespace-normal break-words"
+                            : "whitespace-nowrap"
                         } ${column.className ?? ""} ${
                           isStickyActionsColumn(column) ? TABLE_STICKY_ACTIONS_CLASS : ""
                         }`}

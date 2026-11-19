@@ -241,19 +241,29 @@ export async function getConsolidatedOverviewBundle(
   const period = filters?.period ?? "7d";
   const limit = filters?.limit ?? "15";
   const intervals = filters?.intervals;
+  const eventId = filters?.event_id;
+  const scoped = { event_id: eventId };
 
   const [kpis, activity, leaderboard, topChallenges, difficultyMix, submissions] =
     await Promise.all([
-      getDashboardSection<OverviewKpis>("kpis", { period }),
+      getDashboardSection<OverviewKpis>("kpis", { period, ...scoped }),
       getDashboardSection<OverviewActivityTimeline>("activity-timeline", {
         period,
         intervals,
+        ...scoped,
       }),
-      getDashboardSection<OverviewLeaderboard>("leaderboard", { limit }),
-      getDashboardSection<OverviewTopChallenges>("top-challenges", { limit }),
-      getDashboardSection<OverviewDifficultyMix>("difficulty-mix"),
+      getDashboardSection<OverviewLeaderboard>("leaderboard", {
+        limit,
+        ...scoped,
+      }),
+      getDashboardSection<OverviewTopChallenges>("top-challenges", {
+        limit,
+        ...scoped,
+      }),
+      getDashboardSection<OverviewDifficultyMix>("difficulty-mix", scoped),
       getDashboardSection<OverviewSubmissionsSummary>("submissions-summary", {
         period,
+        ...scoped,
       }),
     ]);
 

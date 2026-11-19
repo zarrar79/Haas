@@ -6,13 +6,17 @@ import path from "path";
 /**
  * Resolve media roots the same way as user-blue-team:
  * NFS / shared mount first (DJ_MEDIA_ROOT or cyberrange/uploads → /mnt/shared/uploads).
+ *
+ * Roots are joined under known prefixes so Turbopack can scope tracing;
+ * runtime fs reads use turbopackIgnore (NFS paths are not part of the image).
  */
 export function getMediaRoots(): string[] {
+  const cwd = process.cwd();
   const roots = [
     process.env.DJ_MEDIA_ROOT,
     process.env.UPLOADS_PATH,
-    path.resolve(process.cwd(), "../cyberrange/uploads"),
-    path.resolve(process.cwd(), "uploads"),
+    path.join(cwd, "..", "cyberrange", "uploads"),
+    path.join(cwd, "uploads"),
   ].filter((root): root is string => Boolean(root && root.trim()));
 
   const resolved: string[] = [];
@@ -76,11 +80,15 @@ export function readMediaFromNfs(
     ) {
       continue;
     }
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isFile()) {
+    // NFS / external mounts — do not include in Turbopack file tracing
+    if (
+      !fs.existsSync(/*turbopackIgnore: true*/ fullPath) ||
+      !fs.statSync(/*turbopackIgnore: true*/ fullPath).isFile()
+    ) {
       continue;
     }
     return {
-      buffer: fs.readFileSync(fullPath),
+      buffer: fs.readFileSync(/*turbopackIgnore: true*/ fullPath),
       contentType: contentTypeFromExt(fullPath),
       fullPath,
     };

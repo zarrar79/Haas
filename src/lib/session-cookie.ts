@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
 
-/** HttpOnly cookie that stores the Django JWT on the BFF.
- *  Same name/flags as dashboard-clone so both apps share the session on one host. */
-export const SESSION_COOKIE_NAME = "session_token";
+import { SESSION_COOKIE_NAME } from "@/lib/session-cookie-name";
+
+export { SESSION_COOKIE_NAME };
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
 

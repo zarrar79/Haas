@@ -13,6 +13,7 @@ import { StickyToolbar } from "@/components/ui/sticky-toolbar";
 import { SystemActivityView } from "@/features/system/system-activity-view";
 import { SystemAdminsSection } from "@/features/system/system-admins-section";
 import { SystemGroupsView } from "@/features/system/system-groups-view";
+import { SystemRefererGateView } from "@/features/system/system-referer-gate-view";
 import { SystemUsersView } from "@/features/system/system-users-view";
 import {
   getSystemStats,
@@ -21,7 +22,14 @@ import {
 } from "@/features/system/system-api";
 import { redirectIfUnauthorized } from "@/lib/client-api";
 
-type Section = "stats" | "users" | "admins" | "audit" | "activity" | "groups";
+type Section =
+  | "stats"
+  | "users"
+  | "admins"
+  | "audit"
+  | "activity"
+  | "groups"
+  | "referer-gate";
 
 type Props = { section?: string };
 
@@ -32,7 +40,8 @@ export function SystemConsoleView({ section }: Props) {
     section === "admins" ||
     section === "audit" ||
     section === "activity" ||
-    section === "groups"
+    section === "groups" ||
+    section === "referer-gate"
       ? section
       : "stats";
 
@@ -67,6 +76,11 @@ export function SystemConsoleView({ section }: Props) {
     { id: "audit", href: "/system/audit", label: "Audit" },
     { id: "activity", href: "/system/activity", label: "Activity" },
     { id: "groups", href: "/system/groups", label: "Groups" },
+    {
+      id: "referer-gate",
+      href: "/system/referer-gate",
+      label: "Referer gate",
+    },
   ] as const;
 
   const showLegacyLoader =
@@ -125,6 +139,7 @@ export function SystemConsoleView({ section }: Props) {
       {active === "admins" ? <SystemAdminsSection /> : null}
       {active === "activity" ? <SystemActivityView /> : null}
       {active === "groups" ? <SystemGroupsView /> : null}
+      {active === "referer-gate" ? <SystemRefererGateView /> : null}
 
       {!showLegacyLoader && active === "audit" ? (
         <DataTable

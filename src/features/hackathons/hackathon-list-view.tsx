@@ -17,6 +17,8 @@ import { useSelectedEvent } from "@/features/events/selected-event-context";
 import {
   getHackathonAnalytics,
   listHackathons,
+  restoreHackathon,
+  updateHackathon,
   type HackathonAnalytics,
 } from "@/features/hackathons/hackathon-api";
 import { redirectIfUnauthorized } from "@/lib/client-api";
@@ -39,6 +41,7 @@ export function HackathonListView() {
   const [showDeleted, setShowDeleted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -79,6 +82,24 @@ export function HackathonListView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function setActive(row: Row, active: boolean) {
+    setBusyId(row.id);
+    setError(null);
+    try {
+      if (row.is_deleted && active) {
+        await restoreHackathon(row.id);
+      } else {
+        await updateHackathon(row.id, { is_active: active });
+      }
+      await load();
+    } catch (err) {
+      if (redirectIfUnauthorized(err, router)) return;
+      setError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   function goChallenges(id: string) {
     setSelectedHackathonId(id);
@@ -228,6 +249,19 @@ export function HackathonListView() {
                     label: "Enter workspace",
                     onClick: () => enterEvent(row.id),
                   },
+                  row.is_active && !row.is_deleted
+                    ? {
+                        id: "deactivate",
+                        label: "Deactivate",
+                        disabled: busyId === row.id,
+                        onClick: () => void setActive(row, false),
+                      }
+                    : {
+                        id: "activate",
+                        label: row.is_deleted ? "Restore & activate" : "Activate",
+                        disabled: busyId === row.id,
+                        onClick: () => void setActive(row, true),
+                      },
                 ]}
               />
             ),

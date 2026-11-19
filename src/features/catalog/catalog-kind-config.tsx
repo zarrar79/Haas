@@ -49,6 +49,7 @@ export const CATALOG_KINDS: { id: CatalogKind; label: string }[] = [
   { id: "hints", label: "Hints" },
   { id: "skills", label: "Skills" },
   { id: "techniques", label: "Techniques" },
+  { id: "referers", label: "Referers" },
 ];
 
 const CONFIG: Record<CatalogKind, CatalogKindMeta> = {
@@ -331,6 +332,66 @@ const CONFIG: Record<CatalogKind, CatalogKindMeta> = {
         key: "skill",
         header: "Skill",
         render: (r) => String(r.parent_tag_name ?? "—"),
+      },
+      {
+        key: "desc",
+        header: "Description",
+        render: (r) => String(r.description ?? "—"),
+      },
+      idColumn(),
+    ],
+  },
+  referers: {
+    id: "referers",
+    label: "Referers",
+    singular: "referer",
+    createTitle: "Create referer",
+    searchTitle: "Search referers",
+    createSubmitLabel: "Create (Root / system.admin)",
+    supportsSkillFilter: false,
+    fields: [
+      {
+        key: "name",
+        label: "Name",
+        kind: "text",
+        required: true,
+        placeholder: "e.g. NASCON",
+      },
+      {
+        key: "slug",
+        label: "Slug",
+        kind: "text",
+        required: true,
+        placeholder: "e.g. nascon",
+      },
+      {
+        key: "description",
+        label: "Description",
+        kind: "textarea",
+        placeholder: "Optional description",
+      },
+      {
+        key: "is_active",
+        label: "Active",
+        kind: "checkbox",
+      },
+    ],
+    buildPayload: (values) => ({
+      name: String(values.name ?? "").trim(),
+      slug: String(values.slug ?? "").trim(),
+      description: String(values.description ?? "").trim(),
+      is_active: Boolean(values.is_active),
+    }),
+    columns: [
+      {
+        key: "name",
+        header: "Name",
+        render: (r) => r.name || r.id,
+      },
+      {
+        key: "slug",
+        header: "Slug",
+        render: (r) => String(r.slug ?? "—"),
       },
       {
         key: "desc",

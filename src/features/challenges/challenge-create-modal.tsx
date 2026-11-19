@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FORM_CONTROL_CLASS } from "@/components/ui/form-control";
 import { FormSelect, FormTextarea } from "@/components/ui/form-fields";
+import { MarkdownField } from "@/components/ui/markdown-field";
 import { TextField } from "@/components/ui/text-field";
 import { FormSkeleton } from "@/components/ui/skeleton";
 import { ModalShell } from "@/components/ui/modal-shell";
@@ -180,6 +181,8 @@ export function ChallengeCreateModal({
   const [difficulty, setDifficulty] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [hintText, setHintText] = useState("");
+  const [hintVisible, setHintVisible] = useState(true);
 
   const [dockerType, setDockerType] = useState("docker");
   const [dockerOs, setDockerOs] = useState("Linux");
@@ -269,6 +272,8 @@ export function ChallengeCreateModal({
     setTechniqueIds([]);
     setIsDynamic(false);
     setIsActive(true);
+    setHintText("");
+    setHintVisible(true);
     setQuestions([{ name: "", description: "", score: "100", answer: "" }]);
   }
 
@@ -281,12 +286,22 @@ export function ChallengeCreateModal({
 
   useEffect(() => {
     if (!open) return;
-    setTargetHackathonId(
-      hackathonId || assignedHackathons[0]?.hackathon_id || "",
-    );
-  }, [open, hackathonId, assignedHackathons]);
+    // Platform operators create into the catalog; hackathon attach is optional later.
+    // Event-only admins still need an assigned event (prop or picker).
+    if (hackathonId) {
+      setTargetHackathonId(hackathonId);
+      return;
+    }
+    if (isPlatformOperator) {
+      setTargetHackathonId("");
+      return;
+    }
+    setTargetHackathonId(assignedHackathons[0]?.hackathon_id || "");
+  }, [open, hackathonId, assignedHackathons, isPlatformOperator]);
 
-  const createHackathonId = hackathonId || targetHackathonId || null;
+  const createHackathonId = isPlatformOperator
+    ? null
+    : hackathonId || targetHackathonId || null;
   const createHackathonLabel =
     assignedHackathons.find((row) => row.hackathon_id === createHackathonId)
       ?.hackathon_name || null;
@@ -323,6 +338,8 @@ export function ChallengeCreateModal({
         if (cancelled) return;
         setName(challenge.name || "");
         setDescription(challenge.description || "");
+        setHintText(challenge.hint_text || "");
+        setHintVisible(challenge.hint_text ? Boolean(challenge.hint_visible) : true);
         setChallengeType(asId(challenge.challenge_type));
         setCategory(asId(challenge.category));
         setSource(asId(challenge.challenge_source));
@@ -460,27 +477,40 @@ export function ChallengeCreateModal({
       const form = new FormData();
       form.set("name", name.trim());
       form.set("description", description.trim());
+      // Hint: empty text clears it on edit; visibility controls what players see.
+      form.set("hint_text", hintText.trim());
+      form.set("hint_visible", String(hintVisible));
       if (challengeType) form.set("challenge_type", challengeType);
       if (category) form.set("category", category);
       if (difficulty) form.set("difficulty_level", difficulty);
       if (source) form.set("challenge_source", source);
       form.set("is_dynamic", String(isDynamic));
-      form.set("challenge_for", "hackathon");
       form.set("is_active", String(isActive));
 
       if (createHackathonId) {
         form.set("hackathon", createHackathonId);
       }
 
+      // Repeated keys → QueryDict.getlist("techniques"). Backend must not use
+      // QueryDict.get() here (that returns a str and breaks many=True).
       for (const techId of techniqueIds) {
         form.append("techniques", techId);
       }
+      // Explicit empty list on edit so clearing techniques persists.
+      if (isEdit && techniqueIds.length === 0) {
+        form.set("techniques", "[]");
+      }
 
-      const hasDocker =
+      // Always send docker on dynamic create/edit so port/flag_num/os/etc. persist.
+      // Previously we only sent docker when image/machine name or a new YAML was set,
+      // so config-only edits never reached the backend.
+      const shouldSendDocker =
+        isDynamic ||
+        Boolean(dockerMedia) ||
         Boolean(dockerImageName.trim() || dockerMachineName.trim()) ||
-        Boolean(dockerMedia);
+        (isEdit && Boolean(dockerType || dockerKind || dockerPort || dockerFlagNum));
 
-      if (hasDocker) {
+      if (shouldSendDocker) {
         form.set(
           "docker",
           JSON.stringify({
@@ -499,6 +529,24 @@ export function ChallengeCreateModal({
             kind: dockerKind,
           }),
         );
+        // Flat aliases so config still updates if nested docker JSON is dropped
+        // by multipart/HTML QueryDict parsing on the backend.
+        form.set("docker_port", String(Number(dockerPort) || 80));
+        form.set("docker_flag_num", String(Number(dockerFlagNum) || 1));
+        form.set("docker_time_limit", String(Number(dockerTimeLimit) || 120));
+        form.set("docker_type", dockerType);
+        form.set("docker_os", dockerOs);
+        form.set("docker_kind", dockerKind);
+        form.set(
+          "docker_image_name",
+          dockerImageName.trim() ||
+            name.trim().toLowerCase().replace(/\s+/g, "-"),
+        );
+        form.set("docker_image_tag", dockerImageTag.trim() || "latest");
+        form.set("docker_machine_name", dockerMachineName.trim() || name.trim());
+        if (dockerMachineDescription.trim()) {
+          form.set("docker_machine_description", dockerMachineDescription.trim());
+        }
       }
 
       if (staticFile) form.set("file", staticFile);
@@ -508,12 +556,14 @@ export function ChallengeCreateModal({
         await updateChallengeMultipart(
           challengeId,
           form,
-          createHackathonId || hackathonId || null,
+          hackathonId || null,
         );
       } else {
+        // Platform operators always create into the catalog (no event bind).
+        // Attach to hackathons afterward from the Challenges table.
         const challenge = await createChallengeMultipart(
           form,
-          createHackathonId || null,
+          isPlatformOperator ? null : createHackathonId || null,
         );
 
         if (!isDynamic) {
@@ -529,7 +579,7 @@ export function ChallengeCreateModal({
                 score: Number(q.score) || 0,
                 is_active: true,
               },
-              hackathonId || createHackathonId || null,
+              isPlatformOperator ? null : hackathonId || createHackathonId || null,
             );
             await createChallengeAnswer(
               challenge.id,
@@ -538,7 +588,7 @@ export function ChallengeCreateModal({
                 answer: q.answer.trim(),
                 team: null,
               },
-              hackathonId || createHackathonId || null,
+              isPlatformOperator ? null : hackathonId || createHackathonId || null,
             );
           }
         }
@@ -721,12 +771,29 @@ export function ChallengeCreateModal({
                 />
               </div>
               <div className="sm:col-span-2">
-                <FormTextarea
+                <MarkdownField
                   label="Description"
-                  controlClassName="min-h-[100px]"
+                  controlClassName="min-h-[140px]"
                   value={description}
                   onChange={setDescription}
                 />
+              </div>
+              <div className="sm:col-span-2 space-y-2 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg)] p-4">
+                <FormTextarea
+                  label="Hint"
+                  value={hintText}
+                  onChange={setHintText}
+                  placeholder="Optional nudge for players. Leave empty for no hint."
+                  controlClassName="min-h-[90px]"
+                />
+                <label className="flex items-center gap-2 text-sm text-[var(--text)]">
+                  <input
+                    type="checkbox"
+                    checked={hintVisible}
+                    onChange={(e) => setHintVisible(e.target.checked)}
+                  />
+                  Visible to players
+                </label>
               </div>
             </div>
           ) : null}
@@ -1022,16 +1089,14 @@ export function ChallengeCreateModal({
                     }
                   />
                   <div className="sm:col-span-2">
-                    <TextField
+                    <MarkdownField
                       label="Description"
-                      name={`q_desc_${index}`}
+                      controlClassName="min-h-[100px]"
                       value={q.description}
-                      onChange={(e) =>
+                      onChange={(value) =>
                         setQuestions((prev) =>
                           prev.map((row, i) =>
-                            i === index
-                              ? { ...row, description: e.target.value }
-                              : row,
+                            i === index ? { ...row, description: value } : row,
                           ),
                         )
                       }
